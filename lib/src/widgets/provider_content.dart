@@ -30,23 +30,26 @@ class _ProviderContentState extends State<ProviderContent> {
       return _buildEmptyState();
     }
     
-    return StreamBuilder<ProviderStatus>(
-      stream: widget.provider!.statusStream,
-      initialData: widget.provider!.status,
-      builder: (context, snapshot) {
-        final status = snapshot.data ?? ProviderStatus.disconnected;
-        
-        switch (status) {
-          case ProviderStatus.connected:
-            return _buildAuthenticatedState();
-          case ProviderStatus.connecting:
-            return _buildConnectingState();
-          case ProviderStatus.error:
-            return _buildErrorState();
-          default:
-            return _buildAuthenticationScreen();
-        }
-      },
+    return Material(
+      color: widget.theme.colorScheme.background,
+      child: StreamBuilder<ProviderStatus>(
+        stream: widget.provider!.statusStream,
+        initialData: widget.provider!.status,
+        builder: (context, snapshot) {
+          final status = snapshot.data ?? ProviderStatus.disconnected;
+          
+          switch (status) {
+            case ProviderStatus.connected:
+              return _buildAuthenticatedState();
+            case ProviderStatus.connecting:
+              return _buildConnectingState();
+            case ProviderStatus.error:
+              return _buildErrorState();
+            default:
+              return _buildAuthenticationScreen();
+          }
+        },
+      ),
     );
   }
   

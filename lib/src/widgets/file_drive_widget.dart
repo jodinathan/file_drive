@@ -118,62 +118,68 @@ class _FileDriveWidgetState extends State<FileDriveWidget> {
   
   Widget _buildCompactLayout(FileDriveTheme theme) {
     // For compact layout, use tabs or drawer
-    return DefaultTabController(
-      length: widget.config.providers.length,
-      child: Column(
-        children: [
-          // Tab bar for providers
-          Container(
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(
-                  color: theme.colorScheme.onBackground.withOpacity(0.1),
+    return Material(
+      color: theme.colorScheme.background,
+      child: DefaultTabController(
+        length: widget.config.providers.length,
+        child: Column(
+          children: [
+            // Tab bar for providers
+            Material(
+              color: theme.colorScheme.surface,
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      color: theme.colorScheme.onBackground.withOpacity(0.1),
+                    ),
+                  ),
+                ),
+                child: TabBar(
+                  isScrollable: true,
+                  labelColor: theme.colorScheme.primary,
+                  unselectedLabelColor: theme.colorScheme.onBackground.withOpacity(0.6),
+                  indicatorColor: theme.colorScheme.primary,
+                  tabs: widget.config.providers.map((provider) {
+                    return Tab(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 20,
+                            height: 20,
+                            decoration: BoxDecoration(
+                              color: provider.providerColor,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.cloud,
+                              size: 12,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(provider.providerName),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  onTap: (index) {
+                    _handleProviderSelection(widget.config.providers[index]);
+                  },
                 ),
               ),
             ),
-            child: TabBar(
-              isScrollable: true,
-              labelColor: theme.colorScheme.primary,
-              unselectedLabelColor: theme.colorScheme.onBackground.withOpacity(0.6),
-              indicatorColor: theme.colorScheme.primary,
-              tabs: widget.config.providers.map((provider) {
-                return Tab(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 20,
-                        height: 20,
-                        decoration: BoxDecoration(
-                          color: provider.providerColor,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.cloud,
-                          size: 12,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(provider.providerName),
-                    ],
-                  ),
-                );
-              }).toList(),
-              onTap: (index) {
-                _handleProviderSelection(widget.config.providers[index]);
-              },
+            // Content
+            Expanded(
+              child: ProviderContent(
+                provider: _selectedProvider,
+                theme: theme,
+                onFilesSelected: widget.onFilesSelected,
+              ),
             ),
-          ),
-          // Content
-          Expanded(
-            child: ProviderContent(
-              provider: _selectedProvider,
-              theme: theme,
-              onFilesSelected: widget.onFilesSelected,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
