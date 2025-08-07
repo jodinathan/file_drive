@@ -103,6 +103,10 @@ void main() async {
 
     print('✅ Tokens obtidos com sucesso!');
     
+    // Armazenar tokens usando o state como chave
+    TokenStorage.storeToken(state, tokenResponse);
+    print('💾 Tokens armazenados para state: $state');
+    
     // Redirecionar de volta para o app com sucesso
     final successUri = Uri.parse(ServerConfig.defaultClientRedirectUri).replace(
       queryParameters: {
@@ -113,6 +117,24 @@ void main() async {
     
     print('🔄 Redirecionando para app: $successUri');
     return Response.found(successUri.toString());
+  });
+
+  // 📍 ENDPOINT: Obter tokens por state
+  app.get('/auth/tokens/<state>', (Request request, String state) async {
+    print('🔍 Solicitação de tokens para state: $state');
+    
+    final tokens = TokenStorage.getToken(state);
+    
+    if (tokens == null) {
+      print('❌ Tokens não encontrados para state: $state');
+      return Response.notFound('Tokens not found for state');
+    }
+    
+    print('✅ Tokens encontrados para state: $state');
+    return Response.ok(
+      jsonEncode(tokens),
+      headers: {'Content-Type': 'application/json'},
+    );
   });
 
   // 📍 ENDPOINT: Refresh token

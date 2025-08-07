@@ -27,7 +27,7 @@ class ServerConfig {
   
   /// 🎯 SCOPES SEGUROS
   static const List<String> defaultScopes = [
-    'https://www.googleapis.com/auth/drive.file',
+    'https://www.googleapis.com/auth/drive.readonly', // Acesso de leitura a todos os arquivos
     'https://www.googleapis.com/auth/userinfo.email',
   ];
   

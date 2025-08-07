@@ -2,9 +2,12 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
+import 'package:http/http.dart' as http;
 
+import '../../utils/constants.dart';
 import '../../models/oauth_types.dart';
 import 'cloud_provider.dart';
 
@@ -155,20 +158,46 @@ abstract class OAuthCloudProvider extends BaseCloudProvider {
       print('🔐 [OAuth] Callback parseado: success=${callback.isSuccess}, code=${callback.code?.substring(0, 10)}..., error=${callback.error}');
 
       if (callback.isSuccess && callback.code != null) {
-        print('✅ [OAuth] Código recebido do servidor! OAuth completo!');
-        // O servidor já fez a troca de tokens e está retornando o código
-        // Não precisamos fazer outra requisição HTTP
-        return AuthResult.success(
-          accessToken: 'token_from_server_${callback.code}',
-          refreshToken: 'refresh_from_server_${callback.code}',
-          expiresAt: DateTime.now().add(const Duration(hours: 1)),
-          metadata: {
-            'code': callback.code,
-            'state': callback.state,
-            'timestamp': DateTime.now().toIso8601String(),
-            'source': 'server_callback',
-          },
-        );
+        print('✅ [OAuth] Código recebido do servidor! Buscando tokens...');
+        
+        // Buscar os tokens reais do servidor usando o state
+        try {
+          final tokenResponse = await http.get(
+            Uri.parse('${ServerConfig.baseUrl}/auth/tokens/${callback.state}'),
+            headers: {'Content-Type': 'application/json'},
+          );
+
+          if (tokenResponse.statusCode == 200) {
+            final tokenData = jsonDecode(tokenResponse.body);
+            print('✅ [OAuth] Tokens obtidos do servidor!');
+            print('🔍 [OAuth] Access token: ${tokenData['access_token']?.substring(0, 20)}...');
+            print('🔍 [OAuth] Token type: ${tokenData['token_type']}');
+            print('🔍 [OAuth] Expires in: ${tokenData['expires_in']}');
+            print('🔍 [OAuth] Scopes: ${tokenData['scope']}');
+            
+            return AuthResult.success(
+              accessToken: tokenData['access_token'],
+              refreshToken: tokenData['refresh_token'],
+              expiresAt: tokenData['expires_in'] != null 
+                  ? DateTime.now().add(Duration(seconds: tokenData['expires_in']))
+                  : DateTime.now().add(const Duration(hours: 1)),
+              metadata: {
+                'code': callback.code,
+                'state': callback.state,
+                'timestamp': DateTime.now().toIso8601String(),
+                'source': 'server_token_retrieval',
+                'token_type': tokenData['token_type'] ?? 'Bearer',
+              },
+            );
+          } else {
+            print('❌ [OAuth] Erro ao buscar tokens do servidor: ${tokenResponse.statusCode}');
+            print('❌ [OAuth] Resposta: ${tokenResponse.body}');
+            return AuthResult.failure('Failed to retrieve tokens from server: ${tokenResponse.statusCode}');
+          }
+        } catch (e) {
+          print('❌ [OAuth] Erro ao buscar tokens: $e');
+          return AuthResult.failure('Token retrieval failed: $e');
+        }
       } else {
         print('❌ [OAuth] Callback com erro: ${callback.errorMessage}');
         return AuthResult.failure(callback.errorMessage);

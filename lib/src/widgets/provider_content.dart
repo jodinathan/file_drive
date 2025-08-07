@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/file_drive_config.dart';
 import '../providers/base/cloud_provider.dart';
 import 'auth_screen.dart';
+import 'file_explorer.dart';
 
 /// Content area showing provider-specific content
 class ProviderContent extends StatefulWidget {
@@ -205,164 +206,16 @@ class _ProviderContentState extends State<ProviderContent> {
   }
   
   Widget _buildAuthenticatedState() {
-    return Container(
-      color: widget.theme.colorScheme.background,
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.check_circle,
-                size: 40,
-                color: Colors.green,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Conectado com Sucesso!',
-              style: widget.theme.typography.title.copyWith(
-                color: Colors.green,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Autenticação OAuth realizada com ${widget.provider!.providerName}',
-              textAlign: TextAlign.center,
-              style: widget.theme.typography.body.copyWith(
-                color: widget.theme.colorScheme.onBackground.withOpacity(0.6),
-              ),
-            ),
-            const SizedBox(height: 16),
-            _buildConnectionInfo(),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                OutlinedButton(
-                  onPressed: () => _testConnection(),
-                  child: const Text('Testar Conexão'),
-                ),
-                const SizedBox(width: 16),
-                ElevatedButton(
-                  onPressed: () => widget.provider!.logout(),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text('Desconectar'),
-                ),
-              ],
-            ),
-          ],
-        ),
+    // Show FileExplorer directly after successful authentication
+    return FileExplorer(
+      provider: widget.provider!,
+      selectionConfig: const FileSelectionConfig(
+        allowMultipleSelection: true,
+        allowFolderSelection: true,
       ),
+      onFilesSelected: widget.onFilesSelected != null 
+        ? (files) => widget.onFilesSelected!(files.map((f) => f.id).toList())
+        : null,
     );
-  }
-  
-  Widget _buildConnectionInfo() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.symmetric(horizontal: 32),
-      decoration: BoxDecoration(
-        color: widget.theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(widget.theme.layout.borderRadius),
-        border: Border.all(
-          color: widget.theme.colorScheme.onSurface.withOpacity(0.1),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.info_outline,
-                size: 20,
-                color: widget.theme.colorScheme.primary,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Informações da Conexão',
-                style: widget.theme.typography.body.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: widget.theme.colorScheme.onSurface,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _buildInfoRow('Provedor', widget.provider!.providerName),
-          _buildInfoRow('Status', 'Autenticado'),
-          _buildInfoRow('Token', 'Válido'),
-          // Additional info for OAuth providers
-          _buildInfoRow('Tipo', 'OAuth 2.0'),
-        ],
-      ),
-    );
-  }
-  
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 80,
-            child: Text(
-              '$label:',
-              style: widget.theme.typography.caption.copyWith(
-                color: widget.theme.colorScheme.onSurface.withOpacity(0.6),
-              ),
-            ),
-          ),
-          Text(
-            value,
-            style: widget.theme.typography.caption.copyWith(
-              color: widget.theme.colorScheme.onSurface,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  void _testConnection() async {
-    // Show loading
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Testando conexão...'),
-        backgroundColor: widget.theme.colorScheme.primary,
-      ),
-    );
-    
-    try {
-      final isValid = await widget.provider!.validateAuth();
-      
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            isValid ? 'Conexão válida!' : 'Falha na conexão',
-          ),
-          backgroundColor: isValid ? Colors.green : Colors.red,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Erro ao testar conexão'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
   }
 }

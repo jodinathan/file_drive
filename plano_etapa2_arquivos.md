@@ -9,6 +9,7 @@ Implementar todas as operações de arquivo sobre a base de autenticação criad
 - Deletar arquivos e pastas
 - Selecionar múltiplos arquivos
 - Arrastar e soltar arquivos para upload
+- Todo código precisa ser genérico para funcionar com outros provedores além do Google Drive. Também vamos implementar provedores customizados.
 
 ## Pré-requisitos da Etapa 2
 - ✅ Etapa 1 completamente funcional

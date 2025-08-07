@@ -1,50 +1,68 @@
-/// Base class for all cloud storage providers
+/// Base class for all cloud storage providers with file operations
 library;
 
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../models/oauth_types.dart';
+import '../../models/cloud_item.dart';
+import '../../models/cloud_file.dart';
+import '../../models/cloud_folder.dart';
+import '../../models/file_operations.dart';
+import '../../models/search_models.dart';
 
 /// Abstract base class for cloud storage providers
 abstract class CloudProvider {
-  /// Authenticate with the provider
+  // Authentication (already implemented in Etapa 1)
   Future<bool> authenticate();
-  
-  /// Logout from the provider
   Future<void> logout();
-  
-  /// Check if currently authenticated
   bool get isAuthenticated;
-  
-  /// Get the provider name
-  String get providerName;
-  
-  /// Get the provider icon path or widget
-  String get providerIcon;
-  
-  /// Get the provider brand color
-  Color get providerColor;
-  
-  /// Get current connection status
-  ProviderStatus get status;
-  
-  /// Stream of status changes
-  Stream<ProviderStatus> get statusStream;
-  
-  /// Get user information (if available)
+  Future<bool> validateAuth();
+  Future<bool> refreshAuth();
   Future<Map<String, dynamic>?> getUserInfo();
   
-  /// Validate current authentication
-  Future<bool> validateAuth();
+  // File Operations (NEW in Etapa 2)
+  /// Lists items in the specified folder (null for root)
+  Future<List<CloudItem>> listItems(String? folderId);
   
-  /// Refresh authentication if needed
-  Future<bool> refreshAuth();
+  /// Creates a new folder in the specified parent (null for root)
+  Future<CloudFolder> createFolder(String name, String? parentId);
   
-  /// Get provider capabilities
+  /// Uploads a file with progress streaming
+  Stream<UploadProgress> uploadFile(FileUpload fileUpload);
+  
+  /// Downloads a file and returns its bytes
+  Future<Uint8List> downloadFile(String fileId);
+  
+  /// Deletes an item (file or folder)
+  Future<void> deleteItem(String itemId);
+  
+  /// Moves an item to a new parent folder
+  Future<void> moveItem(String itemId, String newParentId);
+  
+  /// Renames an item
+  Future<void> renameItem(String itemId, String newName);
+  
+  // Search and Filters
+  /// Searches for items using the provided query
+  Future<List<CloudItem>> searchItems(SearchQuery query);
+  
+  /// Gets a specific item by its ID
+  Future<CloudItem?> getItemById(String itemId);
+  
+  /// Gets folder hierarchy path for breadcrumb navigation
+  Future<List<CloudFolder>> getFolderPath(String? folderId);
+  
+  // Provider Metadata
+  String get providerName;
+  String get providerIcon;
+  Color get providerColor;
+  ProviderStatus get status;
+  Stream<ProviderStatus> get statusStream;
   ProviderCapabilities get capabilities;
   
-  /// Dispose resources
+  // Lifecycle
   void dispose();
 }
 
@@ -79,14 +97,17 @@ enum ProviderStatus {
                        this == ProviderStatus.tokenExpired;
 }
 
-/// Provider capabilities
+/// Provider capabilities - extended for Etapa 2
 class ProviderCapabilities {
   final bool supportsUpload;
   final bool supportsDownload;
   final bool supportsDelete;
   final bool supportsRename;
+  final bool supportsMove;
   final bool supportsCreateFolder;
   final bool supportsSearch;
+  final bool supportsThumbnails;
+  final bool supportsPreview;
   final bool supportsSharing;
   final bool supportsVersioning;
   final List<String> supportedFileTypes;
@@ -98,8 +119,11 @@ class ProviderCapabilities {
     this.supportsDownload = true,
     this.supportsDelete = true,
     this.supportsRename = true,
+    this.supportsMove = true,
     this.supportsCreateFolder = true,
     this.supportsSearch = false,
+    this.supportsThumbnails = true,
+    this.supportsPreview = false,
     this.supportsSharing = false,
     this.supportsVersioning = false,
     this.supportedFileTypes = const [],
@@ -116,12 +140,28 @@ class ProviderCapabilities {
   factory ProviderCapabilities.full() {
     return const ProviderCapabilities(
       supportsSearch: true,
+      supportsThumbnails: true,
+      supportsPreview: true,
       supportsSharing: true,
       supportsVersioning: true,
       maxFileSize: 1024 * 1024 * 1024, // 1GB
       maxFilesPerUpload: 50,
     );
   }
+  
+  /// Returns true if the provider supports all basic operations
+  bool get isFullyFunctional => 
+      supportsUpload && 
+      supportsDownload && 
+      supportsDelete && 
+      supportsCreateFolder;
+  
+  /// Returns true if the file size is within limits
+  bool canUploadFile(int fileSize) => fileSize <= maxFileSize;
+  
+  /// Returns true if the file type is supported
+  bool supportsFileType(String mimeType) => 
+      supportedFileTypes.isEmpty || supportedFileTypes.contains(mimeType);
 }
 
 /// Base implementation for cloud providers
@@ -187,7 +227,7 @@ abstract class BaseCloudProvider extends CloudProvider {
     _statusController.close();
   }
   
-  /// Subclasses should implement these methods
+  /// Subclasses should implement these methods for authentication
   @protected
   Future<Map<String, dynamic>?> fetchUserInfo();
   
