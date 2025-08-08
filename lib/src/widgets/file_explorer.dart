@@ -95,6 +95,7 @@ class _FileExplorerState extends State<FileExplorer> {
             currentPath: _folderPath,
             onNavigate: _navigateToFolder,
             theme: theme,
+            provider: widget.provider,
           ),
           
           // Toolbar
@@ -149,6 +150,11 @@ class _FileExplorerState extends State<FileExplorer> {
       );
     }
     
+    // Check if provider needs reauth before showing error
+    if (widget.provider.status == ProviderStatus.needsReauth) {
+      return _buildPermissionPanel(theme);
+    }
+    
     if (_error != null) {
       return Center(
         child: Column(
@@ -193,6 +199,79 @@ class _FileExplorerState extends State<FileExplorer> {
       onFileSelected: (file) => _onItemTap(file),
       onFileLongPressed: (file) => _onItemSelected(file, true),
       selectedFiles: _selectedItems.map((item) => item.id).toSet(),
+    );
+  }
+  
+  Widget _buildPermissionPanel(FileDriveTheme theme) {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: theme.colorScheme.warning.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.lock_outline,
+              size: 64,
+              color: theme.colorScheme.warning,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Permissões Insuficientes',
+              style: theme.typography.title.copyWith(
+                color: theme.colorScheme.warning,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Esta conta não possui as permissões necessárias para acessar o ${widget.provider.providerName}.',
+              textAlign: TextAlign.center,
+              style: theme.typography.body.copyWith(
+                color: theme.colorScheme.onBackground.withOpacity(0.7),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Você pode reautorizar esta conta ou usar uma conta diferente.',
+              textAlign: TextAlign.center,
+              style: theme.typography.caption.copyWith(
+                color: theme.colorScheme.onBackground.withOpacity(0.6),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () {
+                    // Trigger account selector to switch accounts
+                    // This will be handled by the parent widget
+                  },
+                  icon: const Icon(Icons.account_circle_outlined),
+                  label: const Text('Trocar Conta'),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    await widget.provider.authenticate();
+                    _loadItems();
+                  },
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Reautorizar'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
   

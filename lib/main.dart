@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'src/widgets/file_drive_widget.dart';
 import 'src/models/file_drive_config.dart';
 import 'src/providers/google_drive/google_drive_provider.dart';
+import 'src/storage/token_storage_factory.dart';
 
 void main() {
   runApp(const MyApp());
@@ -12,6 +13,17 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Initialize token storage using factory
+    final tokenStorage = TokenStorageFactory.create();
+    
+    // Create Google Drive provider
+    final googleDriveProvider = GoogleDriveProvider(
+      tokenStorage: tokenStorage,
+    );
+    
+    // Initialize from storage to restore saved tokens
+    googleDriveProvider.initializeFromStorage();
+    
     return MaterialApp(
       title: 'FileDrive',
       theme: ThemeData(
@@ -21,7 +33,7 @@ class MyApp extends StatelessWidget {
       home: FileDriveWidget(
         config: FileDriveConfig(
           providers: [
-            GoogleDriveProvider(),
+            googleDriveProvider,
           ],
         ),
       ),

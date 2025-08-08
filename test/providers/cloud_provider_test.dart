@@ -2,8 +2,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
 import 'package:flutter/material.dart';
+import 'dart:typed_data';
 import 'package:file_drive/src/providers/base/cloud_provider.dart';
 import 'package:file_drive/src/models/oauth_types.dart';
+import 'package:file_drive/src/models/cloud_item.dart';
+import 'package:file_drive/src/models/cloud_folder.dart';
+import 'package:file_drive/src/models/file_operations.dart';
+import '../test_helpers.dart';
+import 'package:file_drive/src/models/search_models.dart';
 
 // Generate mocks
 @GenerateMocks([CloudProvider])
@@ -73,6 +79,57 @@ class TestCloudProvider extends BaseCloudProvider {
 
   void setAuthRefreshResult(bool result) {
     _authRefreshResult = result;
+  }
+
+  // File operation stubs - not used in current tests
+  @override
+  Future<List<CloudItem>> listItems(String? folderId) async {
+    throw UnimplementedError('Test implementation');
+  }
+
+  @override
+  Future<CloudFolder> createFolder(String name, String? parentId) async {
+    throw UnimplementedError('Test implementation');
+  }
+
+  @override
+  Stream<UploadProgress> uploadFile(FileUpload fileUpload) {
+    throw UnimplementedError('Test implementation');
+  }
+
+  @override
+  Future<Uint8List> downloadFile(String fileId) async {
+    throw UnimplementedError('Test implementation');
+  }
+
+  @override
+  Future<void> deleteItem(String itemId) async {
+    throw UnimplementedError('Test implementation');
+  }
+
+  @override
+  Future<void> moveItem(String itemId, String newParentId) async {
+    throw UnimplementedError('Test implementation');
+  }
+
+  @override
+  Future<void> renameItem(String itemId, String newName) async {
+    throw UnimplementedError('Test implementation');
+  }
+
+  @override
+  Future<List<CloudItem>> searchItems(SearchQuery query) async {
+    throw UnimplementedError('Test implementation');
+  }
+
+  @override
+  Future<CloudItem?> getItemById(String itemId) async {
+    throw UnimplementedError('Test implementation');
+  }
+
+  @override
+  Future<List<CloudFolder>> getFolderPath(String? folderId) async {
+    throw UnimplementedError('Test implementation');
   }
 }
 
@@ -146,6 +203,7 @@ void main() {
 
     tearDown(() {
       provider.dispose();
+      TestResourceManager.disposeAll();
     });
 
     test('should start with disconnected status', () {
@@ -155,7 +213,7 @@ void main() {
 
     test('should update status correctly', () async {
       final statusUpdates = <ProviderStatus>[];
-      provider.statusStream.listen(statusUpdates.add);
+      TestResourceManager.safeStreamListen(provider.statusStream, statusUpdates.add);
 
       provider.updateStatus(ProviderStatus.connecting);
       provider.updateStatus(ProviderStatus.connected);
@@ -169,7 +227,7 @@ void main() {
 
     test('should not emit duplicate status updates', () async {
       final statusUpdates = <ProviderStatus>[];
-      provider.statusStream.listen(statusUpdates.add);
+      TestResourceManager.safeStreamListen(provider.statusStream, statusUpdates.add);
 
       // Use authenticate to trigger status changes
       await provider.authenticate();
@@ -185,7 +243,7 @@ void main() {
 
     test('should authenticate successfully', () async {
       final statusUpdates = <ProviderStatus>[];
-      provider.statusStream.listen(statusUpdates.add);
+      TestResourceManager.safeStreamListen(provider.statusStream, statusUpdates.add);
 
       final result = await provider.authenticate();
 

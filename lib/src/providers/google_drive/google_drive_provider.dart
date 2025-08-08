@@ -3,32 +3,40 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
+import '../../storage/token_storage.dart';
+import '../../utils/constants.dart';
 import '../../models/oauth_types.dart';
 import '../../models/cloud_item.dart';
 import '../../models/cloud_file.dart' as models;
 import '../../models/cloud_folder.dart' as models;
 import '../../models/file_operations.dart';
 import '../../models/search_models.dart';
-import '../../utils/constants.dart';
+import '../../config/app_config.dart';
 import '../base/oauth_cloud_provider.dart';
 import '../base/cloud_provider.dart';
 
 /// Google Drive cloud provider implementation
 class GoogleDriveProvider extends OAuthCloudProvider {
+  static const String scopes = 'https://www.googleapis.com/auth/drive';
   
   GoogleDriveProvider({
+    required TokenStorage tokenStorage,
     Function(OAuthParams)? urlGenerator,
+    Function(String providerId, String userId)? onTokenDelete,
   }) : super(
-    // Frontend só chama o servidor - URL simples
-    urlGenerator: urlGenerator ?? ((params) => '${ServerConfig.baseUrl}${ServerConfig.authEndpoint}?state=${params.state}'),
+    tokenStorage: tokenStorage,
+    urlGenerator: urlGenerator ?? ((params) => '${AppConfig.serverBaseUrl}${AppConfig.authEndpoint}?state=${params.state}'),
+    onTokenDelete: onTokenDelete,
   );
+  
+  @override
+  String get providerId => 'google_drive';
   
   @override
   String get providerName => ProviderNames.googleDrive;
@@ -41,31 +49,105 @@ class GoogleDriveProvider extends OAuthCloudProvider {
 
   @override
   ProviderCapabilities get capabilities => ProviderCapabilities.full();
-  
+
   @override
   OAuthParams createOAuthParams() {
-    // ❌ FRONTEND NÃO PRECISA GERAR PARÂMETROS OAUTH!
-    // O servidor que faz isso. Frontend só chama o servidor.
-
     return OAuthParams(
-      clientId: '', // Servidor que tem isso
-      redirectUri: '', // Servidor que define isso
-      scopes: [], // Servidor que define isso
-      state: _generateState(), // Só o state é gerado aqui
+      clientId: '', // O servidor que define isso
+      redirectUri: '${AppConfig.serverBaseUrl}/auth/callback',
+      scopes: [scopes],
+      state: _generateState(),
     );
+  }
+
+  @override
+  Future<Map<String, dynamic>?> getUserInfoFromProvider(String accessToken) async {
+    try {
+      final response = await http.get(
+        Uri.parse('https://www.googleapis.com/oauth2/v2/userinfo'),
+        headers: {
+          'Authorization': 'Bearer $accessToken',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('Error getting user info: $e');
+      return null;
+    }
+  }
+
+  @override
+  Future<bool> validateTokenWithProvider(String accessToken) async {
+    try {
+      final response = await http.get(
+        Uri.parse('https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=$accessToken'),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  @override
+  Future<AuthResult?> refreshTokenWithProvider(String refreshToken) async {
+    try {
+      // Frontend não faz refresh direto! Chama o servidor que faz o refresh
+      final response = await http.post(
+        Uri.parse('${AppConfig.serverBaseUrl}/auth/refresh'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refresh_token': refreshToken}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return AuthResult.success(
+          accessToken: data['access_token'],
+          refreshToken: data['refresh_token'] ?? refreshToken,
+          expiresAt: DateTime.now().add(Duration(seconds: data['expires_in'] ?? 3600)),
+        );
+      }
+      return null;
+    } catch (e) {
+      print('Error refreshing token: $e');
+      return null;
+    }
+  }
+
+  @override
+  Future<void> revokeToken(String accessToken) async {
+    try {
+      // Frontend não revoga direto! Chama o servidor que faz o revoke
+      await http.post(
+        Uri.parse('${AppConfig.serverBaseUrl}/auth/revoke'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'token': accessToken}),
+      );
+    } catch (e) {
+      print('Error revoking token: $e');
+    }
+  }
+
+  /// Generate a random state parameter for OAuth
+  String _generateState() {
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    final random = DateTime.now().millisecondsSinceEpoch;
+    return 'state_${random}_${List.generate(8, (index) => chars[random % chars.length]).join()}';
   }
 
   // File Operations Implementation
 
   @override
   Future<List<CloudItem>> listItems(String? folderId) async {
-    if (!isAuthenticated) throw Exception('Not authenticated');
-    
-    try {
-      final token = accessToken;
-      if (token == null) throw Exception('No valid access token');
+    final token = await getValidTokenForApi();
+    if (token == null) throw Exception('Not authenticated');
 
-      print('🔍 [API] Listando itens com token: ${token.substring(0, 20)}...');
+    try {
+      print('🔍 [API] Listando itens no folder: $folderId');
       print('🔍 [API] Folder ID: ${folderId ?? "root"}');
 
       // Build query for Google Drive API
@@ -80,14 +162,12 @@ class GoogleDriveProvider extends OAuthCloudProvider {
             'q=${Uri.encodeQueryComponent(query)}&'
             'fields=files(id,name,mimeType,size,createdTime,modifiedTime,parents,thumbnailLink,webViewLink)'),
         headers: {
-          'Authorization': 'Bearer $token',
+          'Authorization': 'Bearer ${token.accessToken}',
           'Content-Type': 'application/json',
         },
       );
 
       print('🔍 [API] Response status: ${response.statusCode}');
-      print('🔍 [API] Response headers: ${response.headers}');
-      print('🔍 [API] Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -96,8 +176,16 @@ class GoogleDriveProvider extends OAuthCloudProvider {
         print('✅ [API] ${files.length} itens encontrados');
         return files.map((file) => _mapToCloudItem(file)).toList();
       } else {
-        print('❌ [API] Erro ${response.statusCode}: ${response.body}');
-        throw Exception('Failed to list items: ${response.statusCode} - ${response.body}');
+        // Handle API errors gracefully
+        final handled = await handleApiError(response.statusCode, response.body, 'list files');
+        if (handled) {
+          // Return empty list instead of throwing exception for permission issues
+          print('⚠️ [API] Permission issues detected - returning empty list');
+          return [];
+        } else {
+          // For other errors, still throw
+          throw Exception('Failed to list items: ${response.statusCode} - ${response.body}');
+        }
       }
     } catch (e) {
       print('❌ [API] Error listing items: $e');
@@ -110,7 +198,7 @@ class GoogleDriveProvider extends OAuthCloudProvider {
     if (!isAuthenticated) throw Exception('Not authenticated');
     
     try {
-      final token = accessToken;
+      final token = await getValidTokenForApi();
       if (token == null) throw Exception('No valid access token');
 
       final metadata = {
@@ -122,7 +210,7 @@ class GoogleDriveProvider extends OAuthCloudProvider {
       final response = await http.post(
         Uri.parse('https://www.googleapis.com/drive/v3/files'),
         headers: {
-          'Authorization': 'Bearer $token',
+          'Authorization': 'Bearer ${token.accessToken}',
           'Content-Type': 'application/json',
         },
         body: jsonEncode(metadata),
@@ -147,7 +235,7 @@ class GoogleDriveProvider extends OAuthCloudProvider {
     final uploadId = DateTime.now().millisecondsSinceEpoch.toString();
     
     try {
-      final token = accessToken;
+      final token = await getValidTokenForApi();
       if (token == null) throw Exception('No valid access token');
 
       yield UploadProgress(
@@ -182,7 +270,7 @@ class GoogleDriveProvider extends OAuthCloudProvider {
         Uri.parse('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart'),
       );
       
-      request.headers['Authorization'] = 'Bearer $token';
+      request.headers['Authorization'] = 'Bearer ${token.accessToken}';
       request.files.add(http.MultipartFile(
         'metadata',
         Stream.value(utf8.encode(jsonEncode(metadata))),
@@ -224,7 +312,14 @@ class GoogleDriveProvider extends OAuthCloudProvider {
           status: UploadStatus.completed,
         );
       } else {
-        throw Exception('Upload failed: ${streamedResponse.statusCode}');
+        // Handle API errors gracefully
+        final responseBody = await streamedResponse.stream.bytesToString();
+        final handled = await handleApiError(streamedResponse.statusCode, responseBody, 'upload file');
+        if (!handled) {
+          throw Exception('Upload failed: ${streamedResponse.statusCode}');
+        }
+        // If handled (permission issue), we still throw but with different message
+        throw Exception('Upload failed due to permission issues: ${streamedResponse.statusCode}');
       }
     } catch (e) {
       yield UploadProgress(
@@ -243,13 +338,13 @@ class GoogleDriveProvider extends OAuthCloudProvider {
     if (!isAuthenticated) throw Exception('Not authenticated');
     
     try {
-      final token = accessToken;
+      final token = await getValidTokenForApi();
       if (token == null) throw Exception('No valid access token');
 
       final response = await http.get(
         Uri.parse('https://www.googleapis.com/drive/v3/files/$fileId?alt=media'),
         headers: {
-          'Authorization': 'Bearer $token',
+          'Authorization': 'Bearer ${token.accessToken}',
         },
       );
 
@@ -269,13 +364,13 @@ class GoogleDriveProvider extends OAuthCloudProvider {
     if (!isAuthenticated) throw Exception('Not authenticated');
     
     try {
-      final token = accessToken;
+      final token = await getValidTokenForApi();
       if (token == null) throw Exception('No valid access token');
 
       final response = await http.delete(
         Uri.parse('https://www.googleapis.com/drive/v3/files/$itemId'),
         headers: {
-          'Authorization': 'Bearer $token',
+          'Authorization': 'Bearer ${token.accessToken}',
         },
       );
 
@@ -293,14 +388,14 @@ class GoogleDriveProvider extends OAuthCloudProvider {
     if (!isAuthenticated) throw Exception('Not authenticated');
     
     try {
-      final token = accessToken;
+      final token = await getValidTokenForApi();
       if (token == null) throw Exception('No valid access token');
 
       // First get current parents
       final getResponse = await http.get(
         Uri.parse('https://www.googleapis.com/drive/v3/files/$itemId?fields=parents'),
         headers: {
-          'Authorization': 'Bearer $token',
+          'Authorization': 'Bearer ${token.accessToken}',
         },
       );
 
@@ -317,7 +412,7 @@ class GoogleDriveProvider extends OAuthCloudProvider {
             'addParents=$newParentId&'
             'removeParents=$currentParents'),
         headers: {
-          'Authorization': 'Bearer $token',
+          'Authorization': 'Bearer ${token.accessToken}',
         },
       );
 
@@ -335,13 +430,13 @@ class GoogleDriveProvider extends OAuthCloudProvider {
     if (!isAuthenticated) throw Exception('Not authenticated');
     
     try {
-      final token = accessToken;
+      final token = await getValidTokenForApi();
       if (token == null) throw Exception('No valid access token');
 
       final response = await http.patch(
         Uri.parse('https://www.googleapis.com/drive/v3/files/$itemId'),
         headers: {
-          'Authorization': 'Bearer $token',
+          'Authorization': 'Bearer ${token.accessToken}',
           'Content-Type': 'application/json',
         },
         body: jsonEncode({'name': newName}),
@@ -361,7 +456,7 @@ class GoogleDriveProvider extends OAuthCloudProvider {
     if (!isAuthenticated) throw Exception('Not authenticated');
     
     try {
-      final token = accessToken;
+      final token = await getValidTokenForApi();
       if (token == null) throw Exception('No valid access token');
 
       // Build Google Drive search query
@@ -381,7 +476,7 @@ class GoogleDriveProvider extends OAuthCloudProvider {
             'pageSize=${query.maxResults}&'
             'fields=files(id,name,mimeType,size,createdTime,modifiedTime,parents,thumbnailLink,webViewLink)'),
         headers: {
-          'Authorization': 'Bearer $token',
+          'Authorization': 'Bearer ${token.accessToken}',
           'Content-Type': 'application/json',
         },
       );
@@ -411,14 +506,14 @@ class GoogleDriveProvider extends OAuthCloudProvider {
     if (!isAuthenticated) throw Exception('Not authenticated');
     
     try {
-      final token = accessToken;
+      final token = await getValidTokenForApi();
       if (token == null) throw Exception('No valid access token');
 
       final response = await http.get(
         Uri.parse('https://www.googleapis.com/drive/v3/files/$itemId?'
             'fields=id,name,mimeType,size,createdTime,modifiedTime,parents,thumbnailLink,webViewLink'),
         headers: {
-          'Authorization': 'Bearer $token',
+          'Authorization': 'Bearer ${token.accessToken}',
           'Content-Type': 'application/json',
         },
       );
@@ -443,7 +538,7 @@ class GoogleDriveProvider extends OAuthCloudProvider {
     if (folderId == null) return [];
     
     try {
-      final token = accessToken;
+      final token = await getValidTokenForApi();
       if (token == null) throw Exception('No valid access token');
 
       final List<models.CloudFolder> path = [];
@@ -454,7 +549,7 @@ class GoogleDriveProvider extends OAuthCloudProvider {
           Uri.parse('https://www.googleapis.com/drive/v3/files/$currentId?'
               'fields=id,name,parents,createdTime,modifiedTime'),
           headers: {
-            'Authorization': 'Bearer $token',
+            'Authorization': 'Bearer ${token.accessToken}',
             'Content-Type': 'application/json',
           },
         );
@@ -617,106 +712,32 @@ class GoogleDriveProvider extends OAuthCloudProvider {
   }
 
 
-  
   @override
-  Future<Map<String, dynamic>?> getUserInfoFromProvider(String accessToken) async {
-    try {
-      final response = await http.get(
-        Uri.parse('https://www.googleapis.com/oauth2/v2/userinfo'),
-        headers: {
-          'Authorization': 'Bearer $accessToken',
-          'Content-Type': 'application/json',
-        },
-      );
-      
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      }
-      return null;
-    } catch (e) {
-      print('Error fetching user info: $e');
-      return null;
-    }
+  Future<bool> performAuthValidation() async {
+    final token = await getValidTokenForApi();
+    if (token?.accessToken == null) return false;
+    return await validateTokenWithProvider(token!.accessToken!);
   }
-  
-  @override
-  Future<bool> validateTokenWithProvider(String accessToken) async {
-    try {
-      final response = await http.get(
-        Uri.parse('https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=$accessToken'),
-      );
-      
-      return response.statusCode == 200;
-    } catch (e) {
-      print('Error validating token: $e');
-      return false;
-    }
-  }
-  
-  @override
-  Future<AuthResult?> refreshTokenWithProvider(String refreshToken) async {
-    try {
-      // ❌ FRONTEND NÃO DEVE FAZER REFRESH DIRETO!
-      // Deve chamar o servidor que faz o refresh
-      final response = await http.post(
-        Uri.parse('${ServerConfig.baseUrl}/auth/refresh'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'refresh_token': refreshToken}),
-      );
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return AuthResult.success(
-          accessToken: data['access_token'],
-          refreshToken: refreshToken, // Keep the same refresh token
-          expiresAt: DateTime.now().add(Duration(seconds: data['expires_in'])),
-          metadata: data,
-        );
-      }
-      return null;
-    } catch (e) {
-      print('Error refreshing token: $e');
-      return null;
-    }
-  }
-  
   @override
-  Future<void> revokeToken(String token) async {
-    try {
-      // ❌ FRONTEND NÃO DEVE REVOGAR DIRETO!
-      // Deve chamar o servidor que faz o revoke
-      await http.post(
-        Uri.parse('${ServerConfig.baseUrl}/auth/revoke'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'token': token}),
-      );
-    } catch (e) {
-      debugPrint('Error revoking token: $e');
-    }
+  Future<bool> performAuthRefresh() async {
+    return await refreshAccessToken();
   }
-  
-  /// Generate random state for OAuth
-  String _generateState() {
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    return 'state_$timestamp';
-  }
-  
-  @override
-  void dispose() {
-    super.dispose();
-  }
-  
+
   /// Additional Google Drive specific methods
   
   /// Get Drive quota information
   Future<Map<String, dynamic>?> getDriveQuota() async {
-    if (!isAuthenticated || accessToken == null) return null;
+    if (!isAuthenticated) return null;
     
     try {
+      final token = await getValidTokenForApi();
+      if (token == null) return null;
+      
       final response = await http.get(
         Uri.parse('https://www.googleapis.com/drive/v3/about?fields=storageQuota'),
         headers: {
-          'Authorization': 'Bearer $accessToken',
+          'Authorization': 'Bearer ${token.accessToken}',
           'Content-Type': 'application/json',
         },
       );
@@ -734,13 +755,16 @@ class GoogleDriveProvider extends OAuthCloudProvider {
   
   /// Test connection to Google Drive
   Future<bool> testConnection() async {
-    if (!isAuthenticated || accessToken == null) return false;
+    if (!isAuthenticated) return false;
     
     try {
+      final token = await getValidTokenForApi();
+      if (token == null) return false;
+      
       final response = await http.get(
         Uri.parse('https://www.googleapis.com/drive/v3/files?pageSize=1'),
         headers: {
-          'Authorization': 'Bearer $accessToken',
+          'Authorization': 'Bearer ${token.accessToken}',
           'Content-Type': 'application/json',
         },
       );
@@ -757,7 +781,7 @@ class GoogleDriveProvider extends OAuthCloudProvider {
     return {
       'name': providerName,
       'type': 'oauth',
-      'scopes': ['drive.file'], // Informativo apenas
+      'scopes': [scopes],
       'authenticated': isAuthenticated,
       'status': status.name,
       'hasCloudService': isAuthenticated,
@@ -769,5 +793,32 @@ class GoogleDriveProvider extends OAuthCloudProvider {
         'sharing': capabilities.supportsSharing,
       },
     };
+  }
+  
+  /// Check if error indicates permission issues and mark account accordingly
+  @override
+  bool hasRequiredScopes(String grantedScopes) {
+    final scopes = grantedScopes.split(' ');
+    
+    // Check if we have full drive access
+    if (scopes.contains('https://www.googleapis.com/auth/drive')) {
+      print('✅ [Scopes] Acesso completo ao Drive detectado');
+      return true;
+    }
+    
+    // Check for file-specific access (minimum requirement)
+    if (scopes.contains('https://www.googleapis.com/auth/drive.file')) {
+      print('⚠️ [Scopes] Apenas acesso a arquivos específicos - funcionalidade limitada');
+      return true; // Still usable but limited
+    }
+    
+    if (scopes.contains('https://www.googleapis.com/auth/drive.readonly')) {
+      print('⚠️ [Scopes] Apenas acesso de leitura - funcionalidade limitada');
+      return true; // Read-only access
+    }
+    
+    print('❌ [Scopes] Scopes insuficientes detectados. Disponível: $grantedScopes');
+    print('❌ [Scopes] Necessário pelo menos: drive.file ou drive.readonly');
+    return false;
   }
 }

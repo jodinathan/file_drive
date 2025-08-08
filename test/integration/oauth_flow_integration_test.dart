@@ -7,8 +7,11 @@ import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import 'package:file_drive/src/widgets/file_drive_widget.dart';
 import 'package:file_drive/src/models/file_drive_config.dart';
 import 'package:file_drive/src/providers/google_drive/google_drive_provider.dart';
+import 'package:file_drive/src/providers/base/cloud_provider.dart';
 import 'package:file_drive/src/models/oauth_types.dart';
 import 'dart:convert';
+import 'package:file_drive/src/storage/shared_preferences_token_storage.dart';
+import '../test_helpers.dart';
 
 // Generate mocks
 @GenerateMocks([http.Client])
@@ -45,11 +48,14 @@ void main() {
     late MockClient mockHttpClient;
     late GoogleDriveProvider provider;
     late FileDriveConfig config;
+    late SharedPreferencesTokenStorage tokenStorage;
 
     setUp(() {
       mockHttpClient = MockClient();
+      tokenStorage = SharedPreferencesTokenStorage();
       
       provider = GoogleDriveProvider(
+        tokenStorage: tokenStorage,
         urlGenerator: (params) {
           return 'http://localhost:8080/auth/google?${Uri(queryParameters: params.toQueryParams()).query}';
         },
@@ -63,6 +69,7 @@ void main() {
 
     tearDown(() {
       provider.dispose();
+      TestResourceManager.disposeAll(); // Dispose all test resources to prevent memory leaks
     });
 
     group('Complete OAuth Flow', () {
@@ -82,18 +89,19 @@ void main() {
             ),
           ),
         );
+        await SafeWidgetTestUtils.safePumpAndSettle(tester);
 
         // Find and tap the connect button
         expect(find.text('Google Drive'), findsOneWidget);
         await tester.tap(find.text('Google Drive'));
-        await tester.pump();
+        await SafeWidgetTestUtils.safePump(tester);
 
         // Should show provider content
         expect(find.text('Conectar com Google Drive'), findsOneWidget);
         
         // Tap connect button
         await tester.tap(find.text('Conectar com Google Drive'));
-        await tester.pump();
+        await SafeWidgetTestUtils.safePump(tester);
 
         // Should show connecting state
         expect(find.text('Conectando...'), findsOneWidget);
@@ -115,10 +123,10 @@ void main() {
 
         // Navigate to provider and attempt connection
         await tester.tap(find.text('Google Drive'));
-        await tester.pump();
+        await SafeWidgetTestUtils.safePump(tester);
 
         await tester.tap(find.text('Conectar com Google Drive'));
-        await tester.pump();
+        await SafeWidgetTestUtils.safePump(tester);
 
         // Should handle cancellation gracefully
         expect(find.text('Desconectado'), findsOneWidget);
@@ -139,10 +147,10 @@ void main() {
         );
 
         await tester.tap(find.text('Google Drive'));
-        await tester.pump();
+        await SafeWidgetTestUtils.safePump(tester);
 
         await tester.tap(find.text('Conectar com Google Drive'));
-        await tester.pump();
+        await SafeWidgetTestUtils.safePump(tester);
 
         // Should show error state
         expect(find.text('Erro de conexão'), findsOneWidget);
@@ -186,7 +194,7 @@ void main() {
     group('Provider State Management', () {
       testWidgets('should update provider status during OAuth flow', (WidgetTester tester) async {
         final statusUpdates = <ProviderStatus>[];
-        provider.statusStream.listen(statusUpdates.add);
+        TestResourceManager.safeStreamListen(provider.statusStream, statusUpdates.add);
 
         // Mock successful OAuth
         MockFlutterWebAuth2.setMockResult(
@@ -287,6 +295,7 @@ void main() {
     group('Multi-Provider Scenarios', () {
       testWidgets('should handle multiple providers independently', (WidgetTester tester) async {
         final provider2 = GoogleDriveProvider(
+          tokenStorage: tokenStorage,
           urlGenerator: (params) => 'http://localhost:8080/auth/google2',
         );
 

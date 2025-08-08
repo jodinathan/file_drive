@@ -2,13 +2,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:file_drive/src/providers/google_drive/google_drive_provider.dart';
 import 'package:file_drive/src/models/oauth_types.dart';
 import 'package:file_drive/src/providers/base/cloud_provider.dart';
+import 'package:file_drive/src/storage/shared_preferences_token_storage.dart';
 
 void main() {
   group('OAuth Debug Tests', () {
     late GoogleDriveProvider provider;
+    late SharedPreferencesTokenStorage tokenStorage;
 
     setUp(() {
+      tokenStorage = SharedPreferencesTokenStorage();
       provider = GoogleDriveProvider(
+        tokenStorage: tokenStorage,
         urlGenerator: (params) {
           return 'http://localhost:8080/auth/google?${Uri(queryParameters: params.toQueryParams()).query}';
         },

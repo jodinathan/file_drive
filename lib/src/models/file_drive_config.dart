@@ -70,6 +70,7 @@ class FileDriveColorScheme {
   final Color background;
   final Color surface;
   final Color error;
+  final Color warning;
   final Color onPrimary;
   final Color onSecondary;
   final Color onBackground;
@@ -82,6 +83,7 @@ class FileDriveColorScheme {
     required this.background,
     required this.surface,
     required this.error,
+    required this.warning,
     required this.onPrimary,
     required this.onSecondary,
     required this.onBackground,
@@ -96,6 +98,7 @@ class FileDriveColorScheme {
         background = const Color(0xFFFAFAFA),
         surface = const Color(0xFFFFFFFF),
         error = const Color(0xFFB00020),
+        warning = const Color(0xFFFF9800),
         onPrimary = const Color(0xFFFFFFFF),
         onSecondary = const Color(0xFF000000),
         onBackground = const Color(0xFF000000),
@@ -109,6 +112,7 @@ class FileDriveColorScheme {
         background = const Color(0xFF121212),
         surface = const Color(0xFF1E1E1E),
         error = const Color(0xFFCF6679),
+        warning = const Color(0xFFFFB74D),
         onPrimary = const Color(0xFF000000),
         onSecondary = const Color(0xFF000000),
         onBackground = const Color(0xFFFFFFFF),

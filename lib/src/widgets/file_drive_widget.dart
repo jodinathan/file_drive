@@ -1,7 +1,7 @@
 /// Main FileDrive widget implementation
 library;
 
-import 'package:flutter/material.dart' as material;
+import 'package:flutter/material.dart';
 import 'package:flutter/material.dart' hide ColorScheme;
 import '../models/file_drive_config.dart';
 import '../providers/base/cloud_provider.dart';
@@ -193,7 +193,7 @@ class _FileDriveWidgetState extends State<FileDriveWidget> {
   
   ThemeData _buildThemeData(FileDriveTheme theme) {
     return ThemeData(
-      colorScheme: material.ColorScheme.fromSeed(
+      colorScheme: ColorScheme.fromSeed(
         seedColor: theme.colorScheme.primary,
         brightness: _getBrightness(theme.colorScheme.background),
       ),

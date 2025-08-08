@@ -212,6 +212,12 @@ class ProviderSidebar extends StatelessWidget {
           size: 16,
           color: Colors.orange,
         );
+      case ProviderStatus.needsReauth:
+        return Icon(
+          Icons.warning,
+          size: 16,
+          color: Colors.orange,
+        );
       default:
         return Icon(
           Icons.cloud_off,
@@ -231,6 +237,8 @@ class ProviderSidebar extends StatelessWidget {
         return 'Erro';
       case ProviderStatus.tokenExpired:
         return 'Expirado';
+      case ProviderStatus.needsReauth:
+        return 'Requer reauth';
       default:
         return 'Desconectado';
     }
@@ -245,6 +253,8 @@ class ProviderSidebar extends StatelessWidget {
       case ProviderStatus.error:
         return Colors.red;
       case ProviderStatus.tokenExpired:
+        return Colors.orange;
+      case ProviderStatus.needsReauth:
         return Colors.orange;
       default:
         return theme.colorScheme.onSurface.withOpacity(0.6);

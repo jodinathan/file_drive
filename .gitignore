@@ -44,6 +44,9 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Config files with credentials (keep secure)
 example_server/lib/config.dart
+test/test_config.dart
+lib/src/config/config.dart
 
 .history

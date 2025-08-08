@@ -90,6 +90,8 @@ class AuthResult {
   final DateTime? expiresAt;
   final String? error;
   final Map<String, dynamic> metadata;
+  final bool hasPermissionIssues;
+  final bool needsReauth;
   
   const AuthResult({
     required this.success,
@@ -98,6 +100,8 @@ class AuthResult {
     this.expiresAt,
     this.error,
     this.metadata = const {},
+    this.hasPermissionIssues = false,
+    this.needsReauth = false,
   });
   
   /// Create successful auth result
@@ -106,6 +110,8 @@ class AuthResult {
     String? refreshToken,
     DateTime? expiresAt,
     Map<String, dynamic> metadata = const {},
+    bool hasPermissionIssues = false,
+    bool needsReauth = false,
   }) {
     return AuthResult(
       success: true,
@@ -113,14 +119,41 @@ class AuthResult {
       refreshToken: refreshToken,
       expiresAt: expiresAt,
       metadata: metadata,
+      hasPermissionIssues: hasPermissionIssues,
+      needsReauth: needsReauth,
     );
   }
   
   /// Create failed auth result
-  factory AuthResult.failure(String error) {
+  factory AuthResult.failure(String error, {
+    bool hasPermissionIssues = false,
+    bool needsReauth = false,
+  }) {
     return AuthResult(
       success: false,
       error: error,
+      hasPermissionIssues: hasPermissionIssues,
+      needsReauth: needsReauth,
+    );
+  }
+  
+  /// Create result with permission issues
+  factory AuthResult.permissionIssue({
+    required String accessToken,
+    String? refreshToken,
+    DateTime? expiresAt,
+    Map<String, dynamic> metadata = const {},
+    String? error,
+  }) {
+    return AuthResult(
+      success: false,  // Permission issues mean auth was not fully successful
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+      expiresAt: expiresAt,
+      metadata: metadata,
+      error: error,
+      hasPermissionIssues: true,
+      needsReauth: true,
     );
   }
   

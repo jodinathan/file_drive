@@ -35,7 +35,7 @@
 			<string>google.oauth</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.346650636779-58ec4t2v24ru8kj3s3t7dj46okanjman</string>
+				<string>com.googleusercontent.apps.YOUR_CLIENT_ID_NUMBER</string>
 			</array>
 		</dict>
 	</array>

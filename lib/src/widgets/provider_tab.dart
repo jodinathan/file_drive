@@ -248,6 +248,8 @@ class _ProviderTabState extends State<ProviderTab>
         return Colors.green.withOpacity(0.05);
       case ProviderStatus.error:
         return Colors.red.withOpacity(0.05);
+      case ProviderStatus.needsReauth:
+        return Colors.orange.withOpacity(0.05);
       default:
         return widget.theme.colorScheme.surface;
     }
@@ -271,6 +273,8 @@ class _ProviderTabState extends State<ProviderTab>
         return Colors.red;
       case ProviderStatus.tokenExpired:
         return Colors.orange;
+      case ProviderStatus.needsReauth:
+        return Colors.orange;
       default:
         return widget.theme.colorScheme.onSurface.withOpacity(0.4);
     }
@@ -286,6 +290,8 @@ class _ProviderTabState extends State<ProviderTab>
         return 'Erro de conexão';
       case ProviderStatus.tokenExpired:
         return 'Token expirado';
+      case ProviderStatus.needsReauth:
+        return 'Requer reautenticação';
       default:
         return 'Desconectado';
     }

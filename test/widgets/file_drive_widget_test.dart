@@ -165,6 +165,7 @@ void main() {
           background: Colors.grey,
           surface: Colors.white,
           error: Colors.red,
+          warning: Colors.amber,
           onPrimary: Colors.white,
           onSecondary: Colors.black,
           onBackground: Colors.black,

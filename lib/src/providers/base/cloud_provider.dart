@@ -81,7 +81,10 @@ enum ProviderStatus {
   error,
   
   /// Token expired, needs refresh
-  tokenExpired;
+  tokenExpired,
+  
+  /// Connected but needs re-authentication for proper scopes
+  needsReauth;
   
   /// Whether the provider is in a connected state
   bool get isConnected => this == ProviderStatus.connected;
@@ -92,9 +95,13 @@ enum ProviderStatus {
   /// Whether there's an error state
   bool get hasError => this == ProviderStatus.error;
   
+  /// Whether re-authentication is needed due to permission issues
+  bool get requiresReauth => this == ProviderStatus.needsReauth;
+  
   /// Whether authentication is needed
   bool get needsAuth => this == ProviderStatus.disconnected || 
-                       this == ProviderStatus.tokenExpired;
+                       this == ProviderStatus.tokenExpired ||
+                       this == ProviderStatus.needsReauth;
 }
 
 /// Provider capabilities - extended for Etapa 2

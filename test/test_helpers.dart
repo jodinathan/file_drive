@@ -1,12 +1,172 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/mockito.dart';
+import 'dart:async';
+import 'dart:typed_data';
 import 'package:file_drive/src/providers/base/cloud_provider.dart';
 import 'package:file_drive/src/models/oauth_types.dart';
 import 'package:file_drive/src/models/file_drive_config.dart';
-import 'dart:async';
+import 'package:file_drive/src/models/cloud_item.dart';
+import 'package:file_drive/src/models/cloud_folder.dart';
+import 'package:file_drive/src/models/file_operations.dart';
+import 'package:file_drive/src/models/search_models.dart';
 
 /// Test helpers and utilities for FileDrive tests
+
+/// Timeout wrapper for preventing infinite loops in tests
+class TestTimeouts {
+  static const Duration unitTestTimeout = Duration(seconds: 30);
+  static const Duration widgetTestTimeout = Duration(minutes: 1);
+  static const Duration integrationTestTimeout = Duration(minutes: 2);
+  static const Duration streamEventTimeout = Duration(milliseconds: 500);
+  
+  /// Wraps any Future with a timeout to prevent infinite loops
+  static Future<T> withTimeout<T>(
+    Future<T> future, {
+    Duration? timeout,
+    String? description,
+  }) async {
+    final actualTimeout = timeout ?? unitTestTimeout;
+    try {
+      return await future.timeout(
+        actualTimeout,
+        onTimeout: () {
+          throw TimeoutException(
+            'Test timeout after ${actualTimeout.inSeconds}s${description != null ? ': $description' : ''}',
+            actualTimeout,
+          );
+        },
+      );
+    } catch (e) {
+      print('Test timeout error: $e');
+      rethrow;
+    }
+  }
+  
+  /// Wraps widget test operations with timeout
+  static Future<T> withWidgetTimeout<T>(
+    Future<T> future, {
+    String? description,
+  }) {
+    return withTimeout(future, timeout: widgetTestTimeout, description: description);
+  }
+  
+  /// Wraps integration test operations with timeout
+  static Future<T> withIntegrationTimeout<T>(
+    Future<T> future, {
+    String? description,
+  }) {
+    return withTimeout(future, timeout: integrationTestTimeout, description: description);
+  }
+}
+
+/// Resource management for preventing memory leaks in tests
+class TestResourceManager {
+  static final List<StreamSubscription> _subscriptions = [];
+  static final List<Timer> _timers = [];
+  static final List<Completer> _completers = [];
+  
+  /// Register a stream subscription for automatic disposal
+  static StreamSubscription<T> registerSubscription<T>(StreamSubscription<T> subscription) {
+    _subscriptions.add(subscription);
+    return subscription;
+  }
+  
+  /// Register a timer for automatic disposal
+  static Timer registerTimer(Timer timer) {
+    _timers.add(timer);
+    return timer;
+  }
+  
+  /// Register a completer for automatic completion on timeout
+  static Completer<T> registerCompleter<T>(Completer<T> completer) {
+    _completers.add(completer);
+    return completer;
+  }
+  
+  /// Dispose all registered resources
+  static void disposeAll() {
+    for (final subscription in _subscriptions) {
+      subscription.cancel();
+    }
+    _subscriptions.clear();
+    
+    for (final timer in _timers) {
+      timer.cancel();
+    }
+    _timers.clear();
+    
+    for (final completer in _completers) {
+      if (!completer.isCompleted) {
+        completer.completeError(TimeoutException('Test cleanup', TestTimeouts.unitTestTimeout));
+      }
+    }
+    _completers.clear();
+  }
+  
+  /// Create a safe stream subscription that's automatically managed
+  static StreamSubscription<T> safeStreamListen<T>(
+    Stream<T> stream,
+    void Function(T) onData, {
+    Function? onError,
+    void Function()? onDone,
+    bool? cancelOnError,
+  }) {
+    final subscription = stream.listen(
+      onData,
+      onError: onError,
+      onDone: onDone,
+      cancelOnError: cancelOnError,
+    );
+    return registerSubscription(subscription);
+  }
+}
+
+/// Safe widget test utilities
+class SafeWidgetTestUtils {
+  /// Safe pump that prevents infinite rebuild loops
+  static Future<void> safePump(WidgetTester tester, [Duration? duration]) async {
+    return TestTimeouts.withWidgetTimeout(
+      tester.pump(duration),
+      description: 'Widget pump operation',
+    );
+  }
+  
+  /// Safe pumpAndSettle that prevents infinite animation loops
+  static Future<void> safePumpAndSettle(
+    WidgetTester tester, [
+    Duration timeout = const Duration(seconds: 10),
+    EnginePhase phase = EnginePhase.sendSemanticsUpdate,
+    Duration interval = const Duration(milliseconds: 100),
+  ]) async {
+    return TestTimeouts.withWidgetTimeout(
+      tester.pumpAndSettle(timeout, phase, interval),
+      description: 'Widget pumpAndSettle operation',
+    );
+  }
+  
+  /// Wait for widget to be in expected state with timeout
+  static Future<void> waitForWidget(
+    WidgetTester tester,
+    Finder finder, {
+    Duration timeout = const Duration(seconds: 5),
+    Duration interval = const Duration(milliseconds: 100),
+  }) async {
+    final stopwatch = Stopwatch()..start();
+    
+    while (stopwatch.elapsed < timeout) {
+      await tester.pump(interval);
+      if (finder.evaluate().isNotEmpty) {
+        return;
+      }
+    }
+    
+    throw TimeoutException(
+      'Widget not found within ${timeout.inSeconds}s: $finder',
+      timeout,
+    );
+  }
+}
 
 /// Mock implementation of CloudProvider for testing
 class MockTestCloudProvider extends BaseCloudProvider {
@@ -16,6 +176,7 @@ class MockTestCloudProvider extends BaseCloudProvider {
   String _providerIcon;
   Color _providerColor;
   ProviderCapabilities _capabilities;
+  bool _lastAuthenticateCalled = false;
 
   MockTestCloudProvider({
     String providerName = 'Test Provider',
@@ -39,8 +200,16 @@ class MockTestCloudProvider extends BaseCloudProvider {
   @override
   ProviderCapabilities get capabilities => _capabilities;
 
+  /// Track if authenticate was called
+  bool get lastAuthenticateCalled => _lastAuthenticateCalled;
+
+  void resetAuthenticateFlag() {
+    _lastAuthenticateCalled = false;
+  }
+
   @override
   Future<bool> authenticate() async {
+    _lastAuthenticateCalled = true;
     updateStatus(ProviderStatus.connecting);
     await Future.delayed(Duration(milliseconds: 100));
     _isAuthenticated = true;
@@ -89,6 +258,57 @@ class MockTestCloudProvider extends BaseCloudProvider {
 
   void simulateTokenExpired() {
     updateStatus(ProviderStatus.tokenExpired);
+  }
+
+  // File operation stubs - not used in current tests
+  @override
+  Future<List<CloudItem>> listItems(String? folderId) async {
+    throw UnimplementedError('Test implementation');
+  }
+
+  @override
+  Future<CloudFolder> createFolder(String name, String? parentId) async {
+    throw UnimplementedError('Test implementation');
+  }
+
+  @override
+  Stream<UploadProgress> uploadFile(FileUpload fileUpload) {
+    throw UnimplementedError('Test implementation');
+  }
+
+  @override
+  Future<Uint8List> downloadFile(String fileId) async {
+    throw UnimplementedError('Test implementation');
+  }
+
+  @override
+  Future<void> deleteItem(String itemId) async {
+    throw UnimplementedError('Test implementation');
+  }
+
+  @override
+  Future<void> moveItem(String itemId, String newParentId) async {
+    throw UnimplementedError('Test implementation');
+  }
+
+  @override
+  Future<void> renameItem(String itemId, String newName) async {
+    throw UnimplementedError('Test implementation');
+  }
+
+  @override
+  Future<List<CloudItem>> searchItems(SearchQuery query) async {
+    throw UnimplementedError('Test implementation');
+  }
+
+  @override
+  Future<CloudItem?> getItemById(String itemId) async {
+    throw UnimplementedError('Test implementation');
+  }
+
+  @override
+  Future<List<CloudFolder>> getFolderPath(String? folderId) async {
+    throw UnimplementedError('Test implementation');
   }
 }
 
@@ -289,7 +509,8 @@ class TestEnvironment {
   }
 
   static void tearDown() {
-    // Clean up test environment
+    // Clean up test environment and dispose resources to prevent memory leaks
+    TestResourceManager.disposeAll();
   }
 
   /// Mock HTTP responses for testing

@@ -1,14 +1,17 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:file_drive/src/providers/google_drive/google_drive_provider.dart';
-import 'package:file_drive/src/models/oauth_types.dart';
-import 'package:file_drive/src/utils/constants.dart';
+import 'package:file_drive/src/storage/shared_preferences_token_storage.dart';
+import 'test_config.dart';
 
 void main() {
   group('Google OAuth "Access blocked" Diagnosis', () {
     late GoogleDriveProvider provider;
+    late SharedPreferencesTokenStorage tokenStorage;
 
     setUp(() {
+      tokenStorage = SharedPreferencesTokenStorage();
       provider = GoogleDriveProvider(
+        tokenStorage: tokenStorage,
         urlGenerator: (params) {
           return 'http://localhost:8080/auth/google?${Uri(queryParameters: params.toQueryParams()).query}';
         },
@@ -48,7 +51,10 @@ void main() {
       });
 
       test('PROBLEMA 2: Scopes muito amplos causando bloqueio', () {
-        final currentScopes = GoogleOAuthConfig.safeScopes;
+        final currentScopes = [
+          'https://www.googleapis.com/auth/drive.file', // Safe scope
+          'https://www.googleapis.com/auth/userinfo.email', // Safe scope
+        ];
         print('🔍 Current Scopes: $currentScopes');
         
         // Scopes que podem causar "Access blocked" por serem muito amplos
@@ -58,10 +64,7 @@ void main() {
         ];
         
         // Scopes seguros baseados no código funcional
-        final safeScopes = [
-          'https://www.googleapis.com/auth/drive.file', // Apenas arquivos criados pelo app
-          'https://www.googleapis.com/auth/userinfo.email', // Email básico
-        ];
+        final safeScopes = GoogleOAuthConfig.safeScopes;
         
         // DIAGNÓSTICO: Verificar se estamos usando scopes problemáticos
         final hasProblematicScopes = currentScopes.any(
@@ -143,7 +146,7 @@ void main() {
         expect(uri.scheme, equals('https'));
         expect(uri.host, equals('accounts.google.com'));
         expect(uri.queryParameters['client_id'], isNotNull);
-        expect(uri.queryParameters['redirect_uri'], equals('http://localhost:8080/auth/callback'));
+        expect(uri.queryParameters['redirect_uri'], equals(GoogleOAuthConfig.webRedirectUri));
         expect(uri.queryParameters['scope'], contains('drive.file'));
         expect(uri.queryParameters['scope'], isNot(contains('drive.readonly')));
         expect(uri.queryParameters['prompt'], equals('select_account'));
@@ -164,7 +167,7 @@ void main() {
           'credentials': {
             'type': 'Web application',
             'authorized_redirect_uris': [
-              'http://localhost:8080/auth/callback',
+              GoogleOAuthConfig.webRedirectUri,
               'http://127.0.0.1:8080/auth/callback',
             ],
             'authorized_javascript_origins': [
@@ -192,7 +195,7 @@ void main() {
     group('🧪 Teste da Solução Implementada', () {
       test('deve gerar URL OAuth com configurações corretas', () {
         final params = provider.createOAuthParams();
-        final url = provider.urlGenerator!(params);
+        final url = provider.urlGenerator(params);
         
         print('🧪 URL Gerada: $url');
         
@@ -226,17 +229,17 @@ void main() {
 // Helper para construir URL OAuth correta
 String _buildCorrectOAuthUrl() {
   final params = {
-    'client_id': '346650636779-58ec4t2v24ru8kj3s3t7dj46okanjman.apps.googleusercontent.com',
-    'redirect_uri': 'http://localhost:8080/auth/callback',
+    'client_id': GoogleOAuthConfig.clientId,
+    'redirect_uri': GoogleOAuthConfig.webRedirectUri,
     'response_type': 'code',
-    'scope': 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email',
+    'scope': GoogleOAuthConfig.safeScopes.join(' '),
     'access_type': 'offline',
     'prompt': 'select_account',
     'include_granted_scopes': 'true',
     'state': 'secure_random_state_123',
   };
   
-  return Uri.parse('https://accounts.google.com/o/oauth2/v2/auth')
+  return Uri.parse(GoogleOAuthConfig.authBaseUrl)
       .replace(queryParameters: params)
       .toString();
 }
