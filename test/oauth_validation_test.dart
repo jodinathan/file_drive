@@ -83,7 +83,7 @@ void main() {
           final parsed = Uri.parse(uri);
           expect(parsed.scheme, equals('http'));
           expect(parsed.host, anyOf('localhost', '127.0.0.1'));
-          expect(parsed.port, equals(${TestServerConfig.port}));
+          expect(parsed.port, equals(TestServerConfig.port));
           expect(parsed.path, equals('/auth/callback'));
         }
 
@@ -219,7 +219,7 @@ void main() {
           final uri = Uri.parse(origin);
           expect(uri.scheme, equals('http'));
           expect(uri.host, anyOf('localhost', '127.0.0.1'));
-          expect(uri.port, anyOf(3000, ${TestServerConfig.port}));
+          expect(uri.port, anyOf(3000, TestServerConfig.port));
         }
       });
     });

@@ -7,7 +7,6 @@ import '../providers/base/cloud_provider.dart';
 import '../providers/base/oauth_cloud_provider.dart';
 import 'auth_screen.dart';
 import 'file_explorer.dart';
-import 'account_list.dart';
 
 /// Content area showing provider-specific content
 class ProviderContent extends StatefulWidget {
@@ -158,25 +157,16 @@ class _ProviderContentState extends State<ProviderContent> {
     
     if (isOAuthProvider) {
       // Para provedores OAuth: Row com lista de contas + painel de permissões
-      return Row(
-        children: [
-          // Lista de contas (coluna esquerda)
-          AccountList(
-            provider: widget.provider as OAuthCloudProvider,
-            theme: widget.theme,
-            width: 250,
-          ),
-          
-          // Painel de permissões insuficientes (coluna direita)
-          Expanded(
-            child: _buildReauthPanel(),
-          ),
-        ],
-      );
+      return _buildPermissionRequiredContent();
     } else {
       // Para provedores não-OAuth: apenas o painel central
       return _buildReauthPanel();
     }
+  }
+
+  Widget _buildPermissionRequiredContent() {
+    // Para provedores OAuth com problemas de permissão: apenas o painel de reauth
+    return _buildReauthPanel();
   }
 
   Widget _buildReauthPanel() {
@@ -299,22 +289,8 @@ class _ProviderContentState extends State<ProviderContent> {
     final isOAuthProvider = widget.provider is OAuthCloudProvider;
     
     if (isOAuthProvider) {
-      // Para provedores OAuth: Row com lista de contas + painel de erro
-      return Row(
-        children: [
-          // Lista de contas (coluna esquerda)
-          AccountList(
-            provider: widget.provider as OAuthCloudProvider,
-            theme: widget.theme,
-            width: 250,
-          ),
-          
-          // Painel de erro (coluna direita)
-          Expanded(
-            child: _buildErrorPanel(),
-          ),
-        ],
-      );
+      // Para provedores OAuth: painel de erro
+      return _buildErrorPanel();
     } else {
       // Para provedores não-OAuth: apenas o painel central
       return _buildErrorPanel();
@@ -441,30 +417,16 @@ class _ProviderContentState extends State<ProviderContent> {
     final isOAuthProvider = widget.provider is OAuthCloudProvider;
     
     if (isOAuthProvider) {
-      // Para provedores OAuth: Row com lista de contas + conteúdo principal
-      return Row(
-        children: [
-          // Lista de contas (coluna esquerda)
-          AccountList(
-            provider: widget.provider as OAuthCloudProvider,
-            theme: widget.theme,
-            width: 250,
-          ),
-          
-          // Conteúdo principal (coluna direita)
-          Expanded(
-            child: FileExplorer(
-              provider: widget.provider!,
-              selectionConfig: const FileSelectionConfig(
-                allowMultipleSelection: true,
-                allowFolderSelection: true,
-              ),
-              onFilesSelected: widget.onFilesSelected != null 
-                ? (files) => widget.onFilesSelected!(files.map((f) => f.id).toList())
-                : null,
-            ),
-          ),
-        ],
+      // Para provedores OAuth: apenas o conteúdo principal
+      return FileExplorer(
+        provider: widget.provider!,
+        selectionConfig: const FileSelectionConfig(
+          allowMultipleSelection: true,
+          allowFolderSelection: true,
+        ),
+        onFilesSelected: widget.onFilesSelected != null 
+          ? (files) => widget.onFilesSelected!(files.map((f) => f.id).toList())
+          : null,
       );
     } else {
       // Para provedores não-OAuth: apenas o FileExplorer
