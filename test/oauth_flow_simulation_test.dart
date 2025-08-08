@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:file_drive/src/models/oauth_types.dart';
-import 'test_config.example.dart'; // Usar template seguro
+import 'test_config.dart';
 
 void main() {
   group('OAuth Flow Simulation', () {
@@ -8,18 +8,18 @@ void main() {
       print('\n🔄 [Simulation] Simulando fluxo OAuth baseado no código que funciona...');
       
       // 1. App gera URL para o servidor local - usando placeholder seguro
-      final appUrl = 'http://localhost:8080/auth/google?client_id=${GoogleOAuthConfig.clientId}&redirect_uri=${Uri.encodeComponent(GoogleOAuthConfig.customSchemeRedirectUri)}%3A%2F%2Foauth';
+      final appUrl = 'http://localhost:${TestServerConfig.port}/auth/google?client_id=${GoogleOAuthConfig.clientId}&redirect_uri=${Uri.encodeComponent(GoogleOAuthConfig.customSchemeRedirectUri)}%3A%2F%2Foauth';
       print('🔄 [Simulation] 1. App gera URL: $appUrl');
       
       // 2. Servidor deveria redirecionar para Google - usando placeholder seguro
-      final googleUrl = 'https://accounts.google.com/o/oauth2/v2/auth?client_id=${GoogleOAuthConfig.clientId}&redirect_uri=http://localhost:8080/auth/callback&response_type=code&scope=https://www.googleapis.com/auth/drive.file+https://www.googleapis.com/auth/userinfo.email&access_type=offline&prompt=select_account&include_granted_scopes=true&state=test_state';
+      final googleUrl = 'https://accounts.google.com/o/oauth2/v2/auth?client_id=${GoogleOAuthConfig.clientId}&redirect_uri=http://localhost:${TestServerConfig.port}/auth/callback&response_type=code&scope=https://www.googleapis.com/auth/drive.file+https://www.googleapis.com/auth/userinfo.email&access_type=offline&prompt=select_account&include_granted_scopes=true&state=test_state';
       print('🔄 [Simulation] 2. Servidor redireciona para Google: $googleUrl');
       
       // 3. Usuário faz login no Google (SUCESSO - você conseguiu!)
       print('🔄 [Simulation] 3. ✅ Usuário fez login no Google com sucesso!');
       
       // 4. Google redireciona de volta para o servidor
-      final googleCallback = 'http://localhost:8080/auth/callback?code=google_auth_code_123&state=test_state';
+      final googleCallback = 'http://localhost:${TestServerConfig.port}/auth/callback?code=google_auth_code_123&state=test_state';
       print('🔄 [Simulation] 4. Google redireciona para servidor: $googleCallback');
       
       // 5. Servidor deveria redirecionar de volta para o app - usando placeholder seguro
@@ -61,7 +61,7 @@ void main() {
       print('🔍 [Debug] - Processa: uri.queryParameters[\'hid\'] (token direto)');
       
       print('\n🔍 [Debug] Nosso código usa:');
-      print('🔍 [Debug] - URL: http://localhost:8080/auth/google');
+      print('🔍 [Debug] - URL: http://localhost:${TestServerConfig.port}/auth/google');
       print('🔍 [Debug] - Callback scheme: com.googleusercontent.apps...');
       print('🔍 [Debug] - Processa: uri.queryParameters[\'code\'] (código OAuth)');
       
@@ -79,7 +79,7 @@ void main() {
       print('🔄 [PostLogin] ✅ Aceitar permissões: SUCESSO');
       
       // O que deveria acontecer depois:
-      print('🔄 [PostLogin] Google deveria redirecionar para: http://localhost:8080/auth/callback?code=...&state=...');
+      print('🔄 [PostLogin] Google deveria redirecionar para: http://localhost:${TestServerConfig.port}/auth/callback?code=...&state=...');
       
       // Nosso servidor deveria:
       print('🔄 [PostLogin] Servidor deveria:');

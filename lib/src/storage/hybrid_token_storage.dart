@@ -99,6 +99,11 @@ class HybridTokenStorage with AccountDeletionMixin implements TokenStorage {
       'metadata': token.metadata,
       'hasPermissionIssues': token.hasPermissionIssues,
       'needsReauth': token.needsReauth,
+      'userId': token.userId,
+      'userName': token.userName,
+      'userEmail': token.userEmail,
+      'userPicture': token.userPicture,
+      'userInfoUpdatedAt': token.userInfoUpdatedAt?.toIso8601String(),
     };
     final tokenJson = jsonEncode(tokenData);
     
@@ -155,6 +160,13 @@ class HybridTokenStorage with AccountDeletionMixin implements TokenStorage {
         metadata: Map<String, dynamic>.from(data['metadata'] ?? {}),
         hasPermissionIssues: data['hasPermissionIssues'] ?? false,
         needsReauth: data['needsReauth'] ?? false,
+        userId: data['userId'],
+        userName: data['userName'],
+        userEmail: data['userEmail'],
+        userPicture: data['userPicture'],
+        userInfoUpdatedAt: data['userInfoUpdatedAt'] != null 
+            ? DateTime.parse(data['userInfoUpdatedAt'])
+            : null,
       );
       
       print('🔍 [Hybrid] Token carregado de $source: success=${result.success}, hasPermissionIssues=${result.hasPermissionIssues}, needsReauth=${result.needsReauth}');

@@ -2,6 +2,8 @@
 /// Esta configuração é usada apenas em testes e usa valores seguros
 library;
 
+import 'test_config.dart';
+
 /// Configuração OAuth mock para testes
 class MockOAuthConfig {
   /// 🔑 CLIENT ID MOCK para testes
@@ -11,7 +13,7 @@ class MockOAuthConfig {
   static const String clientSecret = 'MOCK_CLIENT_SECRET_FOR_TESTS';
   
   /// 🔗 REDIRECT URIs MOCK
-  static const String webRedirectUri = 'http://localhost:8080/auth/callback';
+  static String get webRedirectUri => '${TestServerConfig.baseUrl}${TestServerConfig.callbackEndpoint}';
   
   /// 🔗 CUSTOM SCHEME REDIRECT URI MOCK
   static String get customSchemeRedirectUri {

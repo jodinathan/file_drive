@@ -93,8 +93,12 @@ void main() {
         ),
       );
 
-      // Tap the provider tab
-      await tester.tap(find.byType(ProviderTab));
+      // Tap the provider tab using the InkWell which is the actual tappable area
+      final inkWellFinder = find.descendant(
+        of: find.byType(ProviderTab),
+        matching: find.byType(InkWell),
+      );
+      await tester.tap(inkWellFinder);
       await tester.pump();
 
       expect(wasTapped, isTrue);
@@ -269,8 +273,12 @@ void main() {
       await tester.startGesture(tester.getCenter(inkWellFinder));
       await tester.pump(const Duration(milliseconds: 100));
       
-      // Should have animation running
-      expect(find.byType(AnimatedBuilder), findsOneWidget);
+      // Should have animation running - find the specific AnimatedBuilder from ProviderTab
+      final animatedBuilderFinder = find.descendant(
+        of: find.byType(ProviderTab),
+        matching: find.byType(AnimatedBuilder),
+      );
+      expect(animatedBuilderFinder, findsOneWidget);
     });
 
     testWidgets('should show different background colors based on status', (WidgetTester tester) async {

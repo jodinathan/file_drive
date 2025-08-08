@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:file_drive/src/config/app_config.dart';
 import 'package:file_drive/src/utils/constants.dart';
+import 'test_config.dart';
 
 void main() {
   group('Configuração Simples', () {
@@ -11,7 +12,7 @@ void main() {
       
       // Validações básicas
       expect(AppConfig.serverHost, equals('localhost'));
-      expect(AppConfig.serverPort, equals(8080));
+      expect(AppConfig.serverPort, equals(TestServerConfig.port));
       expect(AppConfig.authEndpoint, equals('/auth/google'));
       
       print('✅ [Config] Frontend configurado corretamente!');
@@ -24,7 +25,7 @@ void main() {
       print('✅ [Server] Refresh endpoint: ${ServerConfig.refreshEndpoint}');
       
       // Validações
-      expect(ServerConfig.baseUrl, equals('http://localhost:8080'));
+      expect(ServerConfig.baseUrl, equals('http://localhost:${TestServerConfig.port}'));
       expect(ServerConfig.authEndpoint, equals('/auth/google'));
       expect(ServerConfig.refreshEndpoint, equals('/auth/refresh'));
       

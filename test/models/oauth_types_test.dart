@@ -1,17 +1,18 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:file_drive/src/models/oauth_types.dart';
+import '../test_config.dart';
 
 void main() {
   group('OAuthParams', () {
     test('should create OAuthParams with required fields', () {
       final params = OAuthParams(
         clientId: 'test_client_id',
-        redirectUri: 'http://localhost:8080/callback',
+        redirectUri: 'http://localhost:${TestServerConfig.port}/callback',
         scopes: ['scope1', 'scope2'],
       );
 
       expect(params.clientId, equals('test_client_id'));
-      expect(params.redirectUri, equals('http://localhost:8080/callback'));
+      expect(params.redirectUri, equals('http://localhost:${TestServerConfig.port}/callback'));
       expect(params.scopes, equals(['scope1', 'scope2']));
       expect(params.state, isNull);
       expect(params.codeChallenge, isNull);
@@ -21,7 +22,7 @@ void main() {
     test('should create OAuthParams with optional fields', () {
       final params = OAuthParams(
         clientId: 'test_client_id',
-        redirectUri: 'http://localhost:8080/callback',
+        redirectUri: 'http://localhost:${TestServerConfig.port}/callback',
         scopes: ['scope1'],
         state: 'test_state',
         codeChallenge: 'test_challenge',
@@ -36,7 +37,7 @@ void main() {
     test('should convert to query parameters correctly', () {
       final params = OAuthParams(
         clientId: 'test_client_id',
-        redirectUri: 'http://localhost:8080/callback',
+        redirectUri: 'http://localhost:${TestServerConfig.port}/callback',
         scopes: ['scope1', 'scope2'],
         state: 'test_state',
       );
@@ -44,7 +45,7 @@ void main() {
       final queryParams = params.toQueryParams();
 
       expect(queryParams['client_id'], equals('test_client_id'));
-      expect(queryParams['redirect_uri'], equals('http://localhost:8080/callback'));
+      expect(queryParams['redirect_uri'], equals('http://localhost:${TestServerConfig.port}/callback'));
       expect(queryParams['scope'], equals('scope1 scope2'));
       expect(queryParams['response_type'], equals('code'));
       expect(queryParams['state'], equals('test_state'));
@@ -53,7 +54,7 @@ void main() {
     test('should handle empty scopes', () {
       final params = OAuthParams(
         clientId: 'test_client_id',
-        redirectUri: 'http://localhost:8080/callback',
+        redirectUri: 'http://localhost:${TestServerConfig.port}/callback',
         scopes: [],
       );
 
@@ -64,7 +65,7 @@ void main() {
     test('should have correct toString representation', () {
       final params = OAuthParams(
         clientId: 'test_client_id',
-        redirectUri: 'http://localhost:8080/callback',
+        redirectUri: 'http://localhost:${TestServerConfig.port}/callback',
         scopes: ['scope1', 'scope2'],
       );
 

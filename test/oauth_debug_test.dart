@@ -3,7 +3,7 @@ import 'package:file_drive/src/providers/google_drive/google_drive_provider.dart
 import 'package:file_drive/src/models/oauth_types.dart';
 import 'package:file_drive/src/providers/base/cloud_provider.dart';
 import 'package:file_drive/src/storage/shared_preferences_token_storage.dart';
-import 'test_config.example.dart'; // Usar template seguro
+import 'test_config.dart';
 
 void main() {
   group('OAuth Debug Tests', () {
@@ -15,7 +15,7 @@ void main() {
       provider = GoogleDriveProvider(
         tokenStorage: tokenStorage,
         urlGenerator: (params) {
-          return 'http://localhost:8080/auth/google?${Uri(queryParameters: params.toQueryParams()).query}';
+          return 'http://localhost:${TestServerConfig.port}/auth/google?${Uri(queryParameters: params.toQueryParams()).query}';
         },
       );
     });
@@ -111,7 +111,7 @@ void main() {
       print('🧪 [Test] Formato: scheme://oauth?code=...&state=...');
       
       print('🧪 [Test] === POSSÍVEIS PROBLEMAS ===');
-      if (params.redirectUri.contains('localhost:8080')) {
+      if (params.redirectUri.contains('localhost:${TestServerConfig.port}')) {
         print('⚠️  [Test] Redirect URI usa localhost - deve estar no Google Console');
       }
       if (params.scopes.any((s) => s.contains('readonly'))) {
@@ -131,7 +131,7 @@ void main() {
       
       print('🧪 [Test] 2. Gerando URL de autenticação...');
       final url = provider.urlGenerator!(params);
-      expect(url, contains('accounts.google.com'));
+      expect(url, contains('localhost:${TestServerConfig.port}'));
       
       print('🧪 [Test] 3. Simulando callback de sucesso...');
       final callbackUrl = '${GoogleOAuthConfig.customSchemeRedirectUri}://oauth?code=test_code&state=${params.state}';

@@ -133,7 +133,10 @@ class _AccountListState extends State<AccountList> {
                       final userId = entry.key;
                       final userInfo = entry.value;
                       final isActive = userId == widget.provider.activeUserId;
-                      final needsReauth = isActive && widget.provider.needsReauth;
+                      // Check needsReauth from both provider state and user data
+                      final needsReauth = (isActive && widget.provider.needsReauth) || 
+                                         (userInfo['needsReauth'] == true) ||
+                                         (userInfo['hasPermissionIssues'] == true);
 
                       return _buildAccountCard(userId, userInfo, isActive, needsReauth);
                     }).toList(),
@@ -280,20 +283,53 @@ class _AccountListState extends State<AccountList> {
                   ),
                   
                   // Actions
-                  if (needsReauth)
-                    IconButton(
-                      onPressed: () => widget.provider.authenticate(),
-                      icon: const Icon(Icons.refresh, size: 16),
-                      color: Colors.orange,
-                      tooltip: 'Reautenticar',
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                    )
-                  else if (isActive)
-                    Icon(
-                      Icons.check_circle,
-                      size: 16,
-                      color: widget.provider.providerColor,
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (needsReauth)
+                        IconButton(
+                          onPressed: () => widget.provider.authenticate(),
+                          icon: const Icon(Icons.refresh, size: 16),
+                          color: Colors.orange,
+                          tooltip: 'Reautenticar',
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        )
+                      else if (isActive)
+                        Icon(
+                          Icons.check_circle,
+                          size: 16,
+                          color: widget.provider.providerColor,
+                        ),
+                      
+                      // Remove account button
+                      PopupMenuButton<String>(
+                        onSelected: (value) {
+                          if (value == 'remove') {
+                            _showRemoveAccountDialog(userId, name);
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem<String>(
+                            value: 'remove',
+                            child: Row(
+                              children: [
+                                Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                                SizedBox(width: 8),
+                                Text('Remover conta', style: TextStyle(color: Colors.red)),
+                              ],
+                            ),
+                          ),
+                        ],
+                        icon: Icon(
+                          Icons.more_vert,
+                          size: 16,
+                          color: widget.theme.colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        tooltip: 'Opções da conta',
+                      ),
+                    ],
+                  ),
                 ],
               ),
               
@@ -319,6 +355,59 @@ class _AccountListState extends State<AccountList> {
     final success = await widget.provider.switchToUser(userId);
     if (success && mounted) {
       setState(() {});
+    }
+  }
+
+  void _showRemoveAccountDialog(String userId, String userName) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Remover Conta'),
+          content: Text(
+            'Tem certeza que deseja remover a conta "$userName"?\n\n'
+            'Esta ação não pode ser desfeita e você precisará fazer login novamente para usar esta conta.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _removeAccount(userId);
+              },
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Remover'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _removeAccount(String userId) async {
+    try {
+      await widget.provider.deleteUser(userId);
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Conta removida com sucesso'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao remover conta: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 }

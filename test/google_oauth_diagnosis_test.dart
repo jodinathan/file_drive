@@ -13,7 +13,7 @@ void main() {
       provider = GoogleDriveProvider(
         tokenStorage: tokenStorage,
         urlGenerator: (params) {
-          return 'http://localhost:8080/auth/google?${Uri(queryParameters: params.toQueryParams()).query}';
+          return 'http://localhost:${TestServerConfig.port}/auth/google?${Uri(queryParameters: params.toQueryParams()).query}';
         },
       );
     });
@@ -168,11 +168,11 @@ void main() {
             'type': 'Web application',
             'authorized_redirect_uris': [
               GoogleOAuthConfig.webRedirectUri,
-              'http://127.0.0.1:8080/auth/callback',
+              'http://127.0.0.1:${TestServerConfig.port}/auth/callback',
             ],
             'authorized_javascript_origins': [
-              'http://localhost:8080',
-              'http://127.0.0.1:8080',
+              'http://localhost:${TestServerConfig.port}',
+              'http://127.0.0.1:${TestServerConfig.port}',
             ],
           },
           'test_users': [

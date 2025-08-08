@@ -93,6 +93,13 @@ class AuthResult {
   final bool hasPermissionIssues;
   final bool needsReauth;
   
+  // User info to be cached locally
+  final String? userId;
+  final String? userName;
+  final String? userEmail;
+  final String? userPicture;
+  final DateTime? userInfoUpdatedAt;
+  
   const AuthResult({
     required this.success,
     this.accessToken,
@@ -102,6 +109,11 @@ class AuthResult {
     this.metadata = const {},
     this.hasPermissionIssues = false,
     this.needsReauth = false,
+    this.userId,
+    this.userName,
+    this.userEmail,
+    this.userPicture,
+    this.userInfoUpdatedAt,
   });
   
   /// Create successful auth result
@@ -112,6 +124,10 @@ class AuthResult {
     Map<String, dynamic> metadata = const {},
     bool hasPermissionIssues = false,
     bool needsReauth = false,
+    String? userId,
+    String? userName,
+    String? userEmail,
+    String? userPicture,
   }) {
     return AuthResult(
       success: true,
@@ -121,6 +137,11 @@ class AuthResult {
       metadata: metadata,
       hasPermissionIssues: hasPermissionIssues,
       needsReauth: needsReauth,
+      userId: userId,
+      userName: userName,
+      userEmail: userEmail,
+      userPicture: userPicture,
+      userInfoUpdatedAt: DateTime.now(),
     );
   }
   
@@ -128,12 +149,21 @@ class AuthResult {
   factory AuthResult.failure(String error, {
     bool hasPermissionIssues = false,
     bool needsReauth = false,
+    String? userId,
+    String? userName,
+    String? userEmail,
+    String? userPicture,
   }) {
     return AuthResult(
       success: false,
       error: error,
       hasPermissionIssues: hasPermissionIssues,
       needsReauth: needsReauth,
+      userId: userId,
+      userName: userName,
+      userEmail: userEmail,
+      userPicture: userPicture,
+      userInfoUpdatedAt: userName != null ? DateTime.now() : null,
     );
   }
   
@@ -144,6 +174,10 @@ class AuthResult {
     DateTime? expiresAt,
     Map<String, dynamic> metadata = const {},
     String? error,
+    String? userId,
+    String? userName,
+    String? userEmail,
+    String? userPicture,
   }) {
     return AuthResult(
       success: false,  // Permission issues mean auth was not fully successful
@@ -154,6 +188,35 @@ class AuthResult {
       error: error,
       hasPermissionIssues: true,
       needsReauth: true,
+      userId: userId,
+      userName: userName,
+      userEmail: userEmail,
+      userPicture: userPicture,
+      userInfoUpdatedAt: userName != null ? DateTime.now() : null,
+    );
+  }
+  
+  /// Create copy with updated user info
+  AuthResult copyWithUserInfo({
+    String? userId,
+    String? userName,
+    String? userEmail,
+    String? userPicture,
+  }) {
+    return AuthResult(
+      success: success,
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+      expiresAt: expiresAt,
+      error: error,
+      metadata: metadata,
+      hasPermissionIssues: hasPermissionIssues,
+      needsReauth: needsReauth,
+      userId: userId ?? this.userId,
+      userName: userName ?? this.userName,
+      userEmail: userEmail ?? this.userEmail,
+      userPicture: userPicture ?? this.userPicture,
+      userInfoUpdatedAt: DateTime.now(),
     );
   }
   

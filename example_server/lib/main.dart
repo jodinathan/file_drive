@@ -11,8 +11,50 @@ import 'package:shelf_router/shelf_router.dart';
 import 'package:http/http.dart' as http;
 import 'config.dart';
 
-void main() async {
+void main(List<String> args) async {
   print('🚀 Iniciando servidor OAuth...');
+  
+  // Parse command line arguments for port
+  int port = ServerConfig.port; // default port
+  
+  for (int i = 0; i < args.length; i++) {
+    if ((args[i] == '-p' || args[i] == '--port') && i + 1 < args.length) {
+      try {
+        port = int.parse(args[i + 1]);
+        print('📡 Porta configurada via argumento: $port');
+      } catch (e) {
+        print('❌ Erro ao parsear porta: ${args[i + 1]}. Usando porta padrão: ${ServerConfig.port}');
+      }
+      break;
+    } else if (args[i].startsWith('--port=')) {
+      try {
+        port = int.parse(args[i].split('=')[1]);
+        print('📡 Porta configurada via argumento: $port');
+      } catch (e) {
+        print('❌ Erro ao parsear porta: ${args[i]}. Usando porta padrão: ${ServerConfig.port}');
+      }
+      break;
+    }
+  }
+  
+  if (args.contains('-h') || args.contains('--help')) {
+    print('''
+🖥️ SERVIDOR OAUTH PARA GOOGLE DRIVE
+
+Uso: dart run [opções]
+
+Opções:
+  -p, --port <numero>    Define a porta do servidor (padrão: ${ServerConfig.port})
+  --port=<numero>        Define a porta do servidor (formato alternativo)
+  -h, --help             Mostra esta mensagem de ajuda
+
+Exemplos:
+  dart run                    # Usa porta padrão (${ServerConfig.port})
+  dart run -p 3000           # Usa porta 3000
+  dart run --port=8080       # Usa porta 8080
+''');
+    exit(0);
+  }
   
   final app = Router();
   
@@ -203,9 +245,9 @@ void main() async {
       .addHandler(app);
 
   // Iniciar servidor
-  final server = await serve(handler, ServerConfig.host, ServerConfig.port);
+  final server = await serve(handler, ServerConfig.host, port);
   print('✅ Servidor rodando em ${server.address.host}:${server.port}');
-  print('🔗 OAuth URL: ${ServerConfig.baseUrl}/auth/google');
+  print('🔗 OAuth URL: http://${server.address.host}:${server.port}/auth/google');
 }
 
 /// Trocar código por tokens com Google

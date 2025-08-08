@@ -17,7 +17,24 @@ Abra `lib/src/config/config.dart` e substitua:
 static const String clientId = 'SUA_CLIENT_ID_REAL.apps.googleusercontent.com';
 ```
 
-### 3. Configure o macOS (se necessário)
+### 3. Configure o Example Server (Opcional)
+
+Para desenvolvimento local, você pode usar o servidor OAuth incluído:
+
+```bash
+# Execução básica (porta 8080)
+cd example_server
+dart run
+
+# Execução com porta customizada
+dart run -p 3000
+dart run --port=9000
+
+# Ver todas as opções
+dart run --help
+```
+
+### 4. Configure o macOS (se necessário)
 
 ```bash
 # Configure a variável de ambiente (opcional)
@@ -27,7 +44,7 @@ export GOOGLE_CLIENT_ID="sua_client_id_real.apps.googleusercontent.com"
 ./scripts/configure_macos_oauth.sh
 ```
 
-### 4. Execute o Projeto
+### 5. Execute o Projeto
 
 ```bash
 flutter run

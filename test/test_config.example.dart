@@ -42,7 +42,7 @@ class GoogleOAuthConfig {
 /// Configuração do servidor de teste
 class TestServerConfig {
   static const String host = 'localhost';
-  static const int port = 8080;
+  static const int port = 3000;
   static const String baseUrl = 'http://$host:$port';
   
   /// Endpoints do servidor de teste

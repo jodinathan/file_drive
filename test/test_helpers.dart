@@ -10,6 +10,7 @@ import 'package:file_drive/src/models/cloud_item.dart';
 import 'package:file_drive/src/models/cloud_folder.dart';
 import 'package:file_drive/src/models/file_operations.dart';
 import 'package:file_drive/src/models/search_models.dart';
+import 'test_config.dart';
 
 /// Test helpers and utilities for FileDrive tests
 
@@ -398,7 +399,7 @@ class TestUtils {
   }) {
     return OAuthParams(
       clientId: clientId ?? 'test_client_id',
-      redirectUri: redirectUri ?? 'http://localhost:8080/callback',
+      redirectUri: redirectUri ?? 'http://localhost:${TestServerConfig.port}/callback',
       scopes: scopes ?? ['scope1', 'scope2'],
       state: state,
     );

@@ -4,19 +4,20 @@ library;
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import 'package:http/http.dart' as http;
 
 import '../../utils/constants.dart';
 import '../../models/oauth_types.dart';
 import '../../storage/token_storage.dart';
 import '../../config/config.dart';
+import '../../auth/web_auth_client.dart';
 import 'cloud_provider.dart';
 
 /// Abstract class for OAuth-based cloud providers
 abstract class OAuthCloudProvider extends BaseCloudProvider {
   final Function(OAuthParams) urlGenerator;
   final TokenStorage tokenStorage;
+  final WebAuthClient webAuthClient;
   final Function(String providerId, String userId)? onTokenDelete;
   
   AuthResult? _authResult;
@@ -27,6 +28,7 @@ abstract class OAuthCloudProvider extends BaseCloudProvider {
   OAuthCloudProvider({
     required this.urlGenerator,
     required this.tokenStorage,
+    this.webAuthClient = const FlutterWebAuthClient(),
     this.onTokenDelete,
   });
 
@@ -45,21 +47,90 @@ abstract class OAuthCloudProvider extends BaseCloudProvider {
 
   /// Get all available users for this provider
   Future<Map<String, Map<String, dynamic>>> getAllUsers() async {
+    print('🔍 [getAllUsers] Iniciando busca de todos os usuários...');
     final tokens = await tokenStorage.getAllTokens(providerId);
     final users = <String, Map<String, dynamic>>{};
+    
+    print('🔍 [getAllUsers] Tokens encontrados: ${tokens.keys.toList()}');
     
     for (final entry in tokens.entries) {
       final userId = entry.key;
       final token = entry.value;
       
+      print('🔍 [getAllUsers] Processando usuário: $userId');
+      print('🔍 [getAllUsers] Token tem accessToken: ${token.accessToken != null}');
+      print('🔍 [getAllUsers] Token hasPermissionIssues: ${token.hasPermissionIssues}');
+      print('🔍 [getAllUsers] Token needsReauth: ${token.needsReauth}');
+      print('🔍 [getAllUsers] User info armazenado: name=${token.userName}, email=${token.userEmail}');
+      
+      // First, try to use locally stored user info
+      if (token.userName != null || token.userEmail != null) {
+        users[userId] = {
+          'name': token.userName ?? 'Usuário $userId',
+          'email': token.userEmail ?? 'user@example.com',
+          'picture': token.userPicture,
+          'needsReauth': token.hasPermissionIssues || token.needsReauth,
+          'hasPermissionIssues': token.hasPermissionIssues,
+          'userInfoSource': 'local_cache',
+        };
+        print('✅ [getAllUsers] Usuário $userId adicionado com dados do cache local: ${token.userName ?? token.userEmail}');
+        continue;
+      }
+      
       if (token.accessToken != null) {
-        final userInfo = await getUserInfoFromProvider(token.accessToken!);
-        if (userInfo != null) {
-          users[userId] = userInfo;
+        try {
+          print('🔍 [getAllUsers] Tentando obter userInfo via API para: $userId');
+          final userInfo = await getUserInfoFromProvider(token.accessToken!);
+          print('🔍 [getAllUsers] UserInfo obtido via API para $userId: ${userInfo != null ? 'SIM' : 'NÃO'}');
+          if (userInfo != null) {
+            // Store user info in token for future use
+            final updatedToken = token.copyWithUserInfo(
+              userId: userId,
+              userName: userInfo['name'],
+              userEmail: userInfo['email'],
+              userPicture: userInfo['picture'],
+            );
+            await tokenStorage.storeToken(providerId, userId, updatedToken);
+            
+            users[userId] = {
+              ...userInfo,
+              'needsReauth': token.hasPermissionIssues || token.needsReauth,
+              'hasPermissionIssues': token.hasPermissionIssues,
+              'userInfoSource': 'api_fresh',
+            };
+            print('✅ [getAllUsers] Usuário $userId adicionado com dados da API e cache atualizado: ${userInfo['name'] ?? userInfo['email'] ?? 'sem nome'}');
+          } else {
+            print('❌ [getAllUsers] UserInfo null para usuário: $userId');
+            // Se o userInfo for null mas o token existir, vamos incluir informações básicas
+            users[userId] = {
+              'name': 'Usuário $userId',
+              'email': 'reauth@required.com', 
+              'needsReauth': token.hasPermissionIssues || token.needsReauth,
+              'hasPermissionIssues': token.hasPermissionIssues,
+              'userInfoSource': 'fallback',
+            };
+            print('✅ [getAllUsers] Usuário $userId adicionado com informações básicas para reauth');
+          }
+        } catch (e) {
+          print('❌ [getAllUsers] Erro ao obter userInfo para $userId: $e');
+          // Mesmo com erro, vamos incluir informações básicas do token
+          users[userId] = {
+            'name': 'Usuário $userId',
+            'email': 'error@reauth.required', 
+            'needsReauth': true,
+            'hasPermissionIssues': token.hasPermissionIssues,
+            'error': e.toString(),
+            'userInfoSource': 'error_fallback',
+          };
+          print('✅ [getAllUsers] Usuário $userId adicionado com informações de erro/reauth');
         }
+      } else {
+        print('❌ [getAllUsers] Token sem accessToken para usuário: $userId');
       }
     }
     
+    print('🔍 [getAllUsers] Total de usuários retornados: ${users.length}');
+    print('🔍 [getAllUsers] Usuários: ${users.keys.toList()}');
     return users;
   }
 
@@ -337,7 +408,6 @@ abstract class OAuthCloudProvider extends BaseCloudProvider {
     }
   }
 
-  @override
   Future<bool> refreshAccessToken() async {
     if (_authResult?.refreshToken == null) return false;
 
@@ -372,9 +442,9 @@ abstract class OAuthCloudProvider extends BaseCloudProvider {
       print('🔐 [OAuth] Callback scheme: $callbackScheme');
       print('🔐 [OAuth] Platform: ${kIsWeb ? "Web" : "Desktop"}');
 
-      // Use flutter_web_auth_2 for cross-platform OAuth
-      print('🔐 [OAuth] Chamando FlutterWebAuth2.authenticate...');
-      final result = await FlutterWebAuth2.authenticate(
+      // Use webAuthClient for cross-platform OAuth
+      print('🔐 [OAuth] Chamando webAuthClient.authenticate...');
+      final result = await webAuthClient.authenticate(
         url: authUrl,
         callbackUrlScheme: callbackScheme,
       );
@@ -413,11 +483,18 @@ abstract class OAuthCloudProvider extends BaseCloudProvider {
             final scopesValid = hasRequiredScopes(grantedScopes);
             print('🔍 [OAuth] HasRequiredScopes: $scopesValid');
             
-            // Get user info to generate user ID
+            // Get user info to generate user ID and cache user data
             String? userId;
+            String? userName;
+            String? userEmail;
+            String? userPicture;
             try {
               final userInfo = await getUserInfoFromProvider(tokenData['access_token']);
               userId = userInfo?['id']?.toString() ?? userInfo?['sub']?.toString();
+              userName = userInfo?['name']?.toString();
+              userEmail = userInfo?['email']?.toString();
+              userPicture = userInfo?['picture']?.toString();
+              print('✅ [OAuth] User info obtido: id=$userId, name=$userName, email=$userEmail');
             } catch (e) {
               print('⚠️ [OAuth] Could not get user info for ID: $e');
             }
@@ -430,6 +507,10 @@ abstract class OAuthCloudProvider extends BaseCloudProvider {
                 expiresAt: tokenData['expires_in'] != null 
                     ? DateTime.now().add(Duration(seconds: tokenData['expires_in']))
                     : DateTime.now().add(const Duration(hours: 1)),
+                userId: userId,
+                userName: userName,
+                userEmail: userEmail,
+                userPicture: userPicture,
                 metadata: {
                   'code': callback.code,
                   'state': callback.state,
@@ -448,6 +529,10 @@ abstract class OAuthCloudProvider extends BaseCloudProvider {
                 expiresAt: tokenData['expires_in'] != null 
                     ? DateTime.now().add(Duration(seconds: tokenData['expires_in']))
                     : DateTime.now().add(const Duration(hours: 1)),
+                userId: userId,
+                userName: userName,
+                userEmail: userEmail,
+                userPicture: userPicture,
                 metadata: {
                   'code': callback.code,
                   'state': callback.state,

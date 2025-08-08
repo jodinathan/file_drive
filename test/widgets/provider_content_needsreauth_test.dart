@@ -28,6 +28,20 @@ void main() {
       when(mockProvider.statusStream).thenAnswer((_) => 
           Stream.fromIterable([ProviderStatus.needsReauth]));
       when(mockProvider.authenticate()).thenAnswer((_) async => true);
+      when(mockProvider.getUserInfo()).thenAnswer((_) async => {
+        'name': 'Test User',
+        'email': 'test@example.com',
+      });
+      when(mockProvider.providerColor).thenReturn(Colors.blue);
+      when(mockProvider.getAllUsers()).thenAnswer((_) async => {
+        'test_user_id': {
+          'name': 'Test User',
+          'email': 'test@example.com',
+        },
+      });
+      when(mockProvider.providerName).thenReturn('Google Drive');
+      when(mockProvider.activeUserId).thenReturn('test_user_id');
+      when(mockProvider.needsReauth).thenReturn(true);
     });
 
     testWidgets('should display reauth screen when status is needsReauth', (WidgetTester tester) async {

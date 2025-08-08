@@ -25,7 +25,7 @@ void main() {
       provider = GoogleDriveProvider(
         tokenStorage: tokenStorage,
         urlGenerator: (params) {
-          return 'http://localhost:8080/auth/google?${Uri(queryParameters: params.toQueryParams()).query}';
+          return '${TestServerConfig.baseUrl}${TestServerConfig.authEndpoint}?${Uri(queryParameters: params.toQueryParams()).query}';
         },
       );
     });

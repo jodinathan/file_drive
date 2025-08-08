@@ -64,7 +64,7 @@ void main() {
       
       // Pressionar o botão Tentar Novamente
       await tester.tap(find.text('Tentar Novamente'));
-      await tester.pump();
+      await tester.pumpAndSettle();
       
       // Verificar que o método authenticate foi chamado
       expect(mockProvider.lastAuthenticateCalled, isTrue);

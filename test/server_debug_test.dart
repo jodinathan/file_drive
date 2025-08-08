@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'test_config.dart';
 
 void main() {
   group('Server Debug Tests', () {
@@ -44,7 +45,7 @@ void main() {
       
       print('\n🔍 [TokenDebug] MAIS PROVÁVEL:');
       print('🔍 [TokenDebug] Redirect URI inconsistente!');
-      print('🔍 [TokenDebug] Auth inicial: http://localhost:8080/auth/callback');
+      print('🔍 [TokenDebug] Auth inicial: http://localhost:${TestServerConfig.port}/auth/callback');
       print('🔍 [TokenDebug] Token exchange: deve usar EXATAMENTE o mesmo URI');
     });
 
@@ -52,14 +53,14 @@ void main() {
       print('\n🧪 [ServerTest] Como verificar se o servidor está funcionando...');
       
       print('🧪 [ServerTest] 1. Verificar se servidor está rodando:');
-      print('🧪 [ServerTest]    curl http://localhost:8080/auth/google');
+      print('🧪 [ServerTest]    curl http://localhost:${TestServerConfig.port}/auth/google');
       print('🧪 [ServerTest]    Deve retornar 302 (redirect)');
       
       print('🧪 [ServerTest] 2. Verificar redirect para Google:');
       print('🧪 [ServerTest]    Location header deve conter accounts.google.com');
       
       print('🧪 [ServerTest] 3. Simular callback do Google:');
-      print('🧪 [ServerTest]    curl "http://localhost:8080/auth/callback?code=test&state=test"');
+      print('🧪 [ServerTest]    curl "http://localhost:${TestServerConfig.port}/auth/callback?code=test&state=test"');
       print('🧪 [ServerTest]    Deve processar sem erro');
       
       print('🧪 [ServerTest] 4. Verificar logs do servidor:');
@@ -78,8 +79,8 @@ void main() {
       
       print('☁️ [GoogleConsole] 2. Credentials (Web Application):');
       print('☁️ [GoogleConsole]    - Authorized redirect URIs:');
-      print('☁️ [GoogleConsole]      * http://localhost:8080/auth/callback');
-      print('☁️ [GoogleConsole]      * http://127.0.0.1:8080/auth/callback');
+      print('☁️ [GoogleConsole]      * http://localhost:${TestServerConfig.port}/auth/callback');
+      print('☁️ [GoogleConsole]      * http://127.0.0.1:${TestServerConfig.port}/auth/callback');
       
       print('☁️ [GoogleConsole] 3. Test Users (se app não verificado):');
       print('☁️ [GoogleConsole]    - Adicionar seu email como test user');

@@ -4,7 +4,7 @@ import 'package:mockito/annotations.dart';
 import 'package:http/http.dart' as http;
 import 'package:file_drive/src/utils/constants.dart';
 import 'dart:convert';
-import 'test_config.example.dart'; // Usar template seguro em vez de credenciais reais
+import 'test_config.dart';
 
 // Generate mocks
 @GenerateMocks([http.Client])
@@ -22,7 +22,7 @@ void main() {
       test('should generate correct OAuth URL with proper parameters', () {
         // Usar clientId do template seguro
         final clientId = GoogleOAuthConfig.clientId;
-        final redirectUri = 'http://localhost:8080/auth/callback';
+        final redirectUri = 'http://localhost:${TestServerConfig.port}/auth/callback';
         final scopes = ['https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/userinfo.email'];
         final state = 'test_state_123';
 
@@ -69,21 +69,21 @@ void main() {
       test('should validate redirect URI format', () {
         // Testar diferentes formatos de redirect URI
         final validRedirectUris = [
-          'http://localhost:8080/auth/callback',
-          'http://127.0.0.1:8080/auth/callback',
+          'http://localhost:${TestServerConfig.port}/auth/callback',
+          'http://127.0.0.1:${TestServerConfig.port}/auth/callback',
         ];
 
         final invalidRedirectUris = [
-          'https://localhost:8080/auth/callback', // HTTPS em localhost pode causar problemas
+          'https://localhost:${TestServerConfig.port}/auth/callback', // HTTPS em localhost pode causar problemas
           'http://localhost/auth/callback', // Sem porta
-          'localhost:8080/auth/callback', // Sem protocolo
+          'localhost:${TestServerConfig.port}/auth/callback', // Sem protocolo
         ];
 
         for (final uri in validRedirectUris) {
           final parsed = Uri.parse(uri);
           expect(parsed.scheme, equals('http'));
           expect(parsed.host, anyOf('localhost', '127.0.0.1'));
-          expect(parsed.port, equals(8080));
+          expect(parsed.port, equals(${TestServerConfig.port}));
           expect(parsed.path, equals('/auth/callback'));
         }
 
@@ -185,7 +185,7 @@ void main() {
         expect(tokenExchangeParams['grant_type'], equals('authorization_code'));
         expect(tokenExchangeParams['client_id'], isNotNull);
         expect(tokenExchangeParams['client_secret'], isNotNull);
-        expect(tokenExchangeParams['redirect_uri'], equals('http://localhost:8080/auth/callback'));
+        expect(tokenExchangeParams['redirect_uri'], equals('http://localhost:${TestServerConfig.port}/auth/callback'));
       });
     });
 
@@ -211,15 +211,15 @@ void main() {
       test('should validate CORS configuration', () {
         final allowedOrigins = [
           'http://localhost:3000',
-          'http://localhost:8080',
-          'http://127.0.0.1:8080',
+          'http://localhost:${TestServerConfig.port}',
+          'http://127.0.0.1:${TestServerConfig.port}',
         ];
 
         for (final origin in allowedOrigins) {
           final uri = Uri.parse(origin);
           expect(uri.scheme, equals('http'));
           expect(uri.host, anyOf('localhost', '127.0.0.1'));
-          expect(uri.port, anyOf(3000, 8080));
+          expect(uri.port, anyOf(3000, ${TestServerConfig.port}));
         }
       });
     });
@@ -263,19 +263,20 @@ void main() {
 // Helper functions para os testes
 String _generateSecureState() {
   final chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  final random = DateTime.now().microsecondsSinceEpoch; // Usar microseconds para mais variação
+  final random = DateTime.now().microsecondsSinceEpoch;
   return List.generate(32, (index) => chars[(random + index * 7) % chars.length]).join();
 }
 
 // Mock do sistema de token binding
 class MockTokenBinder {
+  static int _counter = 0;
   final Map<int, Map<String, dynamic>> _bindings = {};
-  int _counter = 0;
+  int _instanceCounter = 0;
 
   int bind(String token, Map<String, dynamic> data) {
-    _counter++;
-    _bindings[_counter] = {...data, 'token': token};
-    return _counter;
+    _instanceCounter++;
+    _bindings[_instanceCounter] = {...data, 'token': token};
+    return _instanceCounter;
   }
 
   Map<String, dynamic>? retrieve(int id) {

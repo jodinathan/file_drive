@@ -19,6 +19,7 @@ import '../../models/cloud_folder.dart' as models;
 import '../../models/file_operations.dart';
 import '../../models/search_models.dart';
 import '../../config/app_config.dart';
+import '../../auth/web_auth_client.dart';
 import '../base/oauth_cloud_provider.dart';
 import '../base/cloud_provider.dart';
 
@@ -30,9 +31,11 @@ class GoogleDriveProvider extends OAuthCloudProvider {
     required TokenStorage tokenStorage,
     Function(OAuthParams)? urlGenerator,
     Function(String providerId, String userId)? onTokenDelete,
+    WebAuthClient? webAuthClient,
   }) : super(
     tokenStorage: tokenStorage,
     urlGenerator: urlGenerator ?? ((params) => '${AppConfig.serverBaseUrl}${AppConfig.authEndpoint}?state=${params.state}'),
+    webAuthClient: webAuthClient ?? const FlutterWebAuthClient(),
     onTokenDelete: onTokenDelete,
   );
   
