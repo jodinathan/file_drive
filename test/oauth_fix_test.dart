@@ -1,13 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:file_drive/src/models/oauth_types.dart';
+import 'mock_oauth_config.dart'; // Usar configuração mock para testes
 
 void main() {
   group('OAuth Fix Validation', () {
     test('deve validar que o callback do servidor é processado corretamente', () {
       print('\n🔧 [Fix] Validando correção do OAuth...');
       
-      // Simular o callback que o servidor está enviando
-      final serverCallback = 'com.googleusercontent.apps.346650636779-58ec4t2v24ru8kj3s3t7dj46okanjman://oauth?code=4/0AVMBsJiVqmq_JLc-BORD9PB-qRu8GiNfBifcYV8G0v5-QPpCeNE-31CshoNyE1r3SeB81g&state=qw9whh4ZelwGOrJEv4YUcNXBxH198DUE';
+      // Simular o callback que o servidor está enviando - usando configuração mock
+      final serverCallback = '${MockOAuthConfig.customSchemeRedirectUri}://oauth?code=4/0AVMBsJiVqmq_JLc-BORD9PB-qRu8GiNfBifcYV8G0v5-QPpCeNE-31CshoNyE1r3SeB81g&state=qw9whh4ZelwGOrJEv4YUcNXBxH198DUE';
       
       print('🔧 [Fix] Callback do servidor: $serverCallback');
       

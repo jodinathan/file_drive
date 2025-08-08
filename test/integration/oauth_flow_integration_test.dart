@@ -8,6 +8,7 @@ import 'package:file_drive/src/widgets/file_drive_widget.dart';
 import 'package:file_drive/src/models/file_drive_config.dart';
 import 'package:file_drive/src/providers/google_drive/google_drive_provider.dart';
 import 'package:file_drive/src/providers/base/cloud_provider.dart';
+import '../test_config.example.dart'; // Usar template seguro
 import 'package:file_drive/src/models/oauth_types.dart';
 import 'dart:convert';
 import 'package:file_drive/src/storage/shared_preferences_token_storage.dart';
@@ -39,7 +40,7 @@ class MockFlutterWebAuth2 {
     if (_mockException != null) {
       throw _mockException!;
     }
-    return _mockResult ?? 'com.test.app://oauth?code=test_code&state=test_state';
+    return _mockResult ?? '${GoogleOAuthConfig.customSchemeRedirectUri}://oauth?code=test_code&state=test_state';
   }
 }
 
@@ -74,9 +75,9 @@ void main() {
 
     group('Complete OAuth Flow', () {
       testWidgets('should complete successful OAuth flow', (WidgetTester tester) async {
-        // Mock successful OAuth response
+        // Mock successful OAuth response - usando placeholder seguro
         MockFlutterWebAuth2.setMockResult(
-          'com.googleusercontent.apps.346650636779-58ec4t2v24ru8kj3s3t7dj46okanjman://oauth?code=test_auth_code&state=test_state'
+          '${GoogleOAuthConfig.customSchemeRedirectUri}://oauth?code=test_auth_code&state=test_state'
         );
 
         // Mock server callback response
@@ -133,9 +134,9 @@ void main() {
       });
 
       testWidgets('should handle OAuth error', (WidgetTester tester) async {
-        // Mock OAuth error
+        // Mock OAuth error - usando placeholder seguro
         MockFlutterWebAuth2.setMockResult(
-          'com.googleusercontent.apps.346650636779-58ec4t2v24ru8kj3s3t7dj46okanjman://oauth?error=access_denied&error_description=User+denied+access'
+          '${GoogleOAuthConfig.customSchemeRedirectUri}://oauth?error=access_denied&error_description=User+denied+access'
         );
 
         await tester.pumpWidget(
@@ -170,7 +171,7 @@ void main() {
       });
 
       test('should parse OAuth callback correctly', () {
-        final callbackUrl = 'com.test.app://oauth?code=test_code&state=test_state';
+        final callbackUrl = '${GoogleOAuthConfig.customSchemeRedirectUri}://oauth?code=test_code&state=test_state';
         final uri = Uri.parse(callbackUrl);
         final callback = OAuthCallback.fromQueryParams(uri.queryParameters);
 
@@ -180,7 +181,7 @@ void main() {
       });
 
       test('should parse OAuth error callback correctly', () {
-        final callbackUrl = 'com.test.app://oauth?error=access_denied&error_description=User+denied+access&state=test_state';
+        final callbackUrl = '${GoogleOAuthConfig.customSchemeRedirectUri}://oauth?error=access_denied&error_description=User+denied+access&state=test_state';
         final uri = Uri.parse(callbackUrl);
         final callback = OAuthCallback.fromQueryParams(uri.queryParameters);
 
@@ -192,21 +193,13 @@ void main() {
     });
 
     group('Provider State Management', () {
-      testWidgets('should update provider status during OAuth flow', (WidgetTester tester) async {
+      test('should update provider status during OAuth flow', () async {
         final statusUpdates = <ProviderStatus>[];
         TestResourceManager.safeStreamListen(provider.statusStream, statusUpdates.add);
 
-        // Mock successful OAuth
+        // Mock successful OAuth - usando configuração mock
         MockFlutterWebAuth2.setMockResult(
-          'com.test.app://oauth?code=test_code&state=test_state'
-        );
-
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(
-              body: FileDriveWidget(config: config),
-            ),
-          ),
+          '${GoogleOAuthConfig.customSchemeRedirectUri}://oauth?code=test_code&state=test_state'
         );
 
         // Initial state should be disconnected
@@ -225,7 +218,7 @@ void main() {
 
         // Mock successful authentication
         MockFlutterWebAuth2.setMockResult(
-          'com.test.app://oauth?code=test_code&state=test_state'
+          '${GoogleOAuthConfig.customSchemeRedirectUri}://oauth?code=test_code&state=test_state'
         );
 
         await provider.authenticate();
@@ -238,7 +231,7 @@ void main() {
       test('should handle logout correctly', () async {
         // First authenticate
         MockFlutterWebAuth2.setMockResult(
-          'com.test.app://oauth?code=test_code&state=test_state'
+          '${GoogleOAuthConfig.customSchemeRedirectUri}://oauth?code=test_code&state=test_state'
         );
         await provider.authenticate();
 
@@ -282,7 +275,7 @@ void main() {
         );
 
         MockFlutterWebAuth2.setMockResult(
-          'com.test.app://oauth?code=test_code&state=test_state'
+          '${GoogleOAuthConfig.customSchemeRedirectUri}://oauth?code=test_code&state=test_state'
         );
 
         final result = await provider.authenticate();

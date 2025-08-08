@@ -13,6 +13,7 @@ import '../../storage/token_storage.dart';
 import '../../utils/constants.dart';
 import '../../models/oauth_types.dart';
 import '../../models/cloud_item.dart';
+import '../../config/config.dart'; // Configuração OAuth
 import '../../models/cloud_file.dart' as models;
 import '../../models/cloud_folder.dart' as models;
 import '../../models/file_operations.dart';
@@ -53,7 +54,7 @@ class GoogleDriveProvider extends OAuthCloudProvider {
   @override
   OAuthParams createOAuthParams() {
     return OAuthParams(
-      clientId: '', // O servidor que define isso
+      clientId: OAuthConfig.clientId, // Usar configuração OAuth
       redirectUri: '${AppConfig.serverBaseUrl}/auth/callback',
       scopes: [scopes],
       state: _generateState(),

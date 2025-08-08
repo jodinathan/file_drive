@@ -4,7 +4,7 @@ import 'package:mockito/annotations.dart';
 import 'package:http/http.dart' as http;
 import 'package:file_drive/src/utils/constants.dart';
 import 'dart:convert';
-import 'test_config.dart';
+import 'test_config.example.dart'; // Usar template seguro em vez de credenciais reais
 
 // Generate mocks
 @GenerateMocks([http.Client])
@@ -20,8 +20,8 @@ void main() {
 
     group('Google OAuth URL Generation', () {
       test('should generate correct OAuth URL with proper parameters', () {
-        // Simular geração de URL OAuth baseada no código funcional
-        final clientId = '346650636779-58ec4t2v24ru8kj3s3t7dj46okanjman.apps.googleusercontent.com';
+        // Usar clientId do template seguro
+        final clientId = GoogleOAuthConfig.clientId;
         final redirectUri = 'http://localhost:8080/auth/callback';
         final scopes = ['https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/userinfo.email'];
         final state = 'test_state_123';
@@ -114,7 +114,8 @@ void main() {
       });
 
       test('should validate client ID format', () {
-        final clientId = '346650636779-58ec4t2v24ru8kj3s3t7dj46okanjman.apps.googleusercontent.com';
+        // Usar clientId do template seguro
+        final clientId = GoogleOAuthConfig.clientId;
         
         // Validar formato do Client ID do Google
         expect(clientId, endsWith('.apps.googleusercontent.com'));

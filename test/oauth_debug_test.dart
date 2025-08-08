@@ -3,6 +3,7 @@ import 'package:file_drive/src/providers/google_drive/google_drive_provider.dart
 import 'package:file_drive/src/models/oauth_types.dart';
 import 'package:file_drive/src/providers/base/cloud_provider.dart';
 import 'package:file_drive/src/storage/shared_preferences_token_storage.dart';
+import 'test_config.example.dart'; // Usar template seguro
 
 void main() {
   group('OAuth Debug Tests', () {
@@ -47,9 +48,9 @@ void main() {
     test('deve simular callback OAuth com logs', () {
       print('\n🧪 [Test] Testando parsing de callback OAuth...');
       
-      // Simular diferentes tipos de callback
-      final successCallback = 'com.googleusercontent.apps.346650636779-58ec4t2v24ru8kj3s3t7dj46okanjman://oauth?code=test_code_123&state=test_state';
-      final errorCallback = 'com.googleusercontent.apps.346650636779-58ec4t2v24ru8kj3s3t7dj46okanjman://oauth?error=access_denied&error_description=User+denied+access';
+      // Simular diferentes tipos de callback - usando placeholder seguro
+      final successCallback = '${GoogleOAuthConfig.customSchemeRedirectUri}://oauth?code=test_code_123&state=test_state';
+      final errorCallback = '${GoogleOAuthConfig.customSchemeRedirectUri}://oauth?error=access_denied&error_description=User+denied+access';
       
       print('🧪 [Test] Callback de sucesso: $successCallback');
       final successUri = Uri.parse(successCallback);
@@ -106,7 +107,7 @@ void main() {
       print('🧪 [Test] $url');
       
       print('🧪 [Test] === CALLBACK ESPERADO ===');
-      print('🧪 [Test] Scheme: com.googleusercontent.apps.346650636779-58ec4t2v24ru8kj3s3t7dj46okanjman');
+      print('🧪 [Test] Scheme: ${GoogleOAuthConfig.customSchemeRedirectUri}');
       print('🧪 [Test] Formato: scheme://oauth?code=...&state=...');
       
       print('🧪 [Test] === POSSÍVEIS PROBLEMAS ===');
@@ -133,7 +134,7 @@ void main() {
       expect(url, contains('accounts.google.com'));
       
       print('🧪 [Test] 3. Simulando callback de sucesso...');
-      final callbackUrl = 'com.googleusercontent.apps.346650636779-58ec4t2v24ru8kj3s3t7dj46okanjman://oauth?code=test_code&state=${params.state}';
+      final callbackUrl = '${GoogleOAuthConfig.customSchemeRedirectUri}://oauth?code=test_code&state=${params.state}';
       final uri = Uri.parse(callbackUrl);
       final callback = OAuthCallback.fromQueryParams(uri.queryParameters);
       expect(callback.isSuccess, isTrue);

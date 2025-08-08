@@ -6,7 +6,7 @@ library;
 class OAuthConfig {
   /// 🔑 CLIENT ID DO GOOGLE
   /// Obtenha em: https://console.cloud.google.com/apis/credentials
-  static const String clientId = 'YOUR_CLIENT_ID.apps.googleusercontent.com';
+  static const String clientId = 'YOUR_CLIENT_ID_NUMBER-abc123.apps.googleusercontent.com';
   
   /// 🔒 CLIENT SECRET DO GOOGLE (se necessário)
   static const String clientSecret = 'YOUR_CLIENT_SECRET';
@@ -18,7 +18,7 @@ class OAuthConfig {
   /// Extraído automaticamente do clientId
   static String get customSchemeRedirectUri {
     final parts = clientId.split('-');
-    if (parts.isNotEmpty && clientId != 'YOUR_CLIENT_ID.apps.googleusercontent.com') {
+    if (parts.isNotEmpty && clientId != 'YOUR_CLIENT_ID_NUMBER-abc123.apps.googleusercontent.com') {
       final number = parts.first;
       return 'com.googleusercontent.apps.$number';
     }

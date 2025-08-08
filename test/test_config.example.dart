@@ -10,14 +10,14 @@ library;
 class GoogleOAuthConfig {
   /// Client ID do Google OAuth Console
   /// Obtenha em: https://console.cloud.google.com/apis/credentials
-  static const String clientId = 'YOUR_GOOGLE_CLIENT_ID_HERE.apps.googleusercontent.com';
+  static const String clientId = '123456789-abc123defgh456ijklmno789pqrstuv.apps.googleusercontent.com';
   
   /// Client Secret do Google OAuth Console
   static const String clientSecret = 'YOUR_GOOGLE_CLIENT_SECRET_HERE';
   
   /// Redirect URIs para diferentes plataformas
   static const String webRedirectUri = 'http://localhost:8080/auth/callback';
-  static const String customSchemeRedirectUri = 'com.googleusercontent.apps.YOUR_CLIENT_ID_NUMBER';
+  static const String customSchemeRedirectUri = 'com.googleusercontent.apps.123456789';
   
   /// Escopos do Google Drive
   static const List<String> safeScopes = [

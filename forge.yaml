@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/antinomyhq/forge/refs/heads/main/forge.schema.json
 variables:
   operating_agent: forge
-model: anthropic/claude-sonnet-4
+model: qwen/qwen3-coder
 custom_rules: |-
   - Avoid generating lint errors
   - Run `dart analyze {FILE} 2>&1 | grep -E "error "` to check for errors when you edit a Dart file
