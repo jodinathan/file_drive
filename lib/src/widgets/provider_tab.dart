@@ -2,8 +2,10 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../models/file_drive_config.dart';
 import '../providers/base/cloud_provider.dart';
+import 'provider_icon.dart';
 
 /// Individual provider tab in the sidebar
 class ProviderTab extends StatefulWidget {
@@ -148,7 +150,9 @@ class _ProviderTabState extends State<ProviderTab>
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: widget.provider.providerColor,
+            color: widget.provider.providerIcon.endsWith('.svg') 
+                ? Colors.white 
+                : widget.provider.providerColor,
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
@@ -158,10 +162,10 @@ class _ProviderTabState extends State<ProviderTab>
               ),
             ],
           ),
-          child: const Icon(
-            Icons.cloud,
-            color: Colors.white,
+          child: ProviderIcon(
+            iconPath: widget.provider.providerIcon,
             size: 20,
+            fallbackColor: Colors.white,
           ),
         ),
         if (status == ProviderStatus.connecting)

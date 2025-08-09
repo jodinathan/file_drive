@@ -1,6 +1,3 @@
-/// OAuth-based cloud provider implementation
-library;
-
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
@@ -11,6 +8,7 @@ import '../../models/oauth_types.dart';
 import '../../storage/token_storage.dart';
 import '../../config/config.dart';
 import '../../auth/web_auth_client.dart';
+import '../../models/cloud_account.dart';
 import 'cloud_provider.dart';
 
 /// Abstract class for OAuth-based cloud providers
@@ -36,54 +34,75 @@ abstract class OAuthCloudProvider extends BaseCloudProvider {
   String get providerId;
 
   /// Get current user info for display
-  Future<Map<String, dynamic>?> getCurrentUserInfo() async {
+  Future<CloudAccount?> getCurrentUserInfo() async {
     if (_activeUserId == null) return null;
-    
+
     final token = await tokenStorage.getToken(providerId, _activeUserId!);
-    if (token?.accessToken == null) return null;
-    
-    return await getUserInfoFromProvider(token!.accessToken!);
+    if (token == null) return null;
+
+    AccountStatus status;
+    if (token.hasPermissionIssues || token.needsReauth) {
+      status = AccountStatus.needsReauth;
+    } else {
+      status = AccountStatus.connected;
+    }
+
+    String? name = token.userName;
+    String? email = token.userEmail;
+    String? picture = token.userPicture;
+
+    if (token.accessToken != null && !token.isExpired) {
+      try {
+        final userInfo = await getUserInfoFromProvider(token.accessToken!);
+        name = userInfo?['name'] ?? name;
+        email = userInfo?['email'] ?? email;
+        picture = userInfo?['picture'] ?? picture;
+      } catch (e) {
+        print('Error fetching current user info: $e');
+        status = AccountStatus.error;
+      }
+    }
+
+    if (name == null || email == null) {
+      // If we can't get basic info, something is wrong.
+      status = AccountStatus.error;
+    }
+
+    return CloudAccount(
+      id: _activeUserId!,
+      name: name ?? 'Usuário',
+      email: email ?? '...',
+      pictureUrl: picture,
+      status: status,
+      isActive: true,
+      providerId: providerId,
+    );
   }
 
   /// Get all available users for this provider
-  Future<Map<String, Map<String, dynamic>>> getAllUsers() async {
+  Future<List<CloudAccount>> getAllUsers() async {
     print('🔍 [getAllUsers] Iniciando busca de todos os usuários...');
     final tokens = await tokenStorage.getAllTokens(providerId);
-    final users = <String, Map<String, dynamic>>{};
-    
+    final users = <CloudAccount>[];
+
     print('🔍 [getAllUsers] Tokens encontrados: ${tokens.keys.toList()}');
-    
+
     for (final entry in tokens.entries) {
       final userId = entry.key;
       final token = entry.value;
-      
+
       print('🔍 [getAllUsers] Processando usuário: $userId');
-      print('🔍 [getAllUsers] Token tem accessToken: ${token.accessToken != null}');
-      print('🔍 [getAllUsers] Token hasPermissionIssues: ${token.hasPermissionIssues}');
-      print('🔍 [getAllUsers] Token needsReauth: ${token.needsReauth}');
-      print('🔍 [getAllUsers] User info armazenado: name=${token.userName}, email=${token.userEmail}');
-      
-      // First, try to use locally stored user info
-      if (token.userName != null || token.userEmail != null) {
-        users[userId] = {
-          'name': token.userName ?? 'Usuário $userId',
-          'email': token.userEmail ?? 'user@example.com',
-          'picture': token.userPicture,
-          'needsReauth': token.hasPermissionIssues || token.needsReauth,
-          'hasPermissionIssues': token.hasPermissionIssues,
-          'userInfoSource': 'local_cache',
-        };
-        print('✅ [getAllUsers] Usuário $userId adicionado com dados do cache local: ${token.userName ?? token.userEmail}');
-        continue;
-      }
-      
-      if (token.accessToken != null) {
-        try {
-          print('🔍 [getAllUsers] Tentando obter userInfo via API para: $userId');
-          final userInfo = await getUserInfoFromProvider(token.accessToken!);
-          print('🔍 [getAllUsers] UserInfo obtido via API para $userId: ${userInfo != null ? 'SIM' : 'NÃO'}');
+
+      AccountStatus status;
+      Map<String, dynamic>? userInfo;
+      String? name, email, picture;
+
+      try {
+        // Try to get fresh user info if token is valid
+        if (token.accessToken != null && !token.isExpired) {
+          userInfo = await getUserInfoFromProvider(token.accessToken!);
           if (userInfo != null) {
-            // Store user info in token for future use
+            // Store updated info
             final updatedToken = token.copyWithUserInfo(
               userId: userId,
               userName: userInfo['name'],
@@ -91,46 +110,51 @@ abstract class OAuthCloudProvider extends BaseCloudProvider {
               userPicture: userInfo['picture'],
             );
             await tokenStorage.storeToken(providerId, userId, updatedToken);
-            
-            users[userId] = {
-              ...userInfo,
-              'needsReauth': token.hasPermissionIssues || token.needsReauth,
-              'hasPermissionIssues': token.hasPermissionIssues,
-              'userInfoSource': 'api_fresh',
-            };
-            print('✅ [getAllUsers] Usuário $userId adicionado com dados da API e cache atualizado: ${userInfo['name'] ?? userInfo['email'] ?? 'sem nome'}');
-          } else {
-            print('❌ [getAllUsers] UserInfo null para usuário: $userId');
-            // Se o userInfo for null mas o token existir, vamos incluir informações básicas
-            users[userId] = {
-              'name': 'Usuário $userId',
-              'email': 'reauth@required.com', 
-              'needsReauth': token.hasPermissionIssues || token.needsReauth,
-              'hasPermissionIssues': token.hasPermissionIssues,
-              'userInfoSource': 'fallback',
-            };
-            print('✅ [getAllUsers] Usuário $userId adicionado com informações básicas para reauth');
+            name = userInfo['name'];
+            email = userInfo['email'];
+            picture = userInfo['picture'];
           }
-        } catch (e) {
-          print('❌ [getAllUsers] Erro ao obter userInfo para $userId: $e');
-          // Mesmo com erro, vamos incluir informações básicas do token
-          users[userId] = {
-            'name': 'Usuário $userId',
-            'email': 'error@reauth.required', 
-            'needsReauth': true,
-            'hasPermissionIssues': token.hasPermissionIssues,
-            'error': e.toString(),
-            'userInfoSource': 'error_fallback',
-          };
-          print('✅ [getAllUsers] Usuário $userId adicionado com informações de erro/reauth');
         }
-      } else {
-        print('❌ [getAllUsers] Token sem accessToken para usuário: $userId');
+
+        // Fallback to cached info if API call fails or is not possible
+        name ??= token.userName;
+        email ??= token.userEmail;
+        picture ??= token.userPicture;
+
+        // Determine status
+        if (token.hasPermissionIssues || token.needsReauth) {
+          status = AccountStatus.needsReauth;
+        } else if (name == null || email == null) {
+          // If after all attempts we still don't have basic info, it's an error
+          status = AccountStatus.error;
+        } else {
+          status = AccountStatus.connected;
+        }
+      } catch (e) {
+        print('❌ [getAllUsers] Erro ao processar usuário $userId: $e');
+        status = AccountStatus.error;
+        name ??= token.userName;
+        email ??= token.userEmail;
+        picture ??= token.userPicture;
       }
+
+      // Ensure we have at least a name and email to display
+      name ??= 'Usuário Desconhecido';
+      email ??= 'Não foi possível carregar o e-mail';
+
+      users.add(CloudAccount(
+        id: userId,
+        name: name,
+        email: email,
+        pictureUrl: picture,
+        status: status,
+        isActive: userId == _activeUserId,
+        providerId: providerId,
+      ));
+      print('✅ [getAllUsers] Usuário $userId adicionado com status: $status');
     }
-    
+
     print('🔍 [getAllUsers] Total de usuários retornados: ${users.length}');
-    print('🔍 [getAllUsers] Usuários: ${users.keys.toList()}');
     return users;
   }
 

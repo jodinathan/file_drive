@@ -15,7 +15,7 @@ class AccountCarousel extends StatefulWidget {
     Key? key,
     required this.provider,
     required this.theme,
-    this.height = 80,
+    this.height = 100,
   }) : super(key: key);
 
   @override
@@ -98,7 +98,7 @@ class _AccountCarouselState extends State<AccountCarousel> {
 
     return ListView.builder(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       itemCount: users.length,
       itemBuilder: (context, index) {
         final entry = users.entries.elementAt(index);
@@ -147,12 +147,13 @@ class _AccountCarouselState extends State<AccountCarousel> {
     return Material(
       color: Colors.transparent,
       child: Container(
-        width: 200,
+        width: 240,
+        height: 80,
         decoration: BoxDecoration(
           color: isActive 
               ? widget.provider.providerColor.withOpacity(0.1)
               : widget.theme.colorScheme.background,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isActive 
                 ? widget.provider.providerColor.withOpacity(0.3)
@@ -162,154 +163,172 @@ class _AccountCarouselState extends State<AccountCarousel> {
         ),
         child: InkWell(
           onTap: isActive ? null : () => _switchToUser(userId),
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                // Avatar with status indicator
-                Stack(
-                  children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: widget.provider.providerColor,
-                    backgroundImage: picture != null ? NetworkImage(picture) : null,
-                    child: picture == null
-                        ? Text(
-                            name.isNotEmpty ? name[0].toUpperCase() : '?',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          )
-                        : null,
+          borderRadius: BorderRadius.circular(12),
+          child: Row(
+            children: [
+              // Avatar - ocupa toda a altura do lado esquerdo
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    bottomLeft: Radius.circular(12),
                   ),
-                  if (needsReauth)
-                    Positioned(
-                      right: -2,
-                      top: -2,
-                      child: Container(
-                        width: 16,
-                        height: 16,
-                        decoration: BoxDecoration(
-                          color: Colors.orange,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                        child: const Icon(
-                          Icons.warning,
-                          size: 10,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  if (isActive && !needsReauth)
-                    Positioned(
-                      right: -2,
-                      top: -2,
-                      child: Container(
-                        width: 16,
-                        height: 16,
-                        decoration: BoxDecoration(
-                          color: Colors.green,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                        child: const Icon(
-                          Icons.check,
-                          size: 10,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                ],
+                  color: widget.provider.providerColor,
+                ),
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    bottomLeft: Radius.circular(12),
+                  ),
+                  child: picture != null 
+                      ? Image.network(
+                          picture,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => _buildFallbackAvatar(name),
+                        )
+                      : _buildFallbackAvatar(name),
+                ),
               ),
-              const SizedBox(width: 12),
               
-              // User info
+              // Conteúdo do lado direito
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      name,
-                      style: widget.theme.typography.body.copyWith(
-                        fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-                        color: needsReauth 
-                            ? Colors.orange
-                            : (isActive 
-                                ? widget.provider.providerColor
-                                : widget.theme.colorScheme.onSurface),
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (email.isNotEmpty)
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Nome
                       Text(
-                        email,
-                        style: widget.theme.typography.caption.copyWith(
-                          color: widget.theme.colorScheme.onSurface.withOpacity(0.6),
+                        name,
+                        style: widget.theme.typography.body.copyWith(
+                          fontSize: 14,
+                          fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                          color: needsReauth 
+                              ? Colors.orange
+                              : (isActive 
+                                  ? widget.provider.providerColor
+                                  : widget.theme.colorScheme.onSurface),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                    if (needsReauth)
-                      Text(
-                        'Requer reauth',
-                        style: widget.theme.typography.caption.copyWith(
-                          color: Colors.orange,
-                          fontSize: 10,
+                      
+                      // Email
+                      if (email.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            email,
+                            style: widget.theme.typography.body.copyWith(
+                              fontSize: 12,
+                              color: widget.theme.colorScheme.onSurface.withOpacity(0.7),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
+                      
+                      // Status de reauth
+                      if (needsReauth)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            'Requer reautenticação',
+                            style: widget.theme.typography.caption.copyWith(
+                              color: Colors.orange,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              
+              // Ações no lado direito
+              Container(
+                padding: const EdgeInsets.only(right: 8),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (needsReauth)
+                      IconButton(
+                        onPressed: () => widget.provider.authenticate(),
+                        icon: const Icon(Icons.refresh, size: 18),
+                        color: Colors.orange,
+                        tooltip: 'Reautenticar',
+                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                      )
+                    else if (isActive)
+                      Icon(
+                        Icons.check_circle,
+                        size: 18,
+                        color: Colors.green,
                       ),
+                    
+                    // Menu de opções compacto
+                    SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: PopupMenuButton<String>(
+                        onSelected: (value) {
+                          if (value == 'remove') {
+                            _showRemoveAccountDialog(userId, name);
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem<String>(
+                            value: 'remove',
+                            child: Row(
+                              children: [
+                                Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                                SizedBox(width: 8),
+                                Text('Remover conta', style: TextStyle(color: Colors.red)),
+                              ],
+                            ),
+                          ),
+                        ],
+                        icon: Icon(
+                          Icons.more_vert,
+                          size: 14,
+                          color: widget.theme.colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                        tooltip: 'Opções da conta',
+                        padding: EdgeInsets.zero,
+                      ),
+                    ),
                   ],
                 ),
               ),
-              
-              // Actions
-              if (needsReauth)
-                IconButton(
-                  onPressed: () => widget.provider.authenticate(),
-                  icon: const Icon(Icons.refresh, size: 16),
-                  color: Colors.orange,
-                  tooltip: 'Reautenticar',
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                )
-              else if (isActive)
-                Icon(
-                  Icons.check_circle,
-                  size: 16,
-                  color: widget.provider.providerColor,
-                ),
-              
-              // Remove account button
-              PopupMenuButton<String>(
-                onSelected: (value) {
-                  if (value == 'remove') {
-                    _showRemoveAccountDialog(userId, name);
-                  }
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem<String>(
-                    value: 'remove',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete_outline, size: 16, color: Colors.red),
-                        SizedBox(width: 8),
-                        Text('Remover conta', style: TextStyle(color: Colors.red)),
-                      ],
-                    ),
-                  ),
-                ],
-                icon: Icon(
-                  Icons.more_vert,
-                  size: 16,
-                  color: widget.theme.colorScheme.onSurface.withOpacity(0.6),
-                ),
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                tooltip: 'Opções da conta',
-              ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFallbackAvatar(String name) {
+    return Container(
+      width: 80,
+      height: 80,
+      decoration: BoxDecoration(
+        color: widget.provider.providerColor,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(12),
+          bottomLeft: Radius.circular(12),
+        ),
+      ),
+      child: Center(
+        child: Text(
+          name.isNotEmpty ? name[0].toUpperCase() : '?',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 24,
           ),
         ),
       ),

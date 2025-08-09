@@ -83,6 +83,7 @@ class ProviderSidebar extends StatelessWidget {
       padding: EdgeInsets.symmetric(
         vertical: theme.layout.spacing / 2,
       ),
+      shrinkWrap: true,
       itemCount: providers.length,
       itemBuilder: (context, index) {
         final provider = providers[index];
@@ -139,8 +140,9 @@ class ProviderSidebar extends StatelessWidget {
         ),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
+          Flexible(
             child: Text(
               '${providers.length} ${providers.length == 1 ? 'provedor' : 'provedores'}',
               style: theme.typography.caption.copyWith(

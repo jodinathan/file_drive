@@ -231,7 +231,7 @@ class _AccountListState extends State<AccountList> {
                           ),
                           child: const Icon(
                             Icons.warning,
-                            size: 6,
+                            size: 8,
                             color: Colors.white,
                           ),
                         ),
@@ -250,7 +250,7 @@ class _AccountListState extends State<AccountList> {
                           ),
                           child: const Icon(
                             Icons.check,
-                            size: 6,
+                            size: 8,
                             color: Colors.white,
                           ),
                         ),
@@ -267,7 +267,8 @@ class _AccountListState extends State<AccountList> {
                       Text(
                         name,
                         style: widget.theme.typography.body.copyWith(
-                          fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                          fontSize: 16,
+                          fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
                           color: needsReauth 
                               ? Colors.orange
                               : (isActive 
@@ -280,8 +281,9 @@ class _AccountListState extends State<AccountList> {
                       if (email.isNotEmpty)
                         Text(
                           email,
-                          style: widget.theme.typography.caption.copyWith(
-                            color: widget.theme.colorScheme.onSurface.withOpacity(0.6),
+                          style: widget.theme.typography.body.copyWith(
+                            fontSize: 13,
+                            color: widget.theme.colorScheme.onSurface.withOpacity(0.7),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,

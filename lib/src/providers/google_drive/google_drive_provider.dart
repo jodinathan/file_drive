@@ -46,7 +46,7 @@ class GoogleDriveProvider extends OAuthCloudProvider {
   String get providerName => ProviderNames.googleDrive;
   
   @override
-  String get providerIcon => 'assets/icons/google_drive.svg';
+  String get providerIcon => 'web/icons/google_drive_icon.svg';
   
   @override
   Color get providerColor => Color(UIConstants.providerColors['Google Drive']!);
