@@ -7,7 +7,7 @@ import '../providers/base/cloud_provider.dart';
 import '../providers/base/oauth_cloud_provider.dart';
 import 'provider_content.dart';
 import 'provider_sidebar.dart';
-import 'account_list_view.dart';
+import 'account_carousel.dart';
 import 'provider_icon.dart';
 
 /// Main FileDrive widget
@@ -101,26 +101,22 @@ class _FileDriveWidgetState extends State<FileDriveWidget> {
           ),
           // Coluna 2: Conteúdo dividido em duas linhas
           Expanded(
-            child: Row(
-              children: [
-                // Coluna 2.1 - Lista de contas
-                if (_selectedProvider != null && _selectedProvider is OAuthCloudProvider)
-                  SizedBox(
-                    width: 350,
-                    child: AccountListView(
-                      provider: _selectedProvider as OAuthCloudProvider,
-                    ),
-                  ),
-                // Coluna 2.2 - Conteúdo (resto do espaço)
-                Expanded(
-                  child: Material(
-                    color: theme.colorScheme.background,
-                    child: _buildContentArea(theme),
-                  ),
-                ),
-              ],
-            ),
-          ),
+  child: Column(
+    children: [
+      if (_selectedProvider != null && _selectedProvider is OAuthCloudProvider)
+        AccountCarousel(
+          provider: _selectedProvider as OAuthCloudProvider,
+          theme: theme,
+        ),
+      Expanded(
+        child: Material(
+          color: theme.colorScheme.background,
+          child: _buildContentArea(theme),
+        ),
+      ),
+    ],
+  ),
+)
         ],
       ),
     );

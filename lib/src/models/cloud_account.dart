@@ -1,51 +1,60 @@
-/// Represents the status of a cloud account connection.
+library;
+
+import 'package:flutter/material.dart';
+
 enum AccountStatus {
-  /// The account is fully connected and operational.
-  connected,
-
-  /// The account is connected, but requires re-authentication to refresh permissions.
+  active,
+  inactive,
   needsReauth,
-
-  /// The account has encountered an error.
-  error,
-
-  /// The account is currently being loaded or processed.
   loading,
+  error,
 }
 
-/// A data model for a user's cloud account.
-///
-/// This class holds all relevant information about a single cloud account,
-/// including user details, authentication status, and provider information.
 class CloudAccount {
-  /// The unique identifier for this account.
   final String id;
-
-  /// The display name of the user (e.g., "John Doe").
   final String name;
-
-  /// The user's email address.
   final String email;
-
-  /// The URL for the user's profile picture. Can be null.
-  final String? pictureUrl;
-
-  /// The current status of the account.
+  final String? photoUrl;
   final AccountStatus status;
-
-  /// Whether this account is the currently active one.
   final bool isActive;
-  
-  /// The provider this account belongs to (e.g., 'google_drive').
-  final String providerId;
+  final DateTime? lastUpdated;
 
-  const CloudAccount({
+  CloudAccount({
     required this.id,
     required this.name,
     required this.email,
-    this.pictureUrl,
-    required this.status,
-    required this.isActive,
-    required this.providerId,
+    this.photoUrl,
+    this.status = AccountStatus.active,
+    this.isActive = false,
+    this.lastUpdated,
   });
+
+  factory CloudAccount.fromJson(Map<String, dynamic> json) {
+    return CloudAccount(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      email: json['email'] as String,
+      photoUrl: json['photoUrl'] as String?,
+      status: AccountStatus.values.firstWhere(
+        (e) => e.toString() == 'AccountStatus.${json['status']}',
+        orElse: () => AccountStatus.inactive,
+      ),
+      isActive: json['isActive'] as bool? ?? false,
+      lastUpdated: json['lastUpdated'] != null
+          ? DateTime.parse(json['lastUpdated'] as String)
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'email': email,
+      'photoUrl': photoUrl,
+      'status': status.toString().split('.').last,
+      'isActive': isActive,
+      'lastUpdated': lastUpdated?.toIso8601String(),
+    };
+  }
 }

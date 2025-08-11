@@ -55,6 +55,10 @@ class SharedPreferencesTokenStorage with AccountDeletionMixin implements TokenSt
       'expiresAt': token.expiresAt?.toIso8601String(),
       'error': token.error,
       'metadata': token.metadata,
+'userName': token.userName,
+'userEmail': token.userEmail,
+'userPicture': token.userPicture,
+'userInfoUpdatedAt': token.userInfoUpdatedAt?.toIso8601String(),
       'hasPermissionIssues': token.hasPermissionIssues,
       'needsReauth': token.needsReauth,
     });
@@ -86,6 +90,10 @@ class SharedPreferencesTokenStorage with AccountDeletionMixin implements TokenSt
             : null,
         error: data['error'],
         metadata: Map<String, dynamic>.from(data['metadata'] ?? {}),
+userName: data['userName'],
+userEmail: data['userEmail'],
+userPicture: data['userPicture'],
+userInfoUpdatedAt: data['userInfoUpdatedAt'] != null ? DateTime.parse(data['userInfoUpdatedAt']) : null,
         hasPermissionIssues: data['hasPermissionIssues'] ?? false,
         needsReauth: data['needsReauth'] ?? false,
       );

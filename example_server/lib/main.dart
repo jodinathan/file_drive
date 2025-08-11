@@ -158,7 +158,26 @@ Exemplos:
     );
     
     print('🔄 Redirecionando para app: $successUri');
-    return Response.found(successUri.toString());
+    return Response.ok('''
+<html>
+<head>
+<title>Autenticação Concluída</title>
+</head>
+<body>
+<h1>Autenticação bem-sucedida!</h1>
+<p>Você pode fechar esta janela agora.</p>
+<p>Se o aplicativo não abriu automaticamente, <a href="$successUri">clique aqui para voltar ao app</a>.</p>
+<script>
+  // Tenta redirecionar automaticamente
+  try {
+    window.location.href = "$successUri";
+  } catch (e) {
+    console.log('Redirecionamento automático falhou');
+  }
+</script>
+</body>
+</html>
+''', headers: {'Content-Type': 'text/html'});
   });
 
   // 📍 ENDPOINT: Obter tokens por state

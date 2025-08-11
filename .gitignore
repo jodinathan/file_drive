@@ -50,3 +50,6 @@ test/test_config.dart
 lib/src/config/config.dart
 
 .history
+
+forge.yaml
+working_examples/

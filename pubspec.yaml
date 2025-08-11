@@ -42,6 +42,8 @@ dependencies:
   shared_preferences: ^2.2.3
   path_provider: ^2.1.4
   flutter_svg: ^2.0.12
+  carousel_slider: ^5.1.1
+carousel_slider: ^4.2.1
 
 dev_dependencies:
   flutter_test:
