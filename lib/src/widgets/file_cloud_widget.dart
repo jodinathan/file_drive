@@ -10,7 +10,10 @@ import '../auth/oauth_config.dart';
 import '../auth/oauth_manager.dart';
 import '../theme/app_constants.dart';
 import '../l10n/generated/app_localizations.dart';
+import '../utils/app_logger.dart';
 import 'provider_logo.dart';
+import 'provider_card.dart';
+import 'account_card.dart';
 
 /// Main File Cloud widget that provides cloud storage integration
 class FileCloudWidget extends StatefulWidget {
@@ -57,18 +60,23 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
   @override
   void initState() {
     super.initState();
+    AppLogger.systemInit('FileCloudWidget iniciado');
     _initializeProviders();
     _loadAccounts();
   }
 
   void _initializeProviders() {
+    AppLogger.info('Inicializando provedores de nuvem', component: 'Init');
+    
     // Only initialize enabled/implemented providers
     final enabledProviders = ProviderHelper.getEnabledProviders();
+    AppLogger.info('Provedores habilitados: $enabledProviders', component: 'Init');
     
     for (final providerType in enabledProviders) {
       switch (providerType) {
         case 'google_drive':
           _providers[providerType] = GoogleDriveProvider();
+          AppLogger.success('GoogleDriveProvider inicializado', component: 'Init');
           break;
         // TODO: Add other providers when implemented
         // case 'dropbox':
@@ -77,14 +85,19 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
         // case 'onedrive':
         //   _providers[providerType] = OneDriveProvider();
         //   break;
+        default:
+          AppLogger.warning('Provedor não implementado: $providerType', component: 'Init');
       }
     }
     
     // Set initial provider to first enabled provider
     _selectedProvider = widget.initialProvider ?? enabledProviders.first;
+    AppLogger.info('Provedor inicial selecionado: $_selectedProvider', component: 'Init');
   }
 
   Future<void> _loadAccounts() async {
+    AppLogger.info('Carregando contas do storage', component: 'Accounts');
+    
     setState(() {
       _isLoading = true;
       _error = null;
@@ -92,6 +105,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
 
     try {
       final accounts = await widget.accountStorage.getAccounts();
+      AppLogger.info('${accounts.length} contas carregadas do storage', component: 'Accounts');
       
       // Group accounts by provider
       _accountsByProvider.clear();
@@ -99,15 +113,20 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
         _accountsByProvider
             .putIfAbsent(account.providerType, () => [])
             .add(account);
+        AppLogger.debug('Conta agrupada: ${account.name} (${account.providerType})', component: 'Accounts');
       }
 
       // Select first account for current provider if available
       if (_selectedProvider != null && 
           _accountsByProvider[_selectedProvider!]?.isNotEmpty == true) {
         _selectedAccount = _accountsByProvider[_selectedProvider!]!.first;
+        AppLogger.info('Conta selecionada automaticamente: ${_selectedAccount!.name}', component: 'Accounts');
         await _loadFiles();
+      } else {
+        AppLogger.info('Nenhuma conta disponível para o provedor $_selectedProvider', component: 'Accounts');
       }
     } catch (e) {
+      AppLogger.error('Erro ao carregar contas', component: 'Accounts', error: e);
       setState(() {
         _error = 'Erro ao carregar contas: $e';
       });
@@ -119,7 +138,12 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
   }
 
   Future<void> _loadFiles({String? folderId}) async {
-    if (_selectedAccount == null || _selectedProvider == null) return;
+    if (_selectedAccount == null || _selectedProvider == null) {
+      AppLogger.warning('Tentativa de carregar arquivos sem conta ou provedor selecionado', component: 'Files');
+      return;
+    }
+
+    AppLogger.info('Carregando arquivos${folderId != null ? ' da pasta $folderId' : ' da raiz'}', component: 'Files');
 
     setState(() {
       _isLoading = true;
@@ -130,17 +154,24 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       final provider = _providers[_selectedProvider!]!;
       provider.initialize(_selectedAccount!);
       
+      AppLogger.debug('Provider inicializado para ${_selectedAccount!.name}', component: 'Files');
+      
       final filesPage = await provider.listFolder(folderId: folderId);
+      
+      AppLogger.success('${filesPage.entries.length} arquivos carregados', component: 'Files');
 
       setState(() {
         _currentFiles = filesPage.entries;
         if (folderId != null) {
           _pathStack.add(folderId);
+          AppLogger.debug('Pasta adicionada ao stack: $folderId', component: 'Files');
         } else {
           _pathStack.clear();
+          AppLogger.debug('Stack de pastas limpo', component: 'Files');
         }
       });
     } catch (e) {
+      AppLogger.error('Erro ao carregar arquivos', component: 'Files', error: e);
       setState(() {
         _error = 'Erro ao carregar arquivos: $e';
       });
@@ -253,6 +284,115 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     });
   }
 
+  void _deleteSelectedFiles() async {
+    if (_selectedFiles.isEmpty) {
+      AppLogger.warning('Tentativa de exclusão sem arquivos selecionados', component: 'FileOps');
+      return;
+    }
+    
+    AppLogger.info('Iniciando exclusão de ${_selectedFiles.length} arquivo(s)', component: 'FileOps');
+    _selectedFiles.forEach((file) {
+      AppLogger.debug('Arquivo para exclusão: ${file.name} (ID: ${file.id})', component: 'FileOps');
+    });
+    
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmar exclusão'),
+        content: Text(
+          'Deseja realmente excluir ${_selectedFiles.length} arquivo(s) selecionado(s)?\n\nEsta ação não pode ser desfeita.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              AppLogger.info('Exclusão cancelada pelo usuário', component: 'FileOps');
+              Navigator.of(context).pop(false);
+            },
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              AppLogger.info('Exclusão confirmada pelo usuário', component: 'FileOps');
+              Navigator.of(context).pop(true);
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirmed == true) {
+      try {
+        AppLogger.info('Executando exclusão de arquivos...', component: 'FileOps');
+        
+        if (_selectedAccount == null || _selectedProvider == null) {
+          throw Exception('Nenhuma conta ou provedor selecionado');
+        }
+        
+        final provider = _providers[_selectedProvider!]!;
+        provider.initialize(_selectedAccount!);
+        
+        // Excluir cada arquivo selecionado
+        int successCount = 0;
+        for (final file in _selectedFiles) {
+          AppLogger.info('Excluindo arquivo: ${file.name}', component: 'FileOps');
+          
+          try {
+            // Exclusão real via provider
+            await provider.deleteEntry(entryId: file.id, permanent: false);
+            
+            // Remove da lista atual se estiver presente
+            setState(() {
+              _currentFiles.removeWhere((f) => f.id == file.id);
+            });
+            
+            successCount++;
+            AppLogger.success('Arquivo excluído com sucesso: ${file.name}', component: 'FileOps');
+          } catch (e) {
+            AppLogger.error('Erro ao excluir arquivo ${file.name}', component: 'FileOps', error: e);
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Erro ao excluir ${file.name}: $e')),
+              );
+            }
+            // Continue tentando excluir outros arquivos
+          }
+        }
+        
+        final totalFiles = _selectedFiles.length;
+        setState(() {
+          _selectedFiles.clear();
+          _isSelectionMode = false;
+        });
+        
+        AppLogger.success('Exclusão concluída: $successCount/$totalFiles arquivos excluídos', component: 'FileOps');
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('$successCount arquivo(s) excluído(s) com sucesso!'),
+            ),
+          );
+        }
+        
+        // Recarregar lista de arquivos
+        await _loadFiles();
+        
+      } catch (e) {
+        AppLogger.error('Erro durante exclusão de arquivos', component: 'FileOps', error: e);
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erro ao excluir arquivos: $e')),
+          );
+        }
+      }
+    }
+  }
+
   void _useSelection() {
     if (widget.onFilesSelected != null && _selectedFiles.isNotEmpty) {
       widget.onFilesSelected!(_selectedFiles);
@@ -266,54 +406,78 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        // Coluna 1: Lista de Provedores
-        _buildProviderColumn(),
-        
-        // Coluna 2: Conteúdo Principal (contas + arquivos)
-        Expanded(
-          child: _buildMainContent(),
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppConstants.radiusL),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
         ),
-      ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Coluna 1: Lista de Provedores
+          _buildProviderColumn(),
+          
+          // Divisor vertical
+          Container(
+            width: 1,
+            color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+          ),
+          
+          // Coluna 2: Conteúdo Principal
+          Expanded(
+            child: _buildMainContent(),
+          ),
+        ],
+      ),
     );
   }
 
-  /// Primeira coluna: Lista de provedores
+  /// Primeira coluna: Lista de provedores com design melhorado
   Widget _buildProviderColumn() {
-    return Container(
-      width: AppConstants.providerListWidth,
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant,
-        border: Border(
-          right: BorderSide(
-            color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
-          ),
-        ),
-      ),
+    return SizedBox(
+      width: 260, // Reduzido de 280 para evitar overflow
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
-          Container(
-            padding: const EdgeInsets.all(AppConstants.paddingM),
+          // Header com melhor padding
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
             child: Text(
               'Provedores',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
           ),
           
-          // Lista de provedores
+          // Lista de provedores com melhor espaçamento
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: AppConstants.paddingS),
-              children: ProviderHelper.getEnabledProviders().map((providerType) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: AppConstants.spacingS),
-                  child: _buildProviderCard(providerType),
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              itemCount: ProviderHelper.getEnabledProviders().length,
+              separatorBuilder: (context, index) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final providerType = ProviderHelper.getEnabledProviders()[index];
+                final accounts = _accountsByProvider[providerType] ?? [];
+                return ProviderCard(
+                  providerType: providerType,
+                  isSelected: _selectedProvider == providerType,
+                  accounts: accounts,
+                  onTap: () {
+                    setState(() {
+                      _selectedProvider = providerType;
+                      _selectedAccount = null;
+                      _currentFiles.clear();
+                      _pathStack.clear();
+                    });
+                    _loadAccounts();
+                  },
                 );
-              }).toList(),
+              },
             ),
           ),
         ],
@@ -321,72 +485,22 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     );
   }
 
-  Widget _buildProviderCard(String providerType) {
-    final isSelected = _selectedProvider == providerType;
-    final accounts = _accountsByProvider[providerType] ?? [];
-    final displayName = ProviderHelper.getDisplayName(providerType);
-    
-    return Card(
-      elevation: isSelected ? 2 : 0,
-      color: isSelected 
-          ? Theme.of(context).colorScheme.primaryContainer 
-          : Theme.of(context).colorScheme.surface,
-      child: InkWell(
-        onTap: () {
-          setState(() {
-            _selectedProvider = providerType;
-            _selectedAccount = null;
-            _currentFiles.clear();
-            _pathStack.clear();
-          });
-          _loadAccounts();
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(AppConstants.paddingM),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  ProviderLogo(
-                    providerType: providerType,
-                    size: AppConstants.iconL,
-                  ),
-                  const SizedBox(width: AppConstants.spacingS),
-                  Expanded(
-                    child: Text(
-                      displayName,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: AppConstants.spacingS),
-              Text(
-                '${accounts.length} conta${accounts.length != 1 ? 's' : ''}',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
-  /// Segunda coluna: Conteúdo principal dividido em duas linhas
+
+  /// Segunda coluna: Conteúdo principal com layout melhorado
   Widget _buildMainContent() {
     return Column(
       children: [
-        // Linha 1: Carrossel de contas
-        _buildAccountCarousel(),
+        // Seção de contas com altura fixa e sem overflow
+        _buildAccountSection(),
         
-        // Linha 2: Navegação de arquivos
+        // Divisor horizontal
+        Container(
+          height: 1,
+          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+        ),
+        
+        // Navegação de arquivos
         Expanded(
           child: _buildFileNavigation(),
         ),
@@ -398,221 +512,132 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     );
   }
 
-  /// Carrossel de contas integradas
-  Widget _buildAccountCarousel() {
+  /// Seção de contas melhorada sem overflow
+  Widget _buildAccountSection() {
     final accounts = _accountsByProvider[_selectedProvider] ?? [];
     
     return Container(
-      height: AppConstants.accountCarouselHeight,
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        border: Border(
-          bottom: BorderSide(
-            color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
-          ),
-        ),
-      ),
+      height: 120, // Altura aumentada de 140 para 120 para evitar overflow
+      padding: const EdgeInsets.all(16), // Padding reduzido de 20 para 16
       child: accounts.isEmpty ? _buildEmptyAccountsView() : _buildAccountsList(accounts),
     );
   }
 
   Widget _buildEmptyAccountsView() {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppConstants.paddingM),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.account_circle_outlined,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.account_circle_outlined,
+            size: 32,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Nenhuma conta conectada',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
-            const SizedBox(width: AppConstants.spacingS),
-            Text(
-              'Nenhuma conta conectada',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+          ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: _addAccount,
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('Adicionar Conta'),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             ),
-            const SizedBox(width: AppConstants.spacingM),
-            FilledButton.icon(
-              onPressed: _addAccount,
-              icon: const Icon(Icons.add),
-              label: const Text('Adicionar Conta'),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildAccountsList(List<CloudAccount> accounts) {
-    return ListView.builder(
+    return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.all(AppConstants.paddingM),
-      itemCount: accounts.length + 1, // +1 para botão adicionar
-      itemBuilder: (context, index) {
-        if (index == accounts.length) {
-          // Botão adicionar nova conta
-          return Container(
-            width: 200,
-            margin: const EdgeInsets.only(left: AppConstants.spacingS),
-            child: Card(
-              child: InkWell(
-                onTap: _addAccount,
-                borderRadius: BorderRadius.circular(12),
-                child: const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.add_circle_outline, size: AppConstants.iconL),
-                      SizedBox(height: AppConstants.spacingXS),
-                      Text('Adicionar\nConta', textAlign: TextAlign.center),
-                    ],
-                  ),
+      child: Row(
+        children: [
+          // Cards de contas existentes
+          ...accounts.asMap().entries.map((entry) {
+            final index = entry.key;
+            final account = entry.value;
+            return Padding(
+              padding: EdgeInsets.only(right: index < accounts.length ? 12 : 0),
+              child: AccountCard(
+                account: account,
+                isSelected: _selectedAccount?.id == account.id,
+                onTap: () {
+                  setState(() {
+                    _selectedAccount = account;
+                    _currentFiles.clear();
+                    _pathStack.clear();
+                  });
+                  _loadFiles();
+                },
+                onMenuAction: (action) {
+                  // TODO: Implementar ações do menu
+                  if (action == 'remove') {
+                    // Remover conta
+                  } else if (action == 'reauth') {
+                    // Reautorizar conta
+                  }
+                },
+              ),
+            );
+          }),
+          
+          // Botão adicionar nova conta com design melhorado
+          _buildAddAccountCard(),
+        ],
+      ),
+    );
+  }
+
+
+
+  Widget _buildAddAccountCard() {
+    const cardHeight = 80.0; // Mesma altura do AccountCard
+    
+    return Container(
+      width: 120,
+      height: cardHeight, // Altura igual ao card da conta
+      margin: const EdgeInsets.only(left: 12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceVariant,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+          style: BorderStyle.solid,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _addAccount,
+          borderRadius: BorderRadius.circular(12),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.add_circle_outline,
+                size: 24,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Adicionar\nConta',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
               ),
-            ),
-          );
-        }
-        
-        final account = accounts[index];
-        final isSelected = _selectedAccount?.id == account.id;
-        
-        return Container(
-          width: 200,
-          margin: EdgeInsets.only(
-            left: index == 0 ? 0 : AppConstants.spacingS,
+            ],
           ),
-          child: Card(
-            elevation: isSelected ? 2 : 0,
-            color: isSelected 
-                ? Theme.of(context).colorScheme.primaryContainer
-                : Theme.of(context).colorScheme.surface,
-            child: InkWell(
-              onTap: () {
-                setState(() {
-                  _selectedAccount = account;
-                  _currentFiles.clear();
-                  _pathStack.clear();
-                });
-                _loadFiles();
-              },
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(40),
-                topRight: Radius.circular(12),
-                bottomLeft: Radius.circular(40),
-                bottomRight: Radius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  // Foto (40x40)
-                  Container(
-                    width: 40,
-                    height: 40,
-                    margin: const EdgeInsets.all(AppConstants.paddingS),
-                    child: CircleAvatar(
-                      backgroundImage: account.photoUrl != null
-                          ? NetworkImage(account.photoUrl!)
-                          : null,
-                      child: account.photoUrl == null
-                          ? Text(account.name.substring(0, 1).toUpperCase())
-                          : null,
-                    ),
-                  ),
-                  
-                  // Informações
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: AppConstants.paddingS,
-                        horizontal: AppConstants.paddingXS,
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            account.name,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w500,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            account.email,
-                            style: Theme.of(context).textTheme.bodySmall,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          // Status icon
-                          Row(
-                            children: [
-                              Icon(
-                                account.status == AccountStatus.ok 
-                                    ? Icons.check_circle 
-                                    : Icons.error,
-                                size: 12,
-                                color: account.status == AccountStatus.ok 
-                                    ? Colors.green 
-                                    : Colors.red,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                account.status == AccountStatus.ok 
-                                    ? 'Conectado' 
-                                    : 'Erro',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  fontSize: 10,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  
-                  // Menu
-                  PopupMenuButton<String>(
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'reauth',
-                        child: Row(
-                          children: [
-                            Icon(Icons.refresh),
-                            SizedBox(width: 8),
-                            Text('Reautorizar'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'remove',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete, color: Colors.red),
-                            SizedBox(width: 8),
-                            Text('Remover'),
-                          ],
-                        ),
-                      ),
-                    ],
-                    onSelected: (value) {
-                      // TODO: Implementar ações do menu
-                      if (value == 'remove') {
-                        // Remover conta
-                      } else if (value == 'reauth') {
-                        // Reautorizar conta
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
+        ),
+      ),
     );
   }
 
@@ -785,6 +810,14 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
               });
             },
             child: const Text('Limpar'),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: _selectedFiles.isNotEmpty ? _deleteSelectedFiles : null,
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Excluir'),
           ),
           const SizedBox(width: 8),
           FilledButton(
