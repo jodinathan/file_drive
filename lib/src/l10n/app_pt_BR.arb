@@ -1,0 +1,81 @@
+{
+  "@@locale": "pt_BR",
+  "appTitle": "File Cloud",
+  
+  "providerGoogleDrive": "Google Drive",
+  "providerDropbox": "Dropbox",
+  "providerOneDrive": "OneDrive",
+  
+  "addAccount": "Adicionar Conta",
+  "removeAccount": "Remover Conta",
+  "reauthorizeAccount": "Reautorizar",
+  
+  "confirmRemoveAccount": "Tem certeza que deseja remover esta conta?",
+  "confirmRemoveAccountTitle": "Remover Conta",
+  
+  "cancel": "Cancelar",
+  "remove": "Remover",
+  
+  "home": "Início",
+  "upload": "Enviar",
+  "newFolder": "Nova Pasta",
+  "useSelection": "Usar Seleção",
+  "deleteSelected": "Excluir Selecionados",
+  
+  "searchFiles": "Buscar arquivos...",
+  "clearSearch": "Limpar busca",
+  
+  "createFolderTitle": "Criar Pasta",
+  "folderName": "Nome da pasta",
+  "create": "Criar",
+  
+  "confirmDeleteTitle": "Excluir Itens",
+  "confirmDeleteSingle": "Tem certeza que deseja excluir este item?",
+  "confirmDeleteMultiple": "Tem certeza que deseja excluir {count} itens?",
+  "delete": "Excluir",
+  
+  "loading": "Carregando...",
+  "noItemsFound": "Nenhum item encontrado",
+  "noSearchResults": "Nenhum arquivo encontrado para '{query}'",
+  "loadMore": "Carregar mais",
+  
+  "uploadProgress": "Enviando... {percent}%",
+  "uploadComplete": "Envio concluído",
+  "uploadFailed": "Falha no envio",
+  "downloadFailed": "Falha no download",
+  
+  "accountStatusOk": "Conectado",
+  "accountStatusError": "Erro",
+  "accountStatusRevoked": "Acesso revogado",
+  "accountStatusMissingScopes": "Permissões necessárias",
+  
+  "errorAccountNotAuthorized": "Sua conta não está autorizada. Por favor, reautorize para continuar.",
+  "errorAccountMissingPermissions": "Sua conta não possui as permissões necessárias. Por favor, reautorize com os escopos necessários.",
+  "errorAccountRevoked": "O acesso da conta foi revogado. Por favor, reautorize sua conta.",
+  "errorAccountGeneric": "Houve um erro com sua conta. Por favor, tente reautorizar.",
+  
+  "errorNetworkConnection": "Erro de conexão de rede. Verifique sua conexão com a internet e tente novamente.",
+  "errorFileNotFound": "Arquivo não encontrado",
+  "errorInsufficientStorage": "Espaço de armazenamento insuficiente",
+  "errorQuotaExceeded": "Cota de armazenamento excedida",
+  "errorGeneric": "Ocorreu um erro. Tente novamente.",
+  
+  "tryAgain": "Tentar novamente",
+  
+  "authenticationCancelled": "Autenticação foi cancelada",
+  "authenticationFailed": "Falha na autenticação. Tente novamente.",
+  
+  "selectionModeActive": "Modo seleção: {count} itens selecionados",
+  "selectionModeMinRequired": "Por favor, selecione pelo menos {min} itens",
+  "selectionModeMaxExceeded": "Você pode selecionar no máximo {max} itens",
+  "selectionModeInvalidType": "Este tipo de arquivo não é permitido",
+  
+  "fileTypeImages": "Imagens",
+  "fileTypeDocuments": "Documentos",
+  "fileTypeVideos": "Vídeos",
+  "fileTypeAudio": "Áudio",
+  
+  "fileSize": "{size}",
+  "lastModified": "Modificado {date}",
+  "moreAccounts": "+{count} mais"
+}

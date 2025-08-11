@@ -6,7 +6,7 @@ library;
 class OAuthConfig {
   /// 🔑 CLIENT ID DO GOOGLE
   /// Obtenha em: https://console.cloud.google.com/apis/credentials
-  static const String clientId = 'YOUR_CLIENT_ID_NUMBER-abc123.apps.googleusercontent.com';
+  static const String clientId = '346650636779-58ec4t2v24ru8kj3s3t7dj46okanjman.apps.googleusercontent.com';
   
   /// 🔒 CLIENT SECRET DO GOOGLE (se necessário)
   static const String clientSecret = 'YOUR_CLIENT_SECRET';

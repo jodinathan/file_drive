@@ -1,0 +1,28 @@
+name: file_cloud_example_app
+description: Example Flutter app demonstrating the File Cloud widget
+
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.1
+  flutter: ">=1.17.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # File Cloud widget (local path)
+  file_cloud:
+    path: ../../
+  
+  # Material Design
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true

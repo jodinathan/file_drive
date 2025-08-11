@@ -1,0 +1,356 @@
+{
+  "@@locale": "en",
+  "appTitle": "File Cloud",
+  "@appTitle": {
+    "description": "Application title"
+  },
+  
+  "providerGoogleDrive": "Google Drive",
+  "@providerGoogleDrive": {
+    "description": "Google Drive provider name"
+  },
+  
+  "providerDropbox": "Dropbox",
+  "@providerDropbox": {
+    "description": "Dropbox provider name"
+  },
+  
+  "providerOneDrive": "OneDrive",
+  "@providerOneDrive": {
+    "description": "OneDrive provider name"
+  },
+  
+  "addAccount": "Add Account",
+  "@addAccount": {
+    "description": "Button text to add a new account"
+  },
+  
+  "removeAccount": "Remove Account",
+  "@removeAccount": {
+    "description": "Button text to remove an account"
+  },
+  
+  "reauthorizeAccount": "Reauthorize",
+  "@reauthorizeAccount": {
+    "description": "Button text to reauthorize an account"
+  },
+  
+  "confirmRemoveAccount": "Are you sure you want to remove this account?",
+  "@confirmRemoveAccount": {
+    "description": "Confirmation message for removing an account"
+  },
+  
+  "confirmRemoveAccountTitle": "Remove Account",
+  "@confirmRemoveAccountTitle": {
+    "description": "Title for remove account confirmation dialog"
+  },
+  
+  "cancel": "Cancel",
+  "@cancel": {
+    "description": "Cancel button text"
+  },
+  
+  "remove": "Remove",
+  "@remove": {
+    "description": "Remove button text"
+  },
+  
+  "home": "Home",
+  "@home": {
+    "description": "Home button text"
+  },
+  
+  "upload": "Upload",
+  "@upload": {
+    "description": "Upload button text"
+  },
+  
+  "newFolder": "New Folder",
+  "@newFolder": {
+    "description": "New folder button text"
+  },
+  
+  "useSelection": "Use Selection",
+  "@useSelection": {
+    "description": "Use selection button text"
+  },
+  
+  "deleteSelected": "Delete Selected",
+  "@deleteSelected": {
+    "description": "Delete selected items button text"
+  },
+  
+  "searchFiles": "Search files...",
+  "@searchFiles": {
+    "description": "Search field placeholder text"
+  },
+  
+  "clearSearch": "Clear search",
+  "@clearSearch": {
+    "description": "Clear search button tooltip"
+  },
+  
+  "createFolderTitle": "Create Folder",
+  "@createFolderTitle": {
+    "description": "Create folder dialog title"
+  },
+  
+  "folderName": "Folder name",
+  "@folderName": {
+    "description": "Folder name input label"
+  },
+  
+  "create": "Create",
+  "@create": {
+    "description": "Create button text"
+  },
+  
+  "confirmDeleteTitle": "Delete Items",
+  "@confirmDeleteTitle": {
+    "description": "Delete confirmation dialog title"
+  },
+  
+  "confirmDeleteSingle": "Are you sure you want to delete this item?",
+  "@confirmDeleteSingle": {
+    "description": "Confirmation message for deleting a single item"
+  },
+  
+  "confirmDeleteMultiple": "Are you sure you want to delete {count} items?",
+  "@confirmDeleteMultiple": {
+    "description": "Confirmation message for deleting multiple items",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "5"
+      }
+    }
+  },
+  
+  "delete": "Delete",
+  "@delete": {
+    "description": "Delete button text"
+  },
+  
+  "loading": "Loading...",
+  "@loading": {
+    "description": "Loading indicator text"
+  },
+  
+  "noItemsFound": "No items found",
+  "@noItemsFound": {
+    "description": "Message when no files or folders are found"
+  },
+  
+  "noSearchResults": "No files found matching '{query}'",
+  "@noSearchResults": {
+    "description": "Message when search returns no results",
+    "placeholders": {
+      "query": {
+        "type": "String",
+        "example": "document"
+      }
+    }
+  },
+  
+  "loadMore": "Load more",
+  "@loadMore": {
+    "description": "Button text to load more items"
+  },
+  
+  "uploadProgress": "Uploading... {percent}%",
+  "@uploadProgress": {
+    "description": "Upload progress message",
+    "placeholders": {
+      "percent": {
+        "type": "int",
+        "example": "75"
+      }
+    }
+  },
+  
+  "uploadComplete": "Upload complete",
+  "@uploadComplete": {
+    "description": "Message when upload is complete"
+  },
+  
+  "uploadFailed": "Upload failed",
+  "@uploadFailed": {
+    "description": "Message when upload fails"
+  },
+  
+  "downloadFailed": "Download failed",
+  "@downloadFailed": {
+    "description": "Message when download fails"
+  },
+  
+  "accountStatusOk": "Connected",
+  "@accountStatusOk": {
+    "description": "Status text for connected account"
+  },
+  
+  "accountStatusError": "Error",
+  "@accountStatusError": {
+    "description": "Status text for account with error"
+  },
+  
+  "accountStatusRevoked": "Access revoked",
+  "@accountStatusRevoked": {
+    "description": "Status text for revoked account"
+  },
+  
+  "accountStatusMissingScopes": "Permissions needed",
+  "@accountStatusMissingScopes": {
+    "description": "Status text for account missing scopes"
+  },
+  
+  "errorAccountNotAuthorized": "Your account is not authorized. Please reauthorize to continue.",
+  "@errorAccountNotAuthorized": {
+    "description": "Error message for unauthorized account"
+  },
+  
+  "errorAccountMissingPermissions": "Your account lacks required permissions. Please reauthorize with the necessary scopes.",
+  "@errorAccountMissingPermissions": {
+    "description": "Error message for account missing permissions"
+  },
+  
+  "errorAccountRevoked": "Account access has been revoked. Please reauthorize your account.",
+  "@errorAccountRevoked": {
+    "description": "Error message for revoked account"
+  },
+  
+  "errorAccountGeneric": "There was an error with your account. Please try reauthorizing.",
+  "@errorAccountGeneric": {
+    "description": "Generic error message for account issues"
+  },
+  
+  "errorNetworkConnection": "Network connection error. Please check your internet connection and try again.",
+  "@errorNetworkConnection": {
+    "description": "Error message for network issues"
+  },
+  
+  "errorFileNotFound": "File not found",
+  "@errorFileNotFound": {
+    "description": "Error message when file is not found"
+  },
+  
+  "errorInsufficientStorage": "Insufficient storage space",
+  "@errorInsufficientStorage": {
+    "description": "Error message for insufficient storage"
+  },
+  
+  "errorQuotaExceeded": "Storage quota exceeded",
+  "@errorQuotaExceeded": {
+    "description": "Error message when quota is exceeded"
+  },
+  
+  "errorGeneric": "An error occurred. Please try again.",
+  "@errorGeneric": {
+    "description": "Generic error message"
+  },
+  
+  "tryAgain": "Try again",
+  "@tryAgain": {
+    "description": "Try again button text"
+  },
+  
+  "authenticationCancelled": "Authentication was cancelled",
+  "@authenticationCancelled": {
+    "description": "Message when user cancels authentication"
+  },
+  
+  "authenticationFailed": "Authentication failed. Please try again.",
+  "@authenticationFailed": {
+    "description": "Message when authentication fails"
+  },
+  
+  "selectionModeActive": "Selection mode: {count} items selected",
+  "@selectionModeActive": {
+    "description": "Message showing number of selected items",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  
+  "selectionModeMinRequired": "Please select at least {min} items",
+  "@selectionModeMinRequired": {
+    "description": "Message when minimum selection not met",
+    "placeholders": {
+      "min": {
+        "type": "int",
+        "example": "1"
+      }
+    }
+  },
+  
+  "selectionModeMaxExceeded": "You can select at most {max} items",
+  "@selectionModeMaxExceeded": {
+    "description": "Message when maximum selection exceeded",
+    "placeholders": {
+      "max": {
+        "type": "int",
+        "example": "10"
+      }
+    }
+  },
+  
+  "selectionModeInvalidType": "This file type is not allowed",
+  "@selectionModeInvalidType": {
+    "description": "Message when selected file type is not allowed"
+  },
+  
+  "fileTypeImages": "Images",
+  "@fileTypeImages": {
+    "description": "File type filter label for images"
+  },
+  
+  "fileTypeDocuments": "Documents",
+  "@fileTypeDocuments": {
+    "description": "File type filter label for documents"
+  },
+  
+  "fileTypeVideos": "Videos",
+  "@fileTypeVideos": {
+    "description": "File type filter label for videos"
+  },
+  
+  "fileTypeAudio": "Audio",
+  "@fileTypeAudio": {
+    "description": "File type filter label for audio files"
+  },
+  
+  "fileSize": "{size}",
+  "@fileSize": {
+    "description": "File size display",
+    "placeholders": {
+      "size": {
+        "type": "String",
+        "example": "1.2 MB"
+      }
+    }
+  },
+  
+  "lastModified": "Modified {date}",
+  "@lastModified": {
+    "description": "Last modified date display",
+    "placeholders": {
+      "date": {
+        "type": "String",
+        "example": "2 days ago"
+      }
+    }
+  },
+  
+  "moreAccounts": "+{count} more",
+  "@moreAccounts": {
+    "description": "Text showing additional accounts count",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  }
+}

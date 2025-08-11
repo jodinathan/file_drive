@@ -1,0 +1,6 @@
+# Servidor OAuth - File Cloud Example
+
+config.dart
+*.log
+.dart_tool/
+pubspec.lock

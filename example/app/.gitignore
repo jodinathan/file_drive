@@ -1,0 +1,12 @@
+# App Example - File Cloud
+
+config.dart
+*.log
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+ios/Pods/
+ios/.symlinks/
+pubspec.lock
