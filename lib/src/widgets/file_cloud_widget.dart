@@ -14,6 +14,7 @@ import '../utils/app_logger.dart';
 import 'provider_logo.dart';
 import 'provider_card.dart';
 import 'account_card.dart';
+import 'file_item_card.dart';
 
 /// Main File Cloud widget that provides cloud storage integration
 class FileCloudWidget extends StatefulWidget {
@@ -56,6 +57,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
   String? _error;
   List<FileEntry> _selectedFiles = [];
   bool _isSelectionMode = false;
+  bool _isAddingAccount = false;
 
   @override
   void initState() {
@@ -311,19 +313,23 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
   }
 
   Future<void> _addAccount() async {
-    if (_selectedProvider == null) return;
+    if (_selectedProvider == null || _isAddingAccount) return;
+
+    setState(() {
+      _isAddingAccount = true;
+    });
 
     try {
-      print('🔍 Starting OAuth for $_selectedProvider');
+      AppLogger.info('Iniciando OAuth para $_selectedProvider', component: 'Auth');
       
       final oauthManager = OAuthManager();
       final result = await oauthManager.authenticate(widget.oauthConfig);
       
-      print('🔍 OAuth result - Success: ${result.isSuccess}');
+      AppLogger.info('Resultado OAuth - Sucesso: ${result.isSuccess}', component: 'Auth');
       if (result.accessToken != null) {
-        print('🔍 Access token received: ${result.accessToken!.substring(0, 20)}...');
+        AppLogger.debug('Token de acesso recebido', component: 'Auth');
       } else {
-        print('🔍 OAuth failed - Error: ${result.error}');
+        AppLogger.warning('OAuth falhou - Erro: ${result.error}', component: 'Auth');
       }
       
       if (result.accessToken != null) {
@@ -376,11 +382,17 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
         }
       }
     } catch (e) {
-      print('🔍 Exception in _addAccount: $e');
+      AppLogger.error('Erro ao adicionar conta', component: 'Auth', error: e);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Erro ao adicionar conta: $e')),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isAddingAccount = false;
+        });
       }
     }
   }
@@ -425,9 +437,114 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Confirmar exclusão'),
-        content: Text(
-          'Deseja realmente excluir ${_selectedFiles.length} arquivo(s) selecionado(s)?\n\nEsta ação não pode ser desfeita.',
+        title: Text(
+          _selectedFiles.length == 1 
+              ? 'Confirmar exclusão' 
+              : 'Confirmar exclusão de ${_selectedFiles.length} itens'
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _selectedFiles.length == 1
+                    ? 'Deseja realmente excluir este arquivo?'
+                    : 'Deseja realmente excluir os seguintes arquivos?',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 16),
+              if (_selectedFiles.length <= 10) ...[
+                // Show full list for up to 10 files
+                ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxHeight: 300,
+                  ),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _selectedFiles.length,
+                    itemBuilder: (context, index) {
+                      final file = _selectedFiles[index];
+                      return FileItemCard(
+                        file: file,
+                        isSelected: false,
+                        showCheckbox: false,
+                      );
+                    },
+                  ),
+                ),
+              ] else ...[
+                // Show first 5 files, then "... and X more"
+                ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxHeight: 250,
+                  ),
+                  child: Column(
+                    children: [
+                      ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: 5,
+                        itemBuilder: (context, index) {
+                          final file = _selectedFiles[index];
+                          return FileItemCard(
+                            file: file,
+                            isSelected: false,
+                            showCheckbox: false,
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surfaceVariant,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '... e mais ${_selectedFiles.length - 5} arquivo(s)',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            fontStyle: FontStyle.italic,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.error.withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Esta ação não pode ser desfeita.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.error,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -674,12 +791,23 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
           ),
           const SizedBox(height: 8), // Reduzido de 12 para 8
           FilledButton.icon(
-            onPressed: _addAccount,
-            icon: const Icon(Icons.add, size: 16), // Reduzido de 18 para 16
-            label: const Text('Adicionar Conta'),
+            onPressed: _isAddingAccount ? null : _addAccount,
+            icon: _isAddingAccount 
+                ? SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Theme.of(context).colorScheme.onPrimary,
+                      ),
+                    ),
+                  )
+                : const Icon(Icons.add, size: 16),
+            label: Text(_isAddingAccount ? 'Conectando...' : 'Adicionar Conta'),
             style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), // Reduzido padding
-              textStyle: Theme.of(context).textTheme.bodySmall, // Texto menor
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              textStyle: Theme.of(context).textTheme.bodySmall,
             ),
           ),
         ],
@@ -767,26 +895,47 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: _addAccount,
+          onTap: _isAddingAccount ? null : _addAccount,
           borderRadius: BorderRadius.circular(12),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.add_circle_outline,
-                size: 24,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Adicionar\nConta',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.w500,
-                  color: Theme.of(context).colorScheme.primary,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              color: _isAddingAccount 
+                  ? Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5)
+                  : null,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _isAddingAccount
+                    ? SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                      )
+                    : Icon(
+                        Icons.add_circle_outline,
+                        size: 24,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                const SizedBox(height: 4),
+                Text(
+                  _isAddingAccount ? 'Conectando...' : 'Adicionar\nConta',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: _isAddingAccount
+                        ? Theme.of(context).colorScheme.onSurfaceVariant
+                        : Theme.of(context).colorScheme.primary,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -903,27 +1052,10 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
   Widget _buildFileItem(FileEntry file) {
     final isSelected = _selectedFiles.contains(file);
     
-    return ListTile(
-      leading: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (widget.selectionConfig != null)
-            Checkbox(
-              value: isSelected,
-              onChanged: (_) => _toggleFileSelection(file),
-            ),
-          Icon(
-            file.isFolder ? Icons.folder : Icons.description,
-            color: file.isFolder
-                ? Theme.of(context).colorScheme.primary
-                : Theme.of(context).colorScheme.onSurface,
-          ),
-        ],
-      ),
-      title: Text(file.name),
-      subtitle: file.size != null
-          ? Text('${(file.size! / 1024 / 1024).toStringAsFixed(1)} MB')
-          : null,
+    return FileItemCard(
+      file: file,
+      isSelected: isSelected,
+      showCheckbox: widget.selectionConfig != null,
       onTap: () {
         if (widget.selectionConfig != null) {
           _toggleFileSelection(file);
@@ -931,7 +1063,9 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
           _loadFiles(folderId: file.id);
         }
       },
-      selected: isSelected,
+      onCheckboxChanged: widget.selectionConfig != null 
+          ? (_) => _toggleFileSelection(file)
+          : null,
     );
   }
 

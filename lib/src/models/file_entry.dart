@@ -15,6 +15,9 @@ class FileEntry {
   /// MIME type of the file (null for folders)
   final String? mimeType;
   
+  /// Creation timestamp
+  final DateTime? createdAt;
+  
   /// Last modified timestamp
   final DateTime? modifiedAt;
   
@@ -45,6 +48,7 @@ class FileEntry {
     required this.isFolder,
     this.size,
     this.mimeType,
+    this.createdAt,
     this.modifiedAt,
     this.parents = const [],
     this.thumbnailUrl,
@@ -62,6 +66,7 @@ class FileEntry {
     bool? isFolder,
     int? size,
     String? mimeType,
+    DateTime? createdAt,
     DateTime? modifiedAt,
     List<String>? parents,
     String? thumbnailUrl,
@@ -77,6 +82,7 @@ class FileEntry {
       isFolder: isFolder ?? this.isFolder,
       size: size ?? this.size,
       mimeType: mimeType ?? this.mimeType,
+      createdAt: createdAt ?? this.createdAt,
       modifiedAt: modifiedAt ?? this.modifiedAt,
       parents: parents ?? this.parents,
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
@@ -96,6 +102,7 @@ class FileEntry {
       'isFolder': isFolder,
       'size': size,
       'mimeType': mimeType,
+      'createdAt': createdAt?.toIso8601String(),
       'modifiedAt': modifiedAt?.toIso8601String(),
       'parents': parents,
       'thumbnailUrl': thumbnailUrl,
@@ -115,6 +122,9 @@ class FileEntry {
       isFolder: json['isFolder'] as bool,
       size: json['size'] as int?,
       mimeType: json['mimeType'] as String?,
+      createdAt: json['createdAt'] != null 
+          ? DateTime.parse(json['createdAt'] as String)
+          : null,
       modifiedAt: json['modifiedAt'] != null 
           ? DateTime.parse(json['modifiedAt'] as String)
           : null,

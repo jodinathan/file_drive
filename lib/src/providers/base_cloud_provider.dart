@@ -194,4 +194,11 @@ abstract class BaseCloudProvider {
   
   /// Gets the current account being used by this provider
   CloudAccount? get currentAccount;
+  
+  /// Disposes of resources used by this provider
+  /// Should be called when the provider is no longer needed
+  void dispose() {
+    // Default implementation does nothing
+    // Subclasses can override to clean up resources
+  }
 }

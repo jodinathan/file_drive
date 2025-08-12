@@ -26,3 +26,4 @@ export 'src/theme/app_constants.dart';
 
 // Export main widget
 export 'src/widgets/file_cloud_widget.dart';
+export 'src/widgets/file_item_card.dart';
