@@ -275,7 +275,7 @@ class OAuthServer {
           .addMiddleware(logRequests())
           .addHandler(_router.call);
       
-      final server = await serve(
+      await serve(
         pipeline,
         config.ServerConfig.host,
         config.ServerConfig.port,

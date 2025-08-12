@@ -7,13 +7,13 @@ import '../theme/app_constants.dart';
 class AccountCard extends StatelessWidget {
   /// Conta a ser exibida
   final CloudAccount account;
-  
+
   /// Se esta conta está selecionada
   final bool isSelected;
-  
+
   /// Callback quando a conta é selecionada
   final VoidCallback onTap;
-  
+
   /// Callback para ações do menu (reauth, remove)
   final Function(String action) onMenuAction;
 
@@ -29,22 +29,26 @@ class AccountCard extends StatelessWidget {
   Widget build(BuildContext context) {
     const cardHeight = 80.0; // Altura fixa do card
     const photoSize = cardHeight; // Foto com altura igual ao container
-    
+
     return Container(
       width: 280,
       height: cardHeight,
       decoration: BoxDecoration(
-        color: isSelected 
+        color: isSelected
             ? Theme.of(context).colorScheme.primaryContainer
             : Theme.of(context).colorScheme.surface,
         borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(photoSize / 2), // Radius circular igual à foto
-          bottomLeft: Radius.circular(photoSize / 2), // Radius circular igual à foto
+          topLeft: Radius.circular(
+            photoSize / 2,
+          ), // Radius circular igual à foto
+          bottomLeft: Radius.circular(
+            photoSize / 2,
+          ), // Radius circular igual à foto
           topRight: Radius.circular(AppConstants.radiusL),
           bottomRight: Radius.circular(AppConstants.radiusL),
         ),
         border: Border.all(
-          color: isSelected 
+          color: isSelected
               ? Theme.of(context).colorScheme.primary.withOpacity(0.3)
               : Theme.of(context).colorScheme.outline.withOpacity(0.2),
         ),
@@ -72,9 +76,7 @@ class AccountCard extends StatelessWidget {
               Container(
                 width: photoSize,
                 height: photoSize,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                ),
+                decoration: const BoxDecoration(shape: BoxShape.circle),
                 child: CircleAvatar(
                   radius: photoSize / 2,
                   backgroundImage: account.photoUrl != null
@@ -91,14 +93,15 @@ class AccountCard extends StatelessWidget {
                       : null,
                 ),
               ),
-              
+
               // Coluna com nome e email com padding top
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.only(
                     left: AppConstants.paddingS,
                     right: AppConstants.paddingXS,
-                    top: AppConstants.paddingM, // Padding top conforme solicitado
+                    top: AppConstants
+                        .paddingM, // Padding top conforme solicitado
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -114,7 +117,7 @@ class AccountCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 2),
-                      
+
                       // Email
                       Text(
                         account.email,
@@ -124,43 +127,38 @@ class AccountCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      
+
                       const SizedBox(height: AppConstants.spacingXS),
-                      
+
                       // Status
-                      if (account.status != AccountStatus.ok )
-                      Row(
-                        children: [
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: BoxDecoration(
-                              color: account.status == AccountStatus.ok 
-                                  ? Colors.green 
-                                  : Colors.red,
-                              shape: BoxShape.circle,
+                      if (account.status != AccountStatus.ok)
+                        Row(
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: AppConstants.spacingXS),
-                          Text(
-                            account.status == AccountStatus.ok 
-                                ? 'Conectado' 
-                                : 'Erro',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                              color: account.status == AccountStatus.ok 
-                                  ? Colors.green.shade700
-                                  : Colors.red.shade700,
+                            const SizedBox(width: AppConstants.spacingXS),
+                            Text(
+                              'Erro',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.red.shade700,
+                                  ),
                             ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
                     ],
                   ),
                 ),
               ),
-              
+
               // Menu de ações
               PopupMenuButton<String>(
                 iconSize: AppConstants.iconXS,

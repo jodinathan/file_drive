@@ -9,7 +9,7 @@ import '../storage/account_storage.dart';
 import '../auth/oauth_config.dart';
 import '../auth/oauth_manager.dart';
 import '../theme/app_constants.dart';
-import '../l10n/generated/app_localizations.dart';
+
 import '../utils/app_logger.dart';
 import 'provider_logo.dart';
 import 'provider_card.dart';
@@ -116,12 +116,24 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
         AppLogger.debug('Conta agrupada: ${account.name} (${account.providerType})', component: 'Accounts');
       }
 
-      // Select first account for current provider if available
+      // Select first valid account for current provider if available
       if (_selectedProvider != null && 
           _accountsByProvider[_selectedProvider!]?.isNotEmpty == true) {
-        _selectedAccount = _accountsByProvider[_selectedProvider!]!.first;
-        AppLogger.info('Conta selecionada automaticamente: ${_selectedAccount!.name}', component: 'Accounts');
-        await _loadFiles();
+        
+        // Find the first account with OK status
+        final availableAccounts = _accountsByProvider[_selectedProvider!]!;
+        final validAccount = availableAccounts.where(
+          (account) => account.status == AccountStatus.ok,
+        ).firstOrNull;
+        
+        if (validAccount != null) {
+          _selectedAccount = validAccount;
+          AppLogger.info('Conta selecionada automaticamente: ${_selectedAccount!.name}', component: 'Accounts');
+          await _loadFiles();
+        } else {
+          AppLogger.warning('Nenhuma conta válida (status OK) encontrada para o provedor $_selectedProvider', component: 'Accounts');
+          _selectedAccount = null;
+        }
       } else {
         AppLogger.info('Nenhuma conta disponível para o provedor $_selectedProvider', component: 'Accounts');
       }
@@ -134,6 +146,116 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  /// Handles authentication errors by updating account status and reloading accounts
+  Future<void> _handleAuthenticationError(dynamic error, String component) async {
+    if (error is CloudProviderException && error.statusCode == 401) {
+      AppLogger.warning('Erro de autenticação detectado, atualizando status da conta', component: component);
+      
+      // Update account status to revoked and save it
+      if (_selectedAccount != null) {
+        final updatedAccount = _selectedAccount!.updateStatus(AccountStatus.revoked);
+        await widget.accountStorage.saveAccount(updatedAccount);
+        AppLogger.info('Status da conta atualizado para revoked: ${updatedAccount.name}', component: component);
+        
+        // Clear the selected account to prevent further attempts with invalid credentials
+        _selectedAccount = null;
+        
+        // Reload accounts to reflect the updated status in UI, but don't auto-load files
+        await _reloadAccountsOnly();
+      }
+    }
+  }
+
+  /// Shows reconnection dialog for revoked accounts
+  void _showReconnectDialog(CloudAccount account) {
+    AppLogger.info('Mostrando dialog de reconexão para conta: ${account.name}', component: 'ReconnectDialog');
+    
+    // Ensure we're not in a loading state when showing the dialog
+    setState(() {
+      _isLoading = false;
+    });
+    
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      showDialog(
+        context: context,
+        barrierDismissible: false, // Prevent dismissing by tapping outside
+        builder: (context) => AlertDialog(
+        title: const Text('Conta desconectada'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('A conta "${account.name}" (${account.email}) do ${account.providerType.toString().split('.').last} foi desconectada e precisa ser reconectada.'),
+            const SizedBox(height: 16),
+            const Text('Isso pode acontecer por:'),
+            const SizedBox(height: 8),
+            const Text('• Token de acesso expirado'),
+            const Text('• Permissões foram revogadas'),
+            const Text('• Configurações de segurança alteradas'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _reconnectAccount(account);
+            },
+            child: const Text('Reconectar'),
+          ),
+        ],
+      ),
+    );
+    });
+  }
+
+  /// Reconnects a revoked account
+  Future<void> _reconnectAccount(CloudAccount account) async {
+    AppLogger.info('Iniciando reconexão da conta: ${account.name}', component: 'Auth');
+    
+    try {
+      // Remove the old account
+      await widget.accountStorage.removeAccount(account.id);
+      
+      // Start new OAuth flow for the same provider
+      await _addAccount();
+      
+    } catch (e) {
+      AppLogger.error('Erro ao reconectar conta', component: 'Auth', error: e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao reconectar: $e')),
+        );
+      }
+    }
+  }
+
+  /// Reloads accounts without auto-selecting or loading files
+  Future<void> _reloadAccountsOnly() async {
+    AppLogger.info('Recarregando contas (sem seleção automática)', component: 'Accounts');
+    
+    try {
+      final accounts = await widget.accountStorage.getAccounts();
+      AppLogger.info('${accounts.length} contas recarregadas', component: 'Accounts');
+      
+      setState(() {
+        // Group accounts by provider
+        _accountsByProvider.clear();
+        for (final account in accounts) {
+          _accountsByProvider
+              .putIfAbsent(account.providerType, () => [])
+              .add(account);
+          AppLogger.debug('Conta reagrupada: ${account.name} (${account.providerType}) - Status: ${account.status}', component: 'Accounts');
+        }
+      });
+    } catch (e) {
+      AppLogger.error('Erro ao recarregar contas', component: 'Accounts', error: e);
     }
   }
 
@@ -172,8 +294,14 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       });
     } catch (e) {
       AppLogger.error('Erro ao carregar arquivos', component: 'Files', error: e);
+      
+      // Handle authentication errors
+      await _handleAuthenticationError(e, 'Files');
+      
       setState(() {
         _error = 'Erro ao carregar arquivos: $e';
+        // Clear current files on error to show empty state
+        _currentFiles = [];
       });
     } finally {
       setState(() {
@@ -265,8 +393,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
         _selectedFiles.remove(file);
       } else {
         // Check selection limits
-        if (widget.selectionConfig!.maxSelection != null &&
-            _selectedFiles.length >= widget.selectionConfig!.maxSelection!) {
+        if (_selectedFiles.length >= widget.selectionConfig!.maxSelection) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -353,6 +480,10 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
             AppLogger.success('Arquivo excluído com sucesso: ${file.name}', component: 'FileOps');
           } catch (e) {
             AppLogger.error('Erro ao excluir arquivo ${file.name}', component: 'FileOps', error: e);
+            
+            // Handle authentication errors
+            await _handleAuthenticationError(e, 'FileOps');
+            
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('Erro ao excluir ${file.name}: $e')),
@@ -527,26 +658,28 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min, // Usa apenas o espaço necessário
         children: [
           Icon(
             Icons.account_circle_outlined,
-            size: 32,
+            size: 24, // Reduzido de 32 para 24
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4), // Reduzido de 8 para 4
           Text(
             'Nenhuma conta conectada',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            style: Theme.of(context).textTheme.bodySmall?.copyWith( // Mudado de bodyMedium para bodySmall
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8), // Reduzido de 12 para 8
           FilledButton.icon(
             onPressed: _addAccount,
-            icon: const Icon(Icons.add, size: 18),
+            icon: const Icon(Icons.add, size: 16), // Reduzido de 18 para 16
             label: const Text('Adicionar Conta'),
             style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), // Reduzido padding
+              textStyle: Theme.of(context).textTheme.bodySmall, // Texto menor
             ),
           ),
         ],
@@ -555,43 +688,62 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
   }
 
   Widget _buildAccountsList(List<CloudAccount> accounts) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          // Cards de contas existentes
-          ...accounts.asMap().entries.map((entry) {
-            final index = entry.key;
-            final account = entry.value;
-            return Padding(
-              padding: EdgeInsets.only(right: index < accounts.length ? 12 : 0),
-              child: AccountCard(
-                account: account,
-                isSelected: _selectedAccount?.id == account.id,
-                onTap: () {
-                  setState(() {
-                    _selectedAccount = account;
-                    _currentFiles.clear();
-                    _pathStack.clear();
-                  });
-                  _loadFiles();
-                },
-                onMenuAction: (action) {
-                  // TODO: Implementar ações do menu
-                  if (action == 'remove') {
-                    // Remover conta
-                  } else if (action == 'reauth') {
-                    // Reautorizar conta
-                  }
-                },
-              ),
-            );
-          }),
-          
-          // Botão adicionar nova conta com design melhorado
-          _buildAddAccountCard(),
-        ],
-      ),
+    return Row(
+      children: [
+        // Carrossel de contas existentes
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: accounts.asMap().entries.map((entry) {
+                final index = entry.key;
+                final account = entry.value;
+                return Padding(
+                  padding: EdgeInsets.only(
+                    right: index < accounts.length - 1 ? 12 : 0, // Espaçamento entre contas
+                  ),
+                  child: AccountCard(
+                    account: account,
+                    isSelected: _selectedAccount?.id == account.id,
+                    onTap: () {
+                      // Check if account has valid status before selecting
+                      if (account.status == AccountStatus.revoked) {
+                        // Log for debugging
+                        AppLogger.info('Conta revoked clicada: ${account.name}. Mostrando dialog de reconexão.', component: 'AccountSelection');
+                        // Show reconnection dialog for revoked accounts
+                        _showReconnectDialog(account);
+                        return;
+                      }
+                      
+                      AppLogger.info('Selecionando conta: ${account.name}', component: 'AccountSelection');
+                      setState(() {
+                        _selectedAccount = account;
+                        _currentFiles.clear();
+                        _pathStack.clear();
+                      });
+                      _loadFiles();
+                    },
+                    onMenuAction: (action) {
+                      // TODO: Implementar ações do menu
+                      if (action == 'remove') {
+                        // Remover conta
+                      } else if (action == 'reauth') {
+                        // Reautorizar conta
+                      }
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+        
+        // Espaçamento entre carrossel e botão
+        const SizedBox(width: 16),
+        
+        // Botão adicionar nova conta fora do carrossel
+        _buildAddAccountCard(),
+      ],
     );
   }
 
@@ -603,7 +755,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     return Container(
       width: 120,
       height: cardHeight, // Altura igual ao card da conta
-      margin: const EdgeInsets.only(left: 12),
+      // Removida margem left pois agora está fora do carrossel
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceVariant,
         borderRadius: BorderRadius.circular(12),
@@ -796,12 +948,20 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       ),
       child: Row(
         children: [
-          Expanded(
-            child: Text(
-              '${_selectedFiles.length} arquivo(s) selecionado(s)',
-              style: Theme.of(context).textTheme.bodyMedium,
+          // Botão Excluir no início (mais longe dos outros)
+          TextButton(
+            onPressed: _selectedFiles.isNotEmpty ? _deleteSelectedFiles : null,
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
             ),
+            child: const Text('Excluir'),
           ),
+          const Spacer(), // Espaça o botão excluir dos demais
+          Text(
+            '${_selectedFiles.length} arquivo(s) selecionado(s)',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(width: 16),
           TextButton(
             onPressed: () {
               setState(() {
@@ -810,14 +970,6 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
               });
             },
             child: const Text('Limpar'),
-          ),
-          const SizedBox(width: 8),
-          TextButton(
-            onPressed: _selectedFiles.isNotEmpty ? _deleteSelectedFiles : null,
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: const Text('Excluir'),
           ),
           const SizedBox(width: 8),
           FilledButton(
