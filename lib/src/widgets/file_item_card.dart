@@ -17,9 +17,6 @@ class FileItemCard extends StatelessWidget {
   
   /// Callback when the checkbox is changed
   final ValueChanged<bool?>? onCheckboxChanged;
-  
-  /// Whether to show detailed date information
-  final bool showDateInfo;
 
   const FileItemCard({
     super.key,
@@ -28,7 +25,6 @@ class FileItemCard extends StatelessWidget {
     this.showCheckbox = false,
     this.onTap,
     this.onCheckboxChanged,
-    this.showDateInfo = false,
   });
 
   @override
@@ -74,30 +70,34 @@ class FileItemCard extends StatelessWidget {
   }
 
   Widget? _buildSubtitle() {
-    final subtitleParts = <String>[];
+    final lines = <String>[];
     
-    // Add size information
+    // Primeira linha: tamanho ou "Pasta"
     if (file.size != null) {
-      subtitleParts.add('${(file.size! / 1024 / 1024).toStringAsFixed(1)} MB');
+      lines.add('${(file.size! / 1024 / 1024).toStringAsFixed(1)} MB');
     } else if (file.isFolder) {
-      subtitleParts.add('Pasta');
+      lines.add('Pasta');
     }
     
-    // Add date information if requested
-    if (showDateInfo) {
-      if (file.modifiedAt != null) {
-        subtitleParts.add('Modificado: ${_formatDate(file.modifiedAt!)}');
-      }
-      if (file.createdAt != null) {
-        subtitleParts.add('Criado: ${_formatDate(file.createdAt!)}');
-      }
+    // Segunda linha: informações de data
+    final dateParts = <String>[];
+    if (file.createdAt != null) {
+      dateParts.add('Criado: ${_formatDate(file.createdAt!)}');
+    }
+    if (file.modifiedAt != null) {
+      dateParts.add('Modificado: ${_formatDate(file.modifiedAt!)}');
     }
     
-    return subtitleParts.isNotEmpty
+    if (dateParts.isNotEmpty) {
+      lines.add(dateParts.join(' • '));
+    }
+    
+    return lines.isNotEmpty
         ? Text(
-            subtitleParts.join(' • '),
-            maxLines: showDateInfo ? 2 : 1,
+            lines.join('\n'),
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
+            style: const TextStyle(height: 1.2),
           )
         : null;
   }

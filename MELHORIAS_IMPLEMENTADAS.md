@@ -25,27 +25,51 @@ A tela de confirmação de exclusão mostrava apenas a quantidade de arquivos se
 
 ### Solução Implementada
 - **Lista Visual de Arquivos**: Mostra cada arquivo que será excluído usando o novo `FileItemCard`
+- **Informações Detalhadas**: Inclui datas de criação e modificação de cada arquivo
 - **Otimização para Muitos Arquivos**: 
-  - Até 10 arquivos: mostra todos
+  - Até 10 arquivos: mostra todos com informações completas
   - Mais de 10: mostra os 5 primeiros + "... e mais X arquivo(s)"
 - **Visual Melhorado**: 
   - Aviso visual de que a ação não pode ser desfeita
-  - Cards compactos para economizar espaço
+  - Cards detalhados para melhor identificação dos arquivos
   - Título dinâmico baseado na quantidade
 
 ### Código Afetado
 - `lib/src/widgets/file_cloud_widget.dart:437-565` - Dialog de confirmação atualizado
 
-## 3. Widget FileItemCard Reutilizável
+## 3. Informações de Data no FileEntry
 
-### Funcionalidade
-Novo widget criado para padronizar a exibição de arquivos em todo o projeto, **mantendo o layout idêntico** ao `ListTile` original.
+### Funcionalidade Adicionada
+Adicionadas informações de **data de criação** (`createdAt`) e **data de modificação** (`modifiedAt`) aos arquivos.
 
 ### Características
-- **Layout Idêntico**: Usa `ListTile` internamente para manter 100% de compatibilidade visual
+- **Campo `createdAt`**: Nova propriedade no modelo `FileEntry` para armazenar quando o arquivo foi criado
+- **Formatação Inteligente**: Datas são exibidas de forma legível:
+  - **Hoje**: "hoje às 14:30"
+  - **Ontem**: "ontem"
+  - **Esta semana**: "terça", "quinta", etc.
+  - **Este ano**: "15 mar", "22 jul"
+  - **Anos anteriores**: "15/03/2023"
+- **Integração com Google Drive**: O provider agora captura `createdTime` da API do Google Drive
+
+### Localização
+- `lib/src/models/file_entry.dart` - Modelo atualizado
+- `lib/src/providers/google_drive_provider.dart` - Provider atualizado
+- `lib/src/widgets/file_item_card.dart` - Widget com suporte a datas
+
+## 4. Widget FileItemCard Reutilizável
+
+### Funcionalidade
+Novo widget criado para padronizar a exibição de arquivos em todo o projeto, **mantendo o layout idêntico** ao `ListTile` original em todos os contextos.
+
+### Características
+- **Layout 100% Idêntico**: Usa `ListTile` internamente para manter compatibilidade visual perfeita
 - **Ícones Simples**: Pasta (azul) ou documento (cor padrão), igual ao original
 - **Seleção Opcional**: Checkbox configurável
-- **Informações Consistentes**: Nome, tamanho em MB para arquivos, "Pasta" para pastas
+- **Informações Completas**: 
+  - **Linha 1**: Nome do arquivo
+  - **Linha 2**: Tamanho em MB (ou "Pasta") + datas de criação e modificação
+- **Mesmo Layout Sempre**: Listagem normal e dialog de confirmação mostram exatamente as mesmas informações
 - **Tema Consistente**: Segue exatamente o design do `ListTile` original
 
 ### Localização
@@ -63,9 +87,9 @@ FileItemCard(
 )
 ```
 
-**Nota**: O widget foi simplificado para garantir que o layout seja **exatamente igual** tanto na listagem original quanto no dialog de confirmação de exclusão.
+**Nota**: O widget garante que o layout seja **exatamente igual** em todos os contextos - listagem normal, dialog de confirmação de exclusão, etc. Não há diferenças visuais entre os usos.
 
-## 4. Melhorias Gerais
+## 5. Melhorias Gerais
 
 ### Logging Aprimorado
 - Substituído `print()` por `AppLogger` no método `_addAccount()`
@@ -75,21 +99,30 @@ FileItemCard(
 - **Consistência Visual**: Todos os cards de arquivo agora usam o mesmo componente
 - **Feedback Imediato**: Estados de loading claros
 - **Informações Mais Claras**: Dialog de exclusão mostra exatamente o que será removido
+- **Contexto Temporal**: Usuário vê quando arquivos foram criados e modificados
+- **Layout Uniforme**: Cards idênticos na listagem e dialog de confirmação
+- **Botão "Cancelar"**: Mudança de "Limpar" para "Cancelar" nos controles de seleção
 
 ## Estrutura de Arquivos Afetados
 
 ```
-lib/src/widgets/
-├── file_cloud_widget.dart    # Atualizado - lógica principal
-└── file_item_card.dart       # Novo - widget reutilizável
+lib/src/
+├── models/
+│   └── file_entry.dart           # Atualizado - campo createdAt
+├── providers/
+│   └── google_drive_provider.dart # Atualizado - captura createdTime
+└── widgets/
+    ├── file_cloud_widget.dart    # Atualizado - lógica principal
+    └── file_item_card.dart       # Novo - widget reutilizável com datas
 
 lib/
-└── file_cloud.dart           # Atualizado - exports
+└── file_cloud.dart               # Atualizado - exports
 ```
 
 ## Compatibilidade
 
 - ✅ **Backward Compatible**: Todas as mudanças são internas
-- ✅ **API Pública**: Não houve mudanças na API pública
+- ✅ **API Pública**: Não houve mudanças na API pública existente
+- ✅ **Novos Campos**: `createdAt` é opcional e não quebra código existente
 - ✅ **Tema**: Mantém consistência com o design system existente
 - ✅ **Performance**: Melhorias não impactam performance

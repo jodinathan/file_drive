@@ -1103,7 +1103,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
                 _isSelectionMode = false;
               });
             },
-            child: const Text('Limpar'),
+            child: const Text('Cancelar'),
           ),
           const SizedBox(width: 8),
           FilledButton(
