@@ -9,7 +9,7 @@ fi
 CLASS_NAME="$1"
 PROJECT_ROOT=$(pwd)
 
-# Caminho correto do Analysis Server no seu setup
+# Caminho do Analysis Server (Flutter Dart SDK)
 ANALYSIS_SERVER="/Users/jonathanrezende/Dart/flutter/bin/cache/dart-sdk/bin/snapshots/analysis_server.dart.snapshot"
 
 if [ ! -f "$ANALYSIS_SERVER" ]; then
@@ -25,8 +25,8 @@ mkfifo "$FIFO_FILE"
 SERVER_OUT=$(mktemp)
 trap 'rm -f "$FIFO_FILE" "$SERVER_OUT"; kill $SERVER_PID 2>/dev/null || true' EXIT
 
-# Inicia o servidor
-dart --disable-dart-dev "$ANALYSIS_SERVER" < "$FIFO_FILE" > "$SERVER_OUT" &
+# Inicia o servidor LSP
+dart --disable-dart-dev "$ANALYSIS_SERVER" --lsp < "$FIFO_FILE" > "$SERVER_OUT" &
 SERVER_PID=$!
 
 exec 3>"$FIFO_FILE"
@@ -51,33 +51,31 @@ read_response() {
   done
 }
 
-# Handshake
-send_request '{"id":"1","method":"server.getVersion"}'
+# 1️⃣ Handshake
+send_request '{"id":1,"method":"server.getVersion"}'
 read_response >/dev/null
 
-# Configura raiz de análise
-send_request "{\"id\":\"2\",\"method\":\"analysis.setAnalysisRoots\",\"params\":{\"included\":[\"$PROJECT_ROOT\"],\"excluded\":[]}}"
+# 2️⃣ Configura raiz de análise
+send_request "{\"id\":2,\"method\":\"analysis.setAnalysisRoots\",\"params\":{\"included\":[\"$PROJECT_ROOT\"],\"excluded\":[]}}"
 read_response >/dev/null
 
-# Busca pela classe
-send_request "{\"id\":\"3\",\"method\":\"search.findTopLevelDeclarations\",\"params\":{\"pattern\":\"^$CLASS_NAME\$\"}}"
+# 3️⃣ Aguarda alguns segundos para análise inicial
+echo "⏳ Aguardando análise do projeto..."
+sleep 3  # aumente se o projeto for grande
+
+# 4️⃣ Busca a classe usando workspace/symbol
+send_request "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"workspace/symbol\",\"params\":{\"query\":\"$CLASS_NAME\"}}"
 RESULT=$(read_response)
 
-RESULT_ID=$(echo "$RESULT" | jq -r '.result.id')
-if [ "$RESULT_ID" = "null" ]; then
+# 5️⃣ Filtra resultados que batem exatamente com o nome da classe
+MATCH=$(echo "$RESULT" | jq -r \
+  '.result[]? | select(.name=="'"$CLASS_NAME"'") | "\(.location.uri | sub("^file://";"")):\(.location.range.start.line+1)"')
+
+if [ -z "$MATCH" ]; then
   echo "⚠️ Classe '$CLASS_NAME' não encontrada."
-  exit 0
+else
+  echo "$MATCH"
 fi
 
-# Espera pelo evento com os resultados
-while read -r line <&4; do
-  if [[ "$line" =~ ^\{ ]] && echo "$line" | jq -e '.event=="search.results"' >/dev/null; then
-    if echo "$line" | jq -e ".params.id==\"$RESULT_ID\"" >/dev/null; then
-      echo "$line" | jq -r '.params.results[] | "\(.location.file):\(.location.startLine)"'
-      break
-    fi
-  fi
-done
-
-# Encerra o servidor
-send_request '{"id":"9","method":"server.shutdown"}' >/dev/null
+# 6️⃣ Encerra o servidor
+send_request '{"id":9,"method":"server.shutdown"}' >/dev/null

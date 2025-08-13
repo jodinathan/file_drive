@@ -1524,62 +1524,10 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
             },
             onCreateFolder: _createFolder,
             onUpload: _uploadFiles,
+            onViewUploads: _showUploadList,
+            activeUploadsCount: _activeUploads.length,
+            uploadProgress: _averageUploadProgress,
           ),
-        
-        // Upload controls and list
-        if (_selectedAccount != null) ...[
-          Container(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                const Spacer(),
-                // Upload status indicator with progress bar
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextButton.icon(
-                      onPressed: () {
-                        _showUploadList();
-                      },
-                      icon: const Icon(Icons.upload),
-                      label: Text('${_activeUploads.length} uploads'),
-                    ),
-                    if (_activeUploads.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Builder(builder: (context) {
-                        print('DEBUG: Renderizando barra de progresso, valor: $_averageUploadProgress');
-                        return Container(
-                          width: 120,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[300],
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                          child: FractionallySizedBox(
-                            alignment: Alignment.centerLeft,
-                            widthFactor: _averageUploadProgress,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.blue,
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                    ],
-                  ],
-                ),
-              ],
-            ),
-          ),
-          
-          // Divisor
-          Container(
-            height: 1,
-            color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
-          ),
-        ],
         
         // Navegação de arquivos
         Expanded(

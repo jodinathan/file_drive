@@ -26,6 +26,15 @@ class NavigationBarWidget extends StatelessWidget {
   /// Callback when user wants to upload files
   final VoidCallback? onUpload;
   
+  /// Callback when user wants to view upload list
+  final VoidCallback? onViewUploads;
+  
+  /// Number of active uploads
+  final int activeUploadsCount;
+  
+  /// Average upload progress (0.0 to 1.0)
+  final double uploadProgress;
+  
   /// Whether to show the upload button
   final bool showUploadButton;
   
@@ -44,6 +53,9 @@ class NavigationBarWidget extends StatelessWidget {
     this.onBreadcrumbTap,
     this.onCreateFolder,
     this.onUpload,
+    this.onViewUploads,
+    this.activeUploadsCount = 0,
+    this.uploadProgress = 0.0,
     this.showUploadButton = true,
     this.showCreateFolderButton = true,
     this.maxBreadcrumbItems = 5,
@@ -309,7 +321,7 @@ class NavigationBarWidget extends StatelessWidget {
           ),
         
         // Upload button
-        if (showUploadButton)
+        if (showUploadButton) ...[
           FilledButton.icon(
             onPressed: onUpload,
             icon: const Icon(Icons.upload, size: 18),
@@ -321,6 +333,59 @@ class NavigationBarWidget extends StatelessWidget {
               ),
             ),
           ),
+          
+          // Upload counter with divider - sempre presente mas invisível quando zero
+          const SizedBox(width: AppConstants.spacingS),
+          Container(
+            height: 24,
+            width: 1,
+            color: activeUploadsCount > 0 
+                ? Theme.of(context).colorScheme.outline.withOpacity(0.3)
+                : Colors.transparent,
+          ),
+          const SizedBox(width: AppConstants.spacingS),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Opacity(
+                opacity: activeUploadsCount > 0 ? 1.0 : 0.0,
+                child: TextButton.icon(
+                  onPressed: activeUploadsCount > 0 ? onViewUploads : null,
+                  icon: const Icon(Icons.upload_file, size: 16),
+                  label: Text('$activeUploadsCount uploads'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.primary,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppConstants.paddingS,
+                      vertical: AppConstants.paddingS,
+                    ),
+                  ),
+                ),
+              ),
+              // Barra de progresso
+              if (activeUploadsCount > 0)
+                Container(
+                  width: 100,
+                  height: 3,
+                  margin: const EdgeInsets.only(top: 2),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.outline.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(1.5),
+                  ),
+                  child: FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: uploadProgress.clamp(0.0, 1.0),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary,
+                        borderRadius: BorderRadius.circular(1.5),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
       ],
     );
   }
