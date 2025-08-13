@@ -7,8 +7,8 @@ import '../models/file_entry.dart';
 import '../models/selection_config.dart';
 import '../providers/base_cloud_provider.dart';
 import '../providers/google_drive_provider.dart';
-import '../providers/custom_provider.dart';
 import '../providers/local_server_provider.dart';
+import '../providers/account_based_provider.dart';
 import '../storage/account_storage.dart';
 import '../auth/oauth_config.dart';
 import '../auth/oauth_manager.dart';
@@ -74,28 +74,38 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
   
   // Calculate average upload progress
   double get _averageUploadProgress {
-    if (_activeUploads.isEmpty) {
-      print('DEBUG: Nenhum upload ativo, retornando 0');
+    // Filter only active uploads (not completed, error, or cancelled)
+    final activeUploads = _activeUploads.values.where((progress) =>
+        progress.status == UploadStatus.uploading ||
+        progress.status == UploadStatus.waiting ||
+        progress.status == UploadStatus.retrying ||
+        progress.status == UploadStatus.paused).toList();
+    
+    if (activeUploads.isEmpty) {
       return 0.0;
     }
     
     double totalProgress = 0.0;
     int validUploads = 0;
     
-    for (final progress in _activeUploads.values) {
+    for (final progress in activeUploads) {
       if (progress.total > 0) {
         final currentProgress = progress.uploaded / progress.total;
         totalProgress += currentProgress;
         validUploads++;
-        print('DEBUG: Upload ${progress.fileName}: ${progress.uploaded}/${progress.total} = ${currentProgress}');
-      } else {
-        print('DEBUG: Upload ${progress.fileName} tem total = 0');
       }
     }
     
-    final result = validUploads > 0 ? totalProgress / validUploads : 0.0;
-    print('DEBUG: Progresso médio calculado: $result (validUploads: $validUploads)');
-    return result;
+    return validUploads > 0 ? totalProgress / validUploads : 0.0;
+  }
+
+  // Count only active uploads (not completed)
+  int get _activeUploadsCount {
+    return _activeUploads.values.where((progress) =>
+        progress.status == UploadStatus.uploading ||
+        progress.status == UploadStatus.waiting ||
+        progress.status == UploadStatus.retrying ||
+        progress.status == UploadStatus.paused).length;
   }
 
   // New managers for upload, navigation, and drag & drop
@@ -151,26 +161,6 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     // Set providers map in ProviderHelper for custom logo access
     ProviderHelper.setProvidersMap(_providers);
     
-    // Create default account for local server provider
-    if (_providers.containsKey('local_server')) {
-      final now = DateTime.now();
-      _accountsByProvider['local_server'] = [
-        CloudAccount(
-          id: 'local_server_default',
-          providerType: 'local_server',
-          externalId: 'local_user',
-          name: 'Local Server User',
-          email: 'user@localhost',
-          accessToken: 'test_token_dev', // Uses test token from server
-          refreshToken: null,
-          expiresAt: null,
-          createdAt: now,
-          updatedAt: now,
-        ),
-      ];
-      AppLogger.success('Conta padrão criada para LocalServerProvider', component: 'Init');
-    }
-    
     // Set initial provider to first enabled provider
     _selectedProvider = widget.initialProvider ?? enabledProviders.first;
     AppLogger.info('Provedor inicial selecionado: $_selectedProvider', component: 'Init');
@@ -189,28 +179,13 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       final showAccountManagement = ProviderHelper.getShowAccountManagement(_selectedProvider ?? '');
       
       if (!showAccountManagement && _selectedProvider != null) {
-        // For providers without account management, create a temporary account
-        AppLogger.info('Provider $_selectedProvider não usa gerenciamento de contas, criando conta temporária', component: 'Accounts');
-        
-        final tempAccount = CloudAccount(
-          id: 'temp_${_selectedProvider!}_account',
-          providerType: _selectedProvider!,
-          name: 'Enterprise User',
-          email: 'user@enterprise.com',
-          accessToken: 'temp_access_token',
-          refreshToken: null,
-          status: AccountStatus.ok,
-          expiresAt: DateTime.now().add(const Duration(days: 365)), // Valid for a year
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-          externalId: 'temp_external_id',
-        );
+        // For providers without account management, no account needed
+        AppLogger.info('Provider $_selectedProvider não usa gerenciamento de contas - funcionando sem conta', component: 'Accounts');
         
         _accountsByProvider.clear();
-        _accountsByProvider[_selectedProvider!] = [tempAccount];
-        _selectedAccount = tempAccount;
+        _selectedAccount = null; // No account needed for serverless providers
         
-        AppLogger.info('Conta temporária criada e selecionada para $_selectedProvider', component: 'Accounts');
+        AppLogger.info('Provider $_selectedProvider configurado para funcionar sem contas', component: 'Accounts');
         await _loadFiles();
         return;
       }
@@ -267,18 +242,40 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     print('   Error Type: ${error.runtimeType}');
     print('   Error: $error');
     print('   Component: $component');
-    print('   Selected Account: ${_selectedAccount?.email}');
+    print('   Selected Account: ${_selectedAccount?.email ?? 'No account (serverless provider)'}');
     print('   Has Refresh Token: ${_selectedAccount?.refreshToken != null}');
     
     if (error is CloudProviderException && error.statusCode == 401) {
       AppLogger.warning('Erro de autenticação detectado, tentando refresh token', component: component);
       
-      if (_selectedAccount != null && _selectedAccount!.refreshToken != null) {
+      // Only try to refresh token for account-based providers
+      final provider = _providers[_selectedProvider!]!;
+      if (provider is AccountBasedProvider && _selectedAccount != null && _selectedAccount!.refreshToken != null && _selectedAccount!.refreshToken!.isNotEmpty) {
         try {
-          // Try to refresh the token first
-          AppLogger.info('Tentando refresh do token para: ${_selectedAccount!.name}', component: component);
-          print('🔍 DEBUG: Attempting token refresh for account: ${_selectedAccount!.email}');
+          // Try to refresh using provider's refreshAuth method first
+          AppLogger.info('Tentando refresh do token via provider para: ${_selectedAccount!.name}', component: component);
+          print('🔍 DEBUG: Attempting provider token refresh for account: ${_selectedAccount!.email}');
           
+          final provider = _providers[_selectedProvider!]!;
+          if (provider is AccountBasedProvider) {
+            final refreshedAccount = await provider.refreshAuth(_selectedAccount!);
+            
+            if (refreshedAccount != null) {
+              // Token refreshed successfully via provider
+              _selectedAccount = refreshedAccount;
+              await widget.accountStorage.saveAccount(refreshedAccount);
+              AppLogger.success('Token refreshed via provider com sucesso: ${refreshedAccount.name}', component: component);
+              
+              // Reinitialize provider with new token
+              provider.initialize(refreshedAccount);
+              
+              // Reload accounts to reflect the updated token in UI
+              await _reloadAccountsOnly();
+              return; // Success, no need to mark as revoked
+            }
+          }
+          
+          // Fallback to OAuth manager refresh if provider refresh fails
           final refreshedAccount = await _refreshAccountToken(_selectedAccount!);
           
           if (refreshedAccount != null) {
@@ -287,9 +284,11 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
             await widget.accountStorage.saveAccount(refreshedAccount);
             AppLogger.success('Token refreshed com sucesso: ${refreshedAccount.name}', component: component);
             
-            // Reinitialize provider with new token
+            // Reinitialize provider with new token (only for account-based providers)
             final provider = _providers[_selectedProvider!]!;
-            provider.initialize(refreshedAccount);
+            if (provider is AccountBasedProvider) {
+              provider.initialize(refreshedAccount);
+            }
             
             // Reload accounts to reflect the updated token in UI
             await _reloadAccountsOnly();
@@ -298,22 +297,34 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
         } catch (refreshError) {
           AppLogger.error('Falha ao fazer refresh do token', component: component, error: refreshError);
         }
+      } else {
+        if (provider is AccountBasedProvider) {
+          AppLogger.warning('Refresh token não disponível para a conta: ${_selectedAccount?.email}', component: component);
+          print('⚠️  Refresh token is null or empty. Account will need reauthorization.');
+        } else {
+          AppLogger.warning('Erro de autenticação em provider serverless - verificar configuração do servidor', component: component);
+          print('⚠️  Serverless provider authentication failed. Check server configuration.');
+        }
       }
       
-      // If refresh failed or no refresh token available, mark as revoked
-      AppLogger.warning('Marcando conta como revogada devido à falha de autenticação', component: component);
-      
-      // Update account status to revoked and save it
-      if (_selectedAccount != null) {
-        final updatedAccount = _selectedAccount!.updateStatus(AccountStatus.revoked);
-        await widget.accountStorage.saveAccount(updatedAccount);
-        AppLogger.info('Status da conta atualizado para revoked: ${updatedAccount.name}', component: component);
+      // If refresh failed or no refresh token available, mark as revoked (only for account-based providers)
+      if (provider is AccountBasedProvider) {
+        AppLogger.warning('Marcando conta como revogada devido à falha de autenticação', component: component);
         
-        // Clear the selected account to prevent further attempts with invalid credentials
-        _selectedAccount = null;
-        
-        // Reload accounts to reflect the updated status in UI, but don't auto-load files
-        await _reloadAccountsOnly();
+        // Update account status to revoked and save it
+        if (_selectedAccount != null) {
+          final updatedAccount = _selectedAccount!.updateStatus(AccountStatus.revoked);
+          await widget.accountStorage.saveAccount(updatedAccount);
+          AppLogger.info('Status da conta atualizado para revoked: ${updatedAccount.name}', component: component);
+          
+          // Clear the selected account to prevent further attempts with invalid credentials
+          _selectedAccount = null;
+          
+          // Reload accounts to reflect the updated status in UI, but don't auto-load files
+          await _reloadAccountsOnly();
+        }
+      } else {
+        AppLogger.warning('Provider serverless com erro de autenticação - não há conta para marcar como revogada', component: component);
       }
     }
   }
@@ -506,8 +517,17 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
   Future<void> _loadFiles({String? folderId, String? folderName, bool skipNavigation = false}) async {
     print('DEBUG: _loadFiles chamado com folderId: $folderId, skipNavigation: $skipNavigation');
     
-    if (_selectedAccount == null || _selectedProvider == null) {
-      AppLogger.warning('Tentativa de carregar arquivos sem conta ou provedor selecionado', component: 'Files');
+    if (_selectedProvider == null) {
+      AppLogger.warning('Tentativa de carregar arquivos sem provedor selecionado', component: 'Files');
+      return;
+    }
+
+    // Check if this provider requires account management
+    final provider = _providers[_selectedProvider!]!;
+    final requiresAccount = provider is AccountBasedProvider;
+    
+    if (requiresAccount && _selectedAccount == null) {
+      AppLogger.warning('Tentativa de carregar arquivos sem conta selecionada para provedor que requer conta', component: 'Files');
       return;
     }
 
@@ -519,18 +539,23 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     });
 
     try {
-      // Check and refresh token if needed before making API calls
-      final refreshedAccount = await _checkAndRefreshTokenIfNeeded(_selectedAccount!);
-      if (refreshedAccount != null && refreshedAccount != _selectedAccount) {
-        _selectedAccount = refreshedAccount;
-        await widget.accountStorage.saveAccount(refreshedAccount);
-        AppLogger.info('Token atualizado preventivamente', component: 'Files');
+      // Check and refresh token if needed before making API calls (only for account-based providers)
+      if (requiresAccount && _selectedAccount != null) {
+        final refreshedAccount = await _checkAndRefreshTokenIfNeeded(_selectedAccount!);
+        if (refreshedAccount != null && refreshedAccount != _selectedAccount) {
+          _selectedAccount = refreshedAccount;
+          await widget.accountStorage.saveAccount(refreshedAccount);
+          AppLogger.info('Token atualizado preventivamente', component: 'Files');
+        }
       }
       
       final provider = _providers[_selectedProvider!]!;
-      provider.initialize(_selectedAccount!);
-      
-      AppLogger.debug('Provider inicializado para ${_selectedAccount!.name}', component: 'Files');
+      if (provider is AccountBasedProvider && _selectedAccount != null) {
+        provider.initialize(_selectedAccount!);
+        AppLogger.debug('Provider inicializado para ${_selectedAccount!.name}', component: 'Files');
+      } else {
+        AppLogger.debug('Provider serverless inicializado sem conta', component: 'Files');
+      }
       
       final filesPage = await provider.listFolder(folderId: folderId);
       
@@ -560,7 +585,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
               folderId: folderId,
               folderName: finalFolderName,
               providerType: _selectedProvider!,
-              accountId: _selectedAccount!.id,
+              accountId: _selectedAccount?.id ?? 'serverless',
             );
             _pathStack = _navigationManager.history.current?.pathComponents ?? [];
           } else {
@@ -568,7 +593,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
               folderId: null,
               folderName: _getRootFolderName(context),
               providerType: _selectedProvider!,
-              accountId: _selectedAccount!.id,
+              accountId: _selectedAccount?.id ?? 'serverless',
             );
             _pathStack.clear();
           }
@@ -620,6 +645,17 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       print('   Refresh Token (last 10 chars): ${result.refreshToken?.substring((result.refreshToken?.length ?? 0) - 10)}');
       print('   Expires At: ${result.expiresAt}');
       print('   Additional Data: ${result.additionalData}');
+
+      // Verificar se o refresh token está presente
+      if (result.refreshToken == null || result.refreshToken!.isEmpty) {
+        print('⚠️  WARNING: Refresh token não recebido do servidor OAuth!');
+        print('   Isso significa que a conta precisará ser reautorizada quando o token expirar.');
+        print('   Para resolver, configure o servidor OAuth com:');
+        print('   - access_type=offline');
+        print('   - approval_prompt=force (ou prompt=consent)');
+      } else {
+        print('✅ Refresh token recebido com sucesso');
+      }
       
       if (result.accessToken != null) {
         AppLogger.debug('Token de acesso recebido', component: 'Auth');
@@ -644,30 +680,32 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
           updatedAt: DateTime.now(),
         );
 
-        provider.initialize(tempAccount);
-        final profile = await provider.getUserProfile();
+        if (provider is AccountBasedProvider) {
+          provider.initialize(tempAccount);
+          final profile = await provider.getUserProfile();
 
-        final account = CloudAccount(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          providerType: _selectedProvider!,
-          externalId: profile.id,
-          accessToken: result.accessToken!,
-          refreshToken: result.refreshToken,
-          name: profile.name,
-          email: profile.email,
-          photoUrl: profile.photoUrl,
-          status: AccountStatus.ok,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        );
-
-        await widget.accountStorage.saveAccount(account);
-        await _loadAccounts();
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Conta adicionada com sucesso!')),
+          final account = CloudAccount(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            providerType: _selectedProvider!,
+            externalId: profile.id,
+            accessToken: result.accessToken!,
+            refreshToken: result.refreshToken,
+            name: profile.name,
+            email: profile.email,
+            photoUrl: profile.photoUrl,
+            status: AccountStatus.ok,
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
           );
+
+          await widget.accountStorage.saveAccount(account);
+          await _loadAccounts();
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Conta adicionada com sucesso!')),
+            );
+          }
         }
       } else {
         if (mounted) {
@@ -867,12 +905,19 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       try {
         AppLogger.info('Executando exclusão de arquivos...', component: 'FileOps');
         
-        if (_selectedAccount == null || _selectedProvider == null) {
-          throw Exception('Nenhuma conta ou provedor selecionado');
+        if (_selectedProvider == null) {
+          throw Exception('Nenhum provedor selecionado');
         }
         
         final provider = _providers[_selectedProvider!]!;
-        provider.initialize(_selectedAccount!);
+        
+        // Only check for account if provider requires it
+        if (provider is AccountBasedProvider) {
+          if (_selectedAccount == null) {
+            throw Exception('Nenhuma conta selecionada para provedor que requer conta');
+          }
+          provider.initialize(_selectedAccount!);
+        }
         
         // Excluir cada arquivo selecionado
         int successCount = 0;
@@ -950,8 +995,16 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
 
 
   Future<void> _createFolder() async {
-    if (_selectedAccount == null || _selectedProvider == null) {
-      AppLogger.warning('Tentativa de criar pasta sem conta ou provedor selecionado', component: 'Folder');
+    if (_selectedProvider == null) {
+      AppLogger.warning('Tentativa de criar pasta sem provedor selecionado', component: 'Folder');
+      return;
+    }
+
+    final provider = _providers[_selectedProvider!]!;
+    
+    // Only check for account if provider requires it
+    if (provider is AccountBasedProvider && _selectedAccount == null) {
+      AppLogger.warning('Tentativa de criar pasta sem conta selecionada para provedor que requer conta', component: 'Folder');
       return;
     }
 
@@ -963,7 +1016,9 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     if (result != null && result.isNotEmpty) {
       try {
         final provider = _providers[_selectedProvider!]!;
-        provider.initialize(_selectedAccount!);
+        if (provider is AccountBasedProvider) {
+          provider.initialize(_selectedAccount!);
+        }
 
         final currentFolderId = _navigationManager.currentFolderId;
 
@@ -1035,12 +1090,18 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
   }
 
   Future<void> _uploadFiles() async {
-    if (_selectedAccount == null || _selectedProvider == null) {
-      AppLogger.warning('Upload cancelado: conta ou provedor não selecionado', component: 'Upload');
+    if (_selectedProvider == null) {
+      AppLogger.warning('Upload cancelado: provedor não selecionado', component: 'Upload');
       return;
     }
 
     final provider = _providers[_selectedProvider!]!;
+    
+    // Only check for account if provider requires it
+    if (provider is AccountBasedProvider && _selectedAccount == null) {
+      AppLogger.warning('Upload cancelado: conta não selecionada para provedor que requer conta', component: 'Upload');
+      return;
+    }
 
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
@@ -1182,6 +1243,13 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
             ),
           );
           
+          // Auto-clear completed uploads after a delay
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) {
+              _clearCompletedUploads();
+            }
+          });
+          
           // Refresh the file list if any file was uploaded successfully
           if (successCount > 0) {
             await _loadFiles();
@@ -1223,7 +1291,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
               children: [
                 const Icon(Icons.upload),
                 const SizedBox(width: 8),
-                Text('Uploads (${_activeUploads.length})'),
+                Text('Uploads (${_activeUploadsCount})'),
               ],
             ),
             content: SizedBox(
@@ -1356,7 +1424,11 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
           progress.status == UploadStatus.error ||
           progress.status == UploadStatus.cancelled);
     });
+    
+    // Update upload dialog if it's open
     _uploadDialogUpdateCallback?.call();
+    
+    AppLogger.info('Uploads concluídos removidos. Uploads ativos restantes: ${_activeUploads.length}', component: 'Upload');
   }
 
   Stream<List<int>> _createSlowUploadStreamWithProgress(List<int> bytes, String uploadId, int totalBytes) async* {
@@ -1539,7 +1611,8 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
         ),
         
         // Navigation bar (nova adição)
-        if (_selectedAccount != null)
+        if (_selectedProvider != null && (_selectedAccount != null || 
+            (_providers[_selectedProvider]! is! AccountBasedProvider)))
           NavigationBarWidget(
             navigationHistory: _navigationManager.history,
             onGoHome: () {
@@ -1566,7 +1639,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
             onCreateFolder: _createFolder,
             onUpload: _uploadFiles,
             onViewUploads: _showUploadList,
-            activeUploadsCount: _activeUploads.length,
+            activeUploadsCount: _activeUploadsCount,
             uploadProgress: _averageUploadProgress,
           ),
         
@@ -1768,7 +1841,11 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
 
   /// Navegação de arquivos (parte inferior)
   Widget _buildFileNavigation() {
-    if (_selectedAccount == null) {
+    // Check if provider requires account
+    final provider = _providers[_selectedProvider]!;
+    final requiresAccount = provider is AccountBasedProvider;
+    
+    if (requiresAccount && _selectedAccount == null) {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1776,6 +1853,20 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
             Icon(Icons.cloud_off, size: 64, color: Colors.grey),
             SizedBox(height: 16),
             Text('Selecione uma conta para navegar nos arquivos'),
+          ],
+        ),
+      );
+    }
+    
+    // For serverless providers, we can proceed without an account
+    if (!requiresAccount && _selectedProvider == null) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.cloud_off, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
+            Text('Selecione um provedor para navegar nos arquivos'),
           ],
         ),
       );

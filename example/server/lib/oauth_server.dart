@@ -22,6 +22,13 @@ class OAuthServer {
     : _storageRoot = storageRoot ?? './storage' {
     _setupStorageDirectory();
     _setupRoutes();
+    _initializeTestToken();
+  }
+  
+  /// Initialize test token for development
+  void _initializeTestToken() {
+    _tokens['test_state'] = 'test_token_dev';
+    print('🧪 Token de teste inicializado: test_token_dev');
   }
   
   void _setupStorageDirectory() {
@@ -445,11 +452,13 @@ class OAuthServer {
         entries.add({
           'id': _generateFileId(entity.path),
           'name': name,
-          'is_folder': isFolder,
+          'isFolder': isFolder,
           'size': isFolder ? 0 : stat.size,
-          'modified_at': stat.modified.toIso8601String(),
-          'mime_type': isFolder ? null : _getMimeType(name),
-          'download_url': isFolder ? null : '/api/download/${_generateFileId(entity.path)}',
+          'modifiedAt': stat.modified.toIso8601String(),
+          'mimeType': isFolder ? null : _getMimeType(name),
+          'downloadUrl': isFolder ? null : '/api/download/${_generateFileId(entity.path)}',
+          'canDownload': !isFolder,
+          'canDelete': true,
           'metadata': {},
         });
       }
@@ -503,9 +512,11 @@ class OAuthServer {
       final result = {
         'id': _generateFileId(folderPath),
         'name': name,
-        'is_folder': true,
+        'isFolder': true,
         'size': 0,
-        'modified_at': stat.modified.toIso8601String(),
+        'modifiedAt': stat.modified.toIso8601String(),
+        'canDownload': false,
+        'canDelete': true,
         'metadata': data['metadata'] ?? {},
       };
 
@@ -706,18 +717,13 @@ class OAuthServer {
   }
 
   Response _handleHealth(Request request) {
-    // Add a test token for development/testing
-    if (!_tokens.containsValue('test_token_dev')) {
-      _tokens['test_state'] = 'test_token_dev';
-      print('🧪 Token de teste adicionado: test_token_dev');
-    }
-    
     return Response.ok(
       json.encode({
         'status': 'healthy',
         'timestamp': DateTime.now().toIso8601String(),
         'active_states': _states.length,
         'stored_tokens': _tokens.length,
+        'test_token_available': _tokens.containsValue('test_token_dev'),
         'storage_root': _storageRoot,
       }),
       headers: {'Content-Type': 'application/json'},

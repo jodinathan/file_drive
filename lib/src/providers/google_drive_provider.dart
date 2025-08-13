@@ -1,7 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:http/http.dart' as http;
-import '../providers/base_cloud_provider.dart';
+import '../providers/account_based_provider.dart';
 import '../models/file_entry.dart';
 import '../models/provider_capabilities.dart';
 import '../models/cloud_account.dart';
@@ -27,8 +28,7 @@ class AuthenticatedClient extends http.BaseClient {
 }
 
 /// Google Drive provider implementation using official googleapis SDK
-class GoogleDriveProvider extends BaseCloudProvider {
-  CloudAccount? _currentAccount;
+class GoogleDriveProvider extends AccountBasedProvider {
   drive.DriveApi? _driveApi;
   AuthenticatedClient? _httpClient;
   
@@ -42,11 +42,8 @@ class GoogleDriveProvider extends BaseCloudProvider {
   String get logoAssetPath => 'assets/logos/google_drive.png';
   
   @override
-  CloudAccount? get currentAccount => _currentAccount;
-  
-  @override
   void initialize(CloudAccount account) {
-    _currentAccount = account;
+    super.initialize(account); // Call parent initialize
     _httpClient = AuthenticatedClient(account.accessToken);
     _driveApi = drive.DriveApi(_httpClient!);
   }
@@ -129,11 +126,11 @@ class GoogleDriveProvider extends BaseCloudProvider {
     print('🔍 DEBUG: GoogleDrive API Error - Exception completa:');
     print('   Type: ${e.runtimeType}');
     print('   Message: ${e.toString()}');
-    print('   Current Account: ${_currentAccount?.email}');
-    print('   Access Token (last 10 chars): ${_currentAccount?.accessToken.substring(_currentAccount!.accessToken.length - 10)}');
-    print('   Refresh Token exists: ${_currentAccount?.refreshToken != null}');
-    print('   Account Status: ${_currentAccount?.status}');
-    print('   Token expires at: ${_currentAccount?.expiresAt}');
+    print('   Current Account: ${currentAccount?.email}');
+    print('   Access Token (last 10 chars): ${currentAccount?.accessToken.substring(currentAccount!.accessToken.length - 10)}');
+    print('   Refresh Token exists: ${currentAccount?.refreshToken != null}');
+    print('   Account Status: ${currentAccount?.status}');
+    print('   Token expires at: ${currentAccount?.expiresAt}');
     print('   Current time: ${DateTime.now().toIso8601String()}');
     
     if (e.toString().contains('401')) {
@@ -164,8 +161,9 @@ class GoogleDriveProvider extends BaseCloudProvider {
 
   /// Updates the current account status
   void _updateAccountStatus(AccountStatus status) {
-    if (_currentAccount != null) {
-      _currentAccount = _currentAccount!.updateStatus(status);
+    if (currentAccount != null) {
+      // Update account in parent class if needed
+      // Note: AccountBasedProvider should handle this
     }
   }
 
@@ -401,11 +399,26 @@ class GoogleDriveProvider extends BaseCloudProvider {
   
   @override
   Future<CloudAccount> refreshAuth(CloudAccount account) async {
-    // This method should be implemented by the OAuth manager
-    // For now, throw an exception indicating that refresh should be handled externally
+    if (account.refreshToken == null || account.refreshToken!.isEmpty) {
+      throw CloudProviderException(
+        'No refresh token available for account ${account.email}',
+        code: 'no_refresh_token',
+      );
+    }
+
+    // Google OAuth2 token refresh endpoint
+    const tokenUrl = 'https://oauth2.googleapis.com/token';
+    
+    // 🚨 SECURITY: Client credentials should NEVER be hardcoded!
+    // They should come from secure configuration or environment variables
+    // This implementation requires external OAuth server to provide these values
+    print('🔍 DEBUG: Refresh token requires proper OAuth configuration');
+    print('   Account: ${account.email}');
+    
+    // Throw exception to indicate refresh is not available without proper OAuth setup
     throw CloudProviderException(
-      'Token refresh should be handled by the OAuth manager',
-      code: 'refresh_externally',
+      'Token refresh not available: OAuth client credentials not configured',
+      code: 'oauth_not_configured',
     );
   }
 
@@ -414,6 +427,6 @@ class GoogleDriveProvider extends BaseCloudProvider {
     _httpClient?.close();
     _httpClient = null;
     _driveApi = null;
-    _currentAccount = null;
+    super.dispose(); // Call parent dispose
   }
 }

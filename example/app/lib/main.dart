@@ -105,6 +105,92 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _removeAllAccounts() async {
+    // Mostrar dialog de confirmação
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('Remover Todas as Contas'),
+          ],
+        ),
+        content: const Text(
+          'Esta ação removerá TODAS as contas salvas, independente do status. '
+          'Esta operação não pode ser desfeita.\n\n'
+          'Deseja continuar?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Remover Todas'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        // Buscar todas as contas para mostrar a contagem
+        final accounts = await _accountStorage.getAccounts();
+        
+        if (accounts.isEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Nenhuma conta encontrada para remover.'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+          return;
+        }
+
+        final accountCount = accounts.length;
+
+        // Usar clearAll() para remover todas as contas de uma vez
+        await _accountStorage.clearAll();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('$accountCount contas removidas com sucesso!'),
+              backgroundColor: Colors.green,
+              action: SnackBarAction(
+                label: 'OK',
+                onPressed: () {
+                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                },
+              ),
+            ),
+          );
+        }
+        
+        // Forçar rebuild do widget para refletir as mudanças
+        setState(() {});
+        
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erro ao remover contas: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   Future<void> _testServerConnection() async {
     // Simple test to see if server is running
     // This will throw if server is not accessible
@@ -194,64 +280,110 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildFileCloudWidget() {
-    return FileCloudWidget(
-      accountStorage: _accountStorage,
-      oauthConfig: _oauthConfig,
-      selectionConfig: SelectionConfig(
-        minSelection: 1,
-        maxSelection: 5,
-        allowFolders: false,
-        onSelectionConfirm: (files) {
-          // Show selected files in a dialog
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: Text('${files.length} arquivos selecionados'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: files.map((file) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    children: [
-                      Icon(
-                        file.isFolder ? Icons.folder : Icons.description,
-                        size: 16,
+    return Column(
+      children: [
+        // Botão de exemplo para remover todas as contas (apenas no exemplo)
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.1),
+          child: Card(
+            color: Theme.of(context).colorScheme.errorContainer,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.delete_sweep,
+                    color: Theme.of(context).colorScheme.onErrorContainer,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Funcionalidade de Exemplo',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onErrorContainer,
+                        fontWeight: FontWeight.bold,
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(file.name)),
+                    ),
+                  ),
+                  FilledButton.tonalIcon(
+                    onPressed: () => _removeAllAccounts(),
+                    icon: const Icon(Icons.delete_forever),
+                    label: const Text('Remover Todas as Contas'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.error,
+                      foregroundColor: Theme.of(context).colorScheme.onError,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        // Widget principal do FileCloud
+        Expanded(
+          child: FileCloudWidget(
+            accountStorage: _accountStorage,
+            oauthConfig: _oauthConfig,
+            selectionConfig: SelectionConfig(
+              minSelection: 1,
+              maxSelection: 5,
+              allowFolders: false,
+              onSelectionConfirm: (files) {
+                // Show selected files in a dialog
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: Text('${files.length} arquivos selecionados'),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: files.map((file) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            Icon(
+                              file.isFolder ? Icons.folder : Icons.description,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(file.name)),
+                          ],
+                        ),
+                      )).toList(),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Cancelar'),
+                      ),
+                      FilledButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('${files.length} arquivos selecionados!'),
+                            ),
+                          );
+                        },
+                        child: const Text('OK'),
+                      ),
                     ],
                   ),
-                )).toList(),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancelar'),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('${files.length} arquivos selecionados!'),
-                      ),
-                    );
-                  },
-                  child: const Text('OK'),
-                ),
-              ],
+                );
+              },
             ),
-          );
-        },
-      ),
-      onFilesSelected: (files) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${files.length} arquivos selecionados via callback!'),
+            onFilesSelected: (files) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('${files.length} arquivos selecionados via callback!'),
+                ),
+              );
+            },
           ),
-        );
-      },
+        ),
+      ],
     );
   }
 

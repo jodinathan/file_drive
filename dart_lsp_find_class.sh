@@ -40,18 +40,25 @@ send_request() {
   echo "[DEBUG ENVIADO] $PAYLOAD"
 }
 
-# Inicialização obrigatória do LSP
+# 1️⃣ Initialize
 INIT_ID=$((RANDOM % 100000))
 send_request "{\"jsonrpc\":\"2.0\",\"id\":$INIT_ID,\"method\":\"initialize\",\"params\":{\"processId\":$$,\"rootUri\":\"file://$PROJECT_ROOT\",\"capabilities\":{}}}"
+
+# 2️⃣ Lê a resposta do initialize
 sleep 1
 
-# Configura a raiz de análise
+# 3️⃣ Envia a notificação initialized (obrigatória)
+send_request "{\"jsonrpc\":\"2.0\",\"method\":\"initialized\",\"params\":{}}"
+
+# 4️⃣ Configura a raiz de análise
 ROOT_ID=$((RANDOM % 100000))
 send_request "{\"jsonrpc\":\"2.0\",\"id\":$ROOT_ID,\"method\":\"analysis.setAnalysisRoots\",\"params\":{\"included\":[\"$PROJECT_ROOT\"],\"excluded\":[]}}"
+
 sleep 2
 
 echo "✅ Analysis Server iniciado corretamente. Digite o nome da classe para buscar."
 
+# Loop interativo
 while true; do
   read -rp "Classe para buscar (ou 'exit' para sair): " CLASS_NAME
   [[ "$CLASS_NAME" == "exit" ]] && break
@@ -64,7 +71,6 @@ while true; do
   # Loop de leitura até receber resposta com o id correto
   MATCH=""
   while true; do
-    # Lê linha a linha do fifo (tail já imprime tudo, mas vamos filtrar)
     read -r LINE <&4 || continue
 
     # Ignora cabeçalhos
@@ -72,9 +78,9 @@ while true; do
     [[ "$LINE" =~ ^Content-Type: ]] && continue
     [[ "$LINE" =~ ^$ ]] && continue
 
-    # Verifica se é JSON
+    # Se JSON
     if echo "$LINE" | jq empty >/dev/null 2>&1; then
-      # Se tiver o id correto
+      # Verifica se é a resposta do workspace/symbol
       if echo "$LINE" | jq -e --argjson ID "$REQUEST_ID" '.id? == $ID' >/dev/null 2>&1; then
         MATCH=$(echo "$LINE" | jq -r \
           '.result[]? | select(.name=="'"$CLASS_NAME"'") | "\(.location.uri | sub("^file://";"")):\(.location.range.start.line+1)"')

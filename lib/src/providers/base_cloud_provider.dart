@@ -1,6 +1,5 @@
 import '../models/file_entry.dart';
 import '../models/provider_capabilities.dart';
-import '../models/cloud_account.dart';
 
 /// Progress information for upload operations
 class UploadProgress {
@@ -305,8 +304,11 @@ abstract class BaseCloudProvider {
   /// Display name for this provider
   String get displayName;
   
-  /// Path to the provider's logo asset
-  String get logoAssetPath;
+  /// Path to the provider's logo asset (can be null for icon-only providers)
+  String? get logoAssetPath => null;
+  
+  /// Whether this provider requires account management
+  bool get requiresAccountManagement => false;
   
   /// Gets the capabilities of this provider
   ProviderCapabilities getCapabilities();
@@ -372,22 +374,6 @@ abstract class BaseCloudProvider {
     String? pageToken,
     int pageSize = 50,
   });
-  
-  /// Gets the user profile information
-  Future<UserProfile> getUserProfile();
-  
-  /// Refreshes the authentication token
-  /// 
-  /// [account] - The account to refresh
-  /// Returns updated account with new tokens
-  Future<CloudAccount> refreshAuth(CloudAccount account);
-  
-  /// Initializes the provider with an account
-  /// This method should be called before using other methods
-  void initialize(CloudAccount account);
-  
-  /// Gets the current account being used by this provider
-  CloudAccount? get currentAccount;
   
   /// Disposes of resources used by this provider
   /// Should be called when the provider is no longer needed

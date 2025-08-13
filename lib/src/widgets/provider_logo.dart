@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../providers/custom_provider.dart';
+import '../providers/base_cloud_provider.dart';
 
 /// Widget for displaying provider logos with fallback to icons
 class ProviderLogo extends StatelessWidget {
@@ -131,9 +132,9 @@ class ProviderHelper {
       return provider.config.showAccountManagement;
     }
     
-    // Local server should not show account management (like custom provider)
-    if (providerType == 'local_server') {
-      return false;
+    // Check if provider requires account management
+    if (provider is BaseCloudProvider) {
+      return provider.requiresAccountManagement;
     }
     
     return true; // Default to true for all other providers

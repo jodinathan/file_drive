@@ -3,19 +3,19 @@ import 'dart:async';
 import 'package:http/http.dart' as http;
 import '../models/file_entry.dart';
 import '../models/provider_capabilities.dart';
-import '../models/cloud_account.dart';
 import 'base_cloud_provider.dart';
 
-/// Provider que conecta ao servidor local para testes
+/// Provider que conecta ao servidor local para testes (sem autenticação)
 class LocalServerProvider extends BaseCloudProvider {
   static const String providerId = 'local_server';
   static const String providerName = 'Local Server';
   
   final String serverUrl;
-  CloudAccount? _currentAccount;
+  final String testToken;
   
   LocalServerProvider({
     this.serverUrl = 'http://localhost:8080',
+    this.testToken = 'test_token_dev',
   });
   
   @override
@@ -25,10 +25,10 @@ class LocalServerProvider extends BaseCloudProvider {
   String get displayName => providerName;
   
   @override
-  String get logoAssetPath => 'packages/file_cloud/assets/logos/local_server.svg';
+  String? get logoAssetPath => null; // Uses icon fallback
   
   @override
-  CloudAccount? get currentAccount => _currentAccount;
+  bool get requiresAccountManagement => false; // 🔑 No account management needed
   
   @override
   ProviderCapabilities getCapabilities() {
@@ -53,18 +53,11 @@ class LocalServerProvider extends BaseCloudProvider {
   }
   
   @override
-  void initialize(CloudAccount account) {
-    _currentAccount = account;
-  }
-  
-  @override
   Future<FileListPage> listFolder({
     String? folderId,
     String? pageToken,
     int pageSize = 50,
   }) async {
-    _ensureAuthenticated();
-    
     final queryParams = <String, String>{};
     if (folderId != null) {
       queryParams['folder'] = folderId;
@@ -74,7 +67,7 @@ class LocalServerProvider extends BaseCloudProvider {
     }
     
     final uri = Uri.parse('$serverUrl/api/files').replace(queryParameters: queryParams);
-    final response = await _makeAuthenticatedRequest('GET', uri.path + (uri.query.isNotEmpty ? '?${uri.query}' : ''));
+    final response = await _makeRequest('GET', uri.path + (uri.query.isNotEmpty ? '?${uri.query}' : ''));
     
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -84,8 +77,8 @@ class LocalServerProvider extends BaseCloudProvider {
       
       return FileListPage(
         entries: files,
-        nextPageToken: data['has_next_page'] == true ? 'next' : null,
-        hasMore: data['has_next_page'] == true,
+        nextPageToken: (data['has_next_page'] as bool? ?? false) ? 'next' : null,
+        hasMore: data['has_next_page'] as bool? ?? false,
       );
     } else {
       throw CloudProviderException(
@@ -100,15 +93,13 @@ class LocalServerProvider extends BaseCloudProvider {
     required String name,
     String? parentId,
   }) async {
-    _ensureAuthenticated();
-    
     final body = json.encode({
       'name': name,
       'parent_id': parentId,
       'metadata': {},
     });
     
-    final response = await _makeAuthenticatedRequest(
+    final response = await _makeRequest(
       'POST',
       '/api/folders',
       body: body,
@@ -131,9 +122,7 @@ class LocalServerProvider extends BaseCloudProvider {
     required String entryId,
     bool permanent = false,
   }) async {
-    _ensureAuthenticated();
-    
-    final response = await _makeAuthenticatedRequest('DELETE', '/api/files/$entryId');
+    final response = await _makeRequest('DELETE', '/api/files/$entryId');
     
     if (response.statusCode != 204) {
       throw CloudProviderException(
@@ -147,9 +136,7 @@ class LocalServerProvider extends BaseCloudProvider {
   Stream<List<int>> downloadFile({
     required String fileId,
   }) async* {
-    _ensureAuthenticated();
-    
-    final response = await _makeAuthenticatedRequest('GET', '/api/download/$fileId');
+    final response = await _makeRequest('GET', '/api/download/$fileId');
     
     if (response.statusCode == 200) {
       yield response.bodyBytes;
@@ -168,8 +155,6 @@ class LocalServerProvider extends BaseCloudProvider {
     String? parentId,
     String? mimeType,
   }) async* {
-    _ensureAuthenticated();
-    
     // Convert stream to bytes
     final List<int> allBytes = [];
     await for (final chunk in fileBytes) {
@@ -192,7 +177,7 @@ class LocalServerProvider extends BaseCloudProvider {
       final uri = Uri.parse('$serverUrl/api/upload').replace(queryParameters: queryParams);
       
       final request = http.Request('POST', uri);
-      request.headers['Authorization'] = 'Bearer ${_currentAccount!.accessToken}';
+      request.headers['Authorization'] = 'Bearer $testToken';
       request.bodyBytes = allBytes;
       
       // Emit progress during upload (simplified)
@@ -243,44 +228,9 @@ class LocalServerProvider extends BaseCloudProvider {
     throw CloudProviderException('Search not implemented for local server');
   }
   
-  @override
-  Future<UserProfile> getUserProfile() async {
-    _ensureAuthenticated();
-    
-    final response = await _makeAuthenticatedRequest('GET', '/api/profile');
-    
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return UserProfile(
-        id: data['id'],
-        name: data['name'],
-        email: data['email'],
-        photoUrl: data['photo_url'],
-      );
-    } else {
-      throw CloudProviderException(
-        'Failed to get user profile: ${response.statusCode}',
-        statusCode: response.statusCode,
-      );
-    }
-  }
-  
-  @override
-  Future<CloudAccount> refreshAuth(CloudAccount account) async {
-    // For local server, we might not need to refresh tokens
-    // Return the same account for now
-    return account;
-  }
-  
   // Helper methods
   
-  void _ensureAuthenticated() {
-    if (_currentAccount?.accessToken == null) {
-      throw CloudProviderException('Not authenticated with local server');
-    }
-  }
-  
-  Future<http.Response> _makeAuthenticatedRequest(
+  Future<http.Response> _makeRequest(
     String method,
     String path, {
     String? body,
@@ -288,7 +238,7 @@ class LocalServerProvider extends BaseCloudProvider {
   }) async {
     final uri = Uri.parse('$serverUrl$path');
     final requestHeaders = {
-      'Authorization': 'Bearer ${_currentAccount!.accessToken}',
+      'Authorization': 'Bearer $testToken', // Uses test token directly
       ...?headers,
     };
     
