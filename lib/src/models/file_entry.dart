@@ -27,6 +27,12 @@ class FileEntry {
   /// URL for file thumbnail (if available)
   final String? thumbnailUrl;
   
+  /// Whether this file has a thumbnail available
+  final bool hasThumbnail;
+  
+  /// Thumbnail version for cache invalidation
+  final String? thumbnailVersion;
+  
   /// Download URL (if available)
   final String? downloadUrl;
   
@@ -42,7 +48,7 @@ class FileEntry {
   /// Additional metadata from the provider
   final Map<String, dynamic> metadata;
 
-  const FileEntry({
+  FileEntry({
     required this.id,
     required this.name,
     required this.isFolder,
@@ -52,12 +58,17 @@ class FileEntry {
     this.modifiedAt,
     this.parents = const [],
     this.thumbnailUrl,
+    this.hasThumbnail = false,
+    this.thumbnailVersion,
     this.downloadUrl,
     this.canDownload = true,
     this.canDelete = false,
     this.canShare = false,
     this.metadata = const {},
-  });
+  }) : assert(id.isNotEmpty, 'ID cannot be empty'),
+       assert(name.isNotEmpty, 'Name cannot be empty'),
+       assert(thumbnailUrl == null || Uri.tryParse(thumbnailUrl) != null, 'thumbnailUrl must be a valid URL'),
+       assert(downloadUrl == null || Uri.tryParse(downloadUrl) != null, 'downloadUrl must be a valid URL');
 
   /// Whether this folder can have subfolders created in it
   bool get canCreateSubfolders {
@@ -200,6 +211,8 @@ class FileEntry {
     DateTime? modifiedAt,
     List<String>? parents,
     String? thumbnailUrl,
+    bool? hasThumbnail,
+    String? thumbnailVersion,
     String? downloadUrl,
     bool? canDownload,
     bool? canDelete,
@@ -216,6 +229,8 @@ class FileEntry {
       modifiedAt: modifiedAt ?? this.modifiedAt,
       parents: parents ?? this.parents,
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+      hasThumbnail: hasThumbnail ?? this.hasThumbnail,
+      thumbnailVersion: thumbnailVersion ?? this.thumbnailVersion,
       downloadUrl: downloadUrl ?? this.downloadUrl,
       canDownload: canDownload ?? this.canDownload,
       canDelete: canDelete ?? this.canDelete,
@@ -236,6 +251,8 @@ class FileEntry {
       'modifiedAt': modifiedAt?.toIso8601String(),
       'parents': parents,
       'thumbnailUrl': thumbnailUrl,
+      'hasThumbnail': hasThumbnail,
+      'thumbnailVersion': thumbnailVersion,
       'downloadUrl': downloadUrl,
       'canDownload': canDownload,
       'canDelete': canDelete,
@@ -260,6 +277,8 @@ class FileEntry {
           : null,
       parents: List<String>.from(json['parents'] as List? ?? []),
       thumbnailUrl: json['thumbnailUrl'] as String?,
+      hasThumbnail: json['hasThumbnail'] as bool? ?? false,
+      thumbnailVersion: json['thumbnailVersion'] as String?,
       downloadUrl: json['downloadUrl'] as String?,
       canDownload: json['canDownload'] as bool? ?? true,
       canDelete: json['canDelete'] as bool? ?? false,

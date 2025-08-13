@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/file_entry.dart';
+import './thumbnail_image.dart';
 
 /// A reusable card widget for displaying file entries
 class FileItemCard extends StatefulWidget {
@@ -89,11 +90,12 @@ class _FileItemCardState extends State<FileItemCard> {
   }
 
   Widget _buildFileIcon(ThemeData theme) {
-    return Icon(
-      widget.file.isFolder ? Icons.folder : Icons.description,
-      color: widget.file.isFolder
-          ? theme.colorScheme.primary
-          : theme.colorScheme.onSurface,
+    // Use thumbnail if available, otherwise fall back to icon
+    return FileThumbnail(
+      thumbnailUrl: widget.file.thumbnailUrl,
+      hasThumbnail: widget.file.hasThumbnail,
+      mimeType: widget.file.mimeType,
+      isFolder: widget.file.isFolder,
     );
   }
 

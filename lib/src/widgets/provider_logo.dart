@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../providers/custom_provider.dart';
 
 /// Widget for displaying provider logos with fallback to icons
 class ProviderLogo extends StatelessWidget {
@@ -11,16 +12,29 @@ class ProviderLogo extends StatelessWidget {
   
   /// Color for fallback icon
   final Color? color;
+  
+  /// Optional custom widget to display (for CustomProvider)
+  final Widget? customWidget;
 
   const ProviderLogo({
     super.key,
     required this.providerType,
     this.size = 24.0,
     this.color,
+    this.customWidget,
   });
 
   @override
   Widget build(BuildContext context) {
+    // If custom widget is provided, use it with proper sizing
+    if (customWidget != null) {
+      return SizedBox(
+        width: size,
+        height: size,
+        child: customWidget,
+      );
+    }
+    
     // Load SVG from package assets
     return _buildProviderLogo();
   }
@@ -80,6 +94,25 @@ class ProviderLogo extends StatelessWidget {
 
 /// Helper for getting provider display name
 class ProviderHelper {
+  /// Reference to the FileCloudWidget's providers map
+  static Map<String, dynamic>? _providersMap;
+  
+  /// Set the providers map from FileCloudWidget
+  static void setProvidersMap(Map<String, dynamic> providers) {
+    _providersMap = providers;
+  }
+  
+  /// Get custom logo widget for a provider
+  static Widget? getCustomLogoWidget(String providerType) {
+    if (_providersMap == null) return null;
+    
+    final provider = _providersMap![providerType];
+    if (provider is CustomProvider) {
+      return provider.config.logoWidget;
+    }
+    return null;
+  }
+
   static String getDisplayName(String providerType) {
     switch (providerType) {
       case 'google_drive':

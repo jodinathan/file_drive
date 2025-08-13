@@ -73,6 +73,29 @@ class GoogleDriveProvider extends BaseCloudProvider {
   FileEntry _convertToFileEntry(drive.File driveFile) {
     final isFolder = driveFile.mimeType == 'application/vnd.google-apps.folder';
     
+    // Safely handle thumbnail fields with validation
+    String? thumbnailUrl;
+    bool hasThumbnail = false;
+    String? thumbnailVersion;
+    
+    try {
+      thumbnailUrl = driveFile.thumbnailLink;
+      hasThumbnail = driveFile.hasThumbnail ?? false;
+      thumbnailVersion = driveFile.thumbnailVersion?.toString();
+      
+      // Validate thumbnail URL if present
+      if (thumbnailUrl != null && Uri.tryParse(thumbnailUrl) == null) {
+        thumbnailUrl = null;
+        hasThumbnail = false;
+      }
+    } catch (e) {
+      // Log error but don't fail the entire conversion
+      print('Warning: Error processing thumbnail data for file ${driveFile.id}: $e');
+      thumbnailUrl = null;
+      hasThumbnail = false;
+      thumbnailVersion = null;
+    }
+    
     return FileEntry(
       id: driveFile.id!,
       name: driveFile.name!,
@@ -82,7 +105,9 @@ class GoogleDriveProvider extends BaseCloudProvider {
       createdAt: driveFile.createdTime,
       modifiedAt: driveFile.modifiedTime,
       parents: driveFile.parents ?? [],
-      thumbnailUrl: driveFile.thumbnailLink,
+      thumbnailUrl: thumbnailUrl,
+      hasThumbnail: hasThumbnail,
+      thumbnailVersion: thumbnailVersion,
       downloadUrl: driveFile.webContentLink,
       canDownload: driveFile.capabilities?.canDownload ?? true,
       canDelete: driveFile.capabilities?.canTrash ?? false,
@@ -91,6 +116,8 @@ class GoogleDriveProvider extends BaseCloudProvider {
         'googleDrive': {
           'mimeType': driveFile.mimeType,
           'capabilities': driveFile.capabilities?.toJson(),
+          'hasThumbnail': hasThumbnail,
+          'thumbnailVersion': thumbnailVersion,
         },
       },
     );
@@ -98,7 +125,19 @@ class GoogleDriveProvider extends BaseCloudProvider {
 
   /// Handles API errors and updates account status if needed
   void _handleApiError(Exception e) {
+    // LOG DETALHADO: Print da resposta completa para debug
+    print('🔍 DEBUG: GoogleDrive API Error - Exception completa:');
+    print('   Type: ${e.runtimeType}');
+    print('   Message: ${e.toString()}');
+    print('   Current Account: ${_currentAccount?.email}');
+    print('   Access Token (last 10 chars): ${_currentAccount?.accessToken.substring(_currentAccount!.accessToken.length - 10)}');
+    print('   Refresh Token exists: ${_currentAccount?.refreshToken != null}');
+    print('   Account Status: ${_currentAccount?.status}');
+    print('   Token expires at: ${_currentAccount?.expiresAt}');
+    print('   Current time: ${DateTime.now().toIso8601String()}');
+    
     if (e.toString().contains('401')) {
+      print('🔍 DEBUG: 401 Unauthorized detected - marking account as revoked');
       _updateAccountStatus(AccountStatus.revoked);
       throw CloudProviderException(
         'Authentication failed. Please reauthorize your account.',
@@ -106,8 +145,10 @@ class GoogleDriveProvider extends BaseCloudProvider {
         statusCode: 401,
       );
     } else if (e.toString().contains('403')) {
+      print('🔍 DEBUG: 403 Forbidden detected');
       if (e.toString().contains('insufficientPermissions') || 
           e.toString().contains('forbidden')) {
+        print('🔍 DEBUG: Insufficient permissions detected - marking account as missing scopes');
         _updateAccountStatus(AccountStatus.missingScopes);
         throw CloudProviderException(
           'Insufficient permissions. Please reauthorize with required scopes.',
@@ -117,6 +158,7 @@ class GoogleDriveProvider extends BaseCloudProvider {
       }
     }
     
+    print('🔍 DEBUG: Generic API error - rethrowing as CloudProviderException');
     throw CloudProviderException('API request failed: ${e.toString()}');
   }
 
@@ -154,7 +196,7 @@ class GoogleDriveProvider extends BaseCloudProvider {
         q: query,
         pageSize: pageSize,
         pageToken: pageToken,
-        $fields: 'nextPageToken,files(id,name,mimeType,size,modifiedTime,parents,thumbnailLink,webContentLink,capabilities)',
+        $fields: 'nextPageToken,files(id,name,mimeType,size,modifiedTime,createdTime,parents,thumbnailLink,hasThumbnail,thumbnailVersion,webContentLink,capabilities)',
       );
       
       final files = (response.files ?? [])
@@ -317,7 +359,7 @@ class GoogleDriveProvider extends BaseCloudProvider {
         q: "name contains '$query' and trashed=false",
         pageSize: pageSize,
         pageToken: pageToken,
-        $fields: 'nextPageToken,files(id,name,mimeType,size,modifiedTime,parents,thumbnailLink,webContentLink,capabilities)',
+        $fields: 'nextPageToken,files(id,name,mimeType,size,modifiedTime,createdTime,parents,thumbnailLink,hasThumbnail,thumbnailVersion,webContentLink,capabilities)',
       );
       
       final files = (response.files ?? [])

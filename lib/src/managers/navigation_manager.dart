@@ -22,8 +22,14 @@ class NavigationManager extends ChangeNotifier {
   
   /// Gets localized root folder name
   String get _rootFolderName {
-    if (_context != null) {
-      return AppLocalizations.of(_context!)?.rootFolder ?? 'Home';
+    try {
+      if (_context != null) {
+        final localizations = Localizations.of<AppLocalizations>(_context!, AppLocalizations);
+        return localizations?.rootFolder ?? 'Home';
+      }
+    } catch (e) {
+      // If localization fails, fall back to default
+      print('🔍 DEBUG: Localization failed, using default: $e');
     }
     return 'Home';
   }
@@ -132,7 +138,13 @@ class NavigationManager extends ChangeNotifier {
     required String accountId,
     Map<String, dynamic>? metadata,
   }) {
-    AppLogger.info('Going to home/root', component: 'NavigationManager');
+    AppLogger.info('Going to home/root - clearing history first', component: 'NavigationManager');
+    print('🔍 DEBUG: NavigationManager.goHome() called');
+    print('🔍 DEBUG: History before clear: ${_history.entries.length} entries');
+    
+    // Clear history first to reset breadcrumb
+    clearHistory();
+    print('🔍 DEBUG: History after clear: ${_history.entries.length} entries');
     
     navigateToFolder(
       folderId: null,
@@ -141,6 +153,7 @@ class NavigationManager extends ChangeNotifier {
       accountId: accountId,
       metadata: metadata,
     );
+    print('🔍 DEBUG: NavigationManager.goHome() completed');
   }
 
   /// Navigates to a specific entry in the history (for breadcrumb navigation)
@@ -177,8 +190,13 @@ class NavigationManager extends ChangeNotifier {
   /// Clears the navigation history
   void clearHistory() {
     AppLogger.info('Clearing navigation history', component: 'NavigationManager');
+    print('🔍 DEBUG: NavigationManager.clearHistory() called');
+    print('🔍 DEBUG: History entries before clear: ${_history.entries.length}');
     
     _history.clear();
+    print('🔍 DEBUG: History entries after clear: ${_history.entries.length}');
+    print('🔍 DEBUG: Current entry after clear: ${_history.current}');
+    
     notifyListeners();
     onNavigationChanged?.call(null);
   }

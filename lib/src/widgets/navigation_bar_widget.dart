@@ -154,13 +154,31 @@ class NavigationBarWidget extends StatelessWidget {
   }
 
   Widget _buildFullBreadcrumb(BuildContext context) {
-    final history = navigationHistory.entries;
-    if (history.isEmpty) return const SizedBox.shrink();
+    final current = navigationHistory.current;
+    if (current == null) return const SizedBox.shrink();
 
-    final currentIndex = navigationHistory.length > 0 
-        ? navigationHistory.length - 1 
-        : -1;
-    final visibleItems = _getVisibleBreadcrumbItems(history, currentIndex);
+    // Build breadcrumb from current entry's pathComponents
+    final pathComponents = current.pathComponents;
+    final items = <BreadcrumbItem>[];
+    
+    // Always show Home first
+    items.add(BreadcrumbItem(
+      label: current.isRoot ? current.folderName : 'Home',
+      historyIndex: 0,
+      isClickable: !current.isRoot,
+    ));
+    
+    // Add path components if not at root
+    if (pathComponents.isNotEmpty) {
+      for (int i = 0; i < pathComponents.length; i++) {
+        final isLast = i == pathComponents.length - 1;
+        items.add(BreadcrumbItem(
+          label: pathComponents[i],
+          historyIndex: i + 1,
+          isClickable: !isLast,
+        ));
+      }
+    }
 
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -177,7 +195,7 @@ class NavigationBarWidget extends StatelessWidget {
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
-                children: _buildBreadcrumbItems(context, visibleItems),
+                children: _buildBreadcrumbItems(context, items),
               ),
             ),
           ),

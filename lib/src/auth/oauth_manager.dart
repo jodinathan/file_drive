@@ -168,6 +168,12 @@ class OAuthManager {
         body['client_id'] = clientId;
       }
       
+      // LOG DETALHADO: Request details
+      print('🔍 DEBUG: OAuth Refresh Token Request:');
+      print('   URL: $refreshUrl');
+      print('   Body: ${body.toString()}');
+      print('   Refresh Token (last 10 chars): ${refreshToken.substring(refreshToken.length - 10)}');
+      
       final response = await http.post(
         Uri.parse(refreshUrl),
         headers: {
@@ -177,7 +183,15 @@ class OAuthManager {
         body: body,
       );
       
+      // LOG DETALHADO: Response details
+      print('🔍 DEBUG: OAuth Refresh Token Response:');
+      print('   Status Code: ${response.statusCode}');
+      print('   Reason Phrase: ${response.reasonPhrase}');
+      print('   Headers: ${response.headers}');
+      print('   Body: ${response.body}');
+      
       if (response.statusCode != 200) {
+        print('🔍 DEBUG: Refresh failed with non-200 status code');
         return OAuthResult.error(
           'Token refresh failed: ${response.statusCode} ${response.reasonPhrase}',
         );
@@ -186,17 +200,21 @@ class OAuthManager {
       final Map<String, dynamic> data;
       try {
         data = json.decode(response.body) as Map<String, dynamic>;
+        print('🔍 DEBUG: Parsed response data: $data');
       } catch (e) {
+        print('🔍 DEBUG: Failed to parse response as JSON: $e');
         return OAuthResult.error('Invalid response format from refresh endpoint');
       }
       
       if (data.containsKey('error')) {
         final error = data['error'] as String? ?? 'Unknown error';
+        print('🔍 DEBUG: Response contains error: $error');
         return OAuthResult.error(error);
       }
       
       final accessToken = data['access_token'] as String?;
       if (accessToken == null || accessToken.isEmpty) {
+        print('🔍 DEBUG: No access token in response');
         return OAuthResult.error('No access token received from refresh');
       }
       
@@ -211,6 +229,12 @@ class OAuthManager {
         }
       }
       
+      print('🔍 DEBUG: Successfully parsed refresh response:');
+      print('   New Access Token (last 10 chars): ${accessToken.substring(accessToken.length - 10)}');
+      print('   New Refresh Token (last 10 chars): ${newRefreshToken.substring(newRefreshToken.length - 10)}');
+      print('   Expires In: $expiresIn seconds');
+      print('   Expires At: $expiresAt');
+      
       return OAuthResult.success(
         accessToken: accessToken,
         refreshToken: newRefreshToken,
@@ -218,6 +242,7 @@ class OAuthManager {
       );
       
     } catch (e) {
+      print('🔍 DEBUG: Exception during refresh token: $e');
       return OAuthResult.error('Token refresh failed: ${e.toString()}');
     }
   }

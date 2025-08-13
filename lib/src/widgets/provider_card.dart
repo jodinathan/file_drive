@@ -16,6 +16,9 @@ class ProviderCard extends StatelessWidget {
   
   /// Callback quando o provedor é selecionado
   final VoidCallback onTap;
+  
+  /// Widget customizável para o logo (para CustomProvider)
+  final Widget? customLogoWidget;
 
   const ProviderCard({
     super.key,
@@ -23,6 +26,7 @@ class ProviderCard extends StatelessWidget {
     required this.isSelected,
     required this.accounts,
     required this.onTap,
+    this.customLogoWidget,
   });
 
   @override
@@ -66,6 +70,7 @@ class ProviderCard extends StatelessWidget {
                     ProviderLogo(
                       providerType: providerType,
                       size: AppConstants.iconL - 4, // 28px
+                      customWidget: customLogoWidget,
                     ),
                     const SizedBox(width: AppConstants.spacingS + 4), // 12px
                     Expanded(

@@ -6,41 +6,41 @@ Implementar suporte a thumbnails do Google Drive no sistema de arquivos, integra
 ## Implementation Plan
 
 ### Phase 1: Model Enhancement
-- [ ] Task 1. Adicionar campos `thumbnailLink` e `hasThumbnail` ao modelo FileEntry
-- [ ] Task 2. Adicionar campo `thumbnailVersion` para controle de cache
-- [ ] Task 3. Atualizar serialização/deserialização JSON do modelo
-- [ ] Task 4. Implementar validação dos novos campos
+- [x] Task 1. Adicionar campos `thumbnailLink` e `hasThumbnail` ao modelo FileEntry
+- [x] Task 2. Adicionar campo `thumbnailVersion` para controle de cache
+- [x] Task 3. Atualizar serialização/deserialização JSON do modelo
+- [x] Task 4. Implementar validação dos novos campos
 
 ### Phase 2: Google Drive Provider Integration
-- [ ] Task 5. Modificar GoogleDriveProvider para solicitar campos de thumbnail na API
-- [ ] Task 6. Adicionar `thumbnailLink` e `hasThumbnail` aos parâmetros de fields
-- [ ] Task 7. Mapear resposta da API para os novos campos do FileEntry
-- [ ] Task 8. Implementar tratamento de erro para thumbnails indisponíveis
+- [x] Task 5. Modificar GoogleDriveProvider para solicitar campos de thumbnail na API
+- [x] Task 6. Adicionar `thumbnailLink` e `hasThumbnail` aos parâmetros de fields
+- [x] Task 7. Mapear resposta da API para os novos campos do FileEntry
+- [x] Task 8. Implementar tratamento de erro para thumbnails indisponíveis
 
 ### Phase 3: Thumbnail Widget Component
-- [ ] Task 9. Criar widget ThumbnailImage reutilizável
-- [ ] Task 10. Implementar carregamento assíncrono de imagens
-- [ ] Task 11. Adicionar fallback para ícones quando thumbnail não disponível
-- [ ] Task 12. Implementar cache local de thumbnails carregadas
-- [ ] Task 13. Adicionar indicador de carregamento durante fetch
+- [x] Task 9. Criar widget ThumbnailImage reutilizável
+- [x] Task 10. Implementar carregamento assíncrono de imagens
+- [x] Task 11. Adicionar fallback para ícones quando thumbnail não disponível
+- [x] Task 12. Implementar cache local de thumbnails carregadas
+- [x] Task 13. Adicionar indicador de carregamento durante fetch
 
 ### Phase 4: FileItemCard Integration
-- [ ] Task 14. Modificar FileItemCard para usar ThumbnailImage quando disponível
-- [ ] Task 15. Ajustar layout para acomodar thumbnails mantendo consistência
-- [ ] Task 16. Implementar lógica condicional baseada em hasThumbnail
-- [ ] Task 17. Garantir que thumbnails respeitem tamanhos definidos
+- [x] Task 14. Modificar FileItemCard para usar ThumbnailImage quando disponível
+- [x] Task 15. Ajustar layout para acomodar thumbnails mantendo consistência
+- [x] Task 16. Implementar lógica condicional baseada em hasThumbnail
+- [x] Task 17. Garantir que thumbnails respeitem tamanhos definidos
 
 ### Phase 5: Security and Performance
-- [ ] Task 18. Implementar validação de URLs de thumbnail
-- [ ] Task 19. Adicionar timeout para carregamento de thumbnails
-- [ ] Task 20. Implementar compressão/redimensionamento se necessário
-- [ ] Task 21. Adicionar tratamento para URLs expiradas
+- [x] Task 18. Implementar validação de URLs de thumbnail
+- [x] Task 19. Adicionar timeout para carregamento de thumbnails
+- [x] Task 20. Implementar compressão/redimensionamento se necessário
+- [x] Task 21. Adicionar tratamento para URLs expiradas
 
 ### Phase 6: Testing and Validation
-- [ ] Task 22. Criar testes unitários para novo modelo FileEntry
-- [ ] Task 23. Testar integração com Google Drive API
-- [ ] Task 24. Validar comportamento com diferentes tipos de arquivo
-- [ ] Task 25. Testar performance com múltiplos thumbnails
+- [x] Task 22. Criar testes unitários para novo modelo FileEntry
+- [x] Task 23. Testar integração com Google Drive API
+- [x] Task 24. Validar comportamento com diferentes tipos de arquivo
+- [x] Task 25. Testar performance com múltiplos thumbnails
 
 ## Verification Criteria
 

@@ -151,6 +151,9 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       }
     }
     
+    // Set providers map in ProviderHelper for custom logo access
+    ProviderHelper.setProvidersMap(_providers);
+    
     // Create default account for custom provider
     if (_providers.containsKey('custom')) {
       final now = DateTime.now();
@@ -232,6 +235,14 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
 
   /// Handles authentication errors by trying to refresh token first, then updating account status
   Future<void> _handleAuthenticationError(dynamic error, String component) async {
+    // LOG DETALHADO: Authentication error detected
+    print('🔍 DEBUG: Authentication Error Handler Called:');
+    print('   Error Type: ${error.runtimeType}');
+    print('   Error: $error');
+    print('   Component: $component');
+    print('   Selected Account: ${_selectedAccount?.email}');
+    print('   Has Refresh Token: ${_selectedAccount?.refreshToken != null}');
+    
     if (error is CloudProviderException && error.statusCode == 401) {
       AppLogger.warning('Erro de autenticação detectado, tentando refresh token', component: component);
       
@@ -239,6 +250,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
         try {
           // Try to refresh the token first
           AppLogger.info('Tentando refresh do token para: ${_selectedAccount!.name}', component: component);
+          print('🔍 DEBUG: Attempting token refresh for account: ${_selectedAccount!.email}');
           
           final refreshedAccount = await _refreshAccountToken(_selectedAccount!);
           
@@ -284,6 +296,18 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     try {
       AppLogger.info('Iniciando refresh token para provedor: ${account.providerType}', component: 'Auth');
       
+      // LOG DETALHADO: Estado da conta antes do refresh
+      print('🔍 DEBUG: Refresh Token Request - Estado da Conta:');
+      print('   Account ID: ${account.id}');
+      print('   Account Email: ${account.email}');
+      print('   Provider Type: ${account.providerType}');
+      print('   Access Token (last 10 chars): ${account.accessToken.substring(account.accessToken.length - 10)}');
+      print('   Refresh Token exists: ${account.refreshToken != null}');
+      print('   Refresh Token (last 10 chars): ${account.refreshToken?.substring((account.refreshToken?.length ?? 0) - 10)}');
+      print('   Token expires at: ${account.expiresAt}');
+      print('   Current time: ${DateTime.now().toIso8601String()}');
+      print('   Account Status: ${account.status}');
+      
       // Get OAuth configuration for the provider
       final oauthConfig = widget.oauthConfig;
       if (oauthConfig.providerType != account.providerType) {
@@ -301,6 +325,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       final refreshUrl = '$baseUrl/auth/refresh';
       
       AppLogger.info('Usando refresh URL: $refreshUrl', component: 'Auth');
+      print('🔍 DEBUG: Refresh URL: $refreshUrl');
       
       // Attempt to refresh the token
       final result = await oauthManager.refreshToken(
@@ -308,6 +333,16 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
         refreshToken: account.refreshToken!,
         clientId: null, // Most implementations don't need client ID for refresh
       );
+      
+      // LOG DETALHADO: Resultado do refresh
+      print('🔍 DEBUG: Refresh Token Response:');
+      print('   Success: ${result.isSuccess}');
+      print('   Error: ${result.error}');
+      print('   New Access Token exists: ${result.accessToken != null}');
+      print('   New Access Token (last 10 chars): ${result.accessToken?.substring((result.accessToken?.length ?? 0) - 10)}');
+      print('   New Refresh Token exists: ${result.refreshToken != null}');
+      print('   New Refresh Token (last 10 chars): ${result.refreshToken?.substring((result.refreshToken?.length ?? 0) - 10)}');
+      print('   New Expires At: ${result.expiresAt}');
       
       if (result.isSuccess) {
         // Update account with new tokens
@@ -318,13 +353,16 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
         );
         
         AppLogger.success('Token refreshed com sucesso', component: 'Auth');
+        print('🔍 DEBUG: Account updated with new tokens');
         return refreshedAccount;
       } else {
         AppLogger.warning('Refresh token falhou: ${result.error}', component: 'Auth');
+        print('🔍 DEBUG: Refresh failed - account will be marked as revoked');
         return null;
       }
     } catch (e) {
       AppLogger.error('Erro durante refresh token', component: 'Auth', error: e);
+      print('🔍 DEBUG: Exception during refresh: ${e.toString()}');
       return null;
     }
   }
@@ -438,7 +476,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     }
   }
 
-  Future<void> _loadFiles({String? folderId, bool skipNavigation = false}) async {
+  Future<void> _loadFiles({String? folderId, String? folderName, bool skipNavigation = false}) async {
     print('DEBUG: _loadFiles chamado com folderId: $folderId, skipNavigation: $skipNavigation');
     
     if (_selectedAccount == null || _selectedProvider == null) {
@@ -479,8 +517,8 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
           print('DEBUG: Atualizando navegação no _loadFiles');
           // Update navigation manager with folder information
           if (folderId != null) {
-            // Get folder name from the file entry (if available in current list)
-            final folderName = _currentFiles.firstWhere(
+            // Use provided folderName or fallback to searching in current files
+            final finalFolderName = folderName ?? _currentFiles.firstWhere(
               (entry) => entry.id == folderId,
               orElse: () => FileEntry(
                 id: folderId,
@@ -493,7 +531,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
             
             _navigationManager.navigateToFolder(
               folderId: folderId,
-              folderName: folderName,
+              folderName: finalFolderName,
               providerType: _selectedProvider!,
               accountId: _selectedAccount!.id,
             );
@@ -921,14 +959,15 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     
     switch (action) {
       case 'home':
-        print('DEBUG: Navegando para home');
-        _navigationManager.navigateToFolder(
-          folderId: null,
-          folderName: _getRootFolderName(context),
+        print('🔍 DEBUG: HOME NAVIGATION - Clearing history and going to root');
+        print('🔍 DEBUG: Navigation state before: $_navigationManager');
+        _navigationManager.goHome(
           providerType: _selectedProvider!,
           accountId: _selectedAccount!.id,
         );
-        _loadFiles();
+        print('🔍 DEBUG: Navigation state after goHome: $_navigationManager');
+        _loadFiles(skipNavigation: true);
+        print('🔍 DEBUG: Home navigation completed');
         break;
       case 'back':
         print('DEBUG: Tentando voltar. CanGoBack: ${_navigationManager.canGoBack}');
@@ -1422,6 +1461,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
                   providerType: providerType,
                   isSelected: _selectedProvider == providerType,
                   accounts: accounts,
+                  customLogoWidget: ProviderHelper.getCustomLogoWidget(providerType),
                   onTap: () {
                     setState(() {
                       _selectedProvider = providerType;
@@ -1429,6 +1469,8 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
                       _currentFiles.clear();
                       _pathStack.clear();
                     });
+                    // Reset navigation history when changing provider
+                    _navigationManager.clearHistory();
                     _loadAccounts();
                   },
                 );
@@ -1459,13 +1501,25 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
         if (_selectedAccount != null)
           NavigationBarWidget(
             navigationHistory: _navigationManager.history,
-            onGoHome: () => _handleNavigation('home'),
+            onGoHome: () {
+              print('🔍 DEBUG: HOME BUTTON CLICKED - calling _handleNavigation(home)');
+              _handleNavigation('home');
+            },
             onGoBack: _navigationManager.canGoBack ? () => _handleNavigation('back') : null,
             onGoForward: _navigationManager.canGoForward ? () => _handleNavigation('forward') : null,
             onBreadcrumbTap: (index) {
-              final entry = _navigationManager.navigateToIndex(index);
-              if (entry != null) {
-                _loadFiles(folderId: entry.folderId, skipNavigation: true);
+              print('🔍 DEBUG: BREADCRUMB CLICKED - index: $index');
+              
+              // Special case: if clicking on index 0 (Home), clear history first
+              if (index == 0) {
+                print('🔍 DEBUG: BREADCRUMB HOME (index 0) - calling goHome instead');
+                _handleNavigation('home');
+              } else {
+                print('🔍 DEBUG: BREADCRUMB - navigating to index: $index');
+                final entry = _navigationManager.navigateToIndex(index);
+                if (entry != null) {
+                  _loadFiles(folderId: entry.folderId, skipNavigation: true);
+                }
               }
             },
             onCreateFolder: _createFolder,
@@ -1628,6 +1682,8 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
                         _currentFiles.clear();
                         _pathStack.clear();
                       });
+                      // Reset navigation history when changing account
+                      _navigationManager.clearHistory();
                       _loadFiles();
                     },
                     onMenuAction: (action) {
@@ -1805,7 +1861,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       onTap: () {
         if (file.isFolder) {
           // Always navigate into folders when clicked
-          _loadFiles(folderId: file.id);
+          _loadFiles(folderId: file.id, folderName: file.name);
         } else if (widget.selectionConfig != null) {
           // Only toggle selection for files when in selection mode
           _toggleFileSelection(file);
