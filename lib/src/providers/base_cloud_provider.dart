@@ -10,19 +10,213 @@ class UploadProgress {
   /// Total size in bytes
   final int total;
   
+  /// Name of the file being uploaded
+  final String fileName;
+  
+  /// Upload speed in bytes per second
+  final double speed;
+  
+  /// Estimated time remaining in seconds
+  final Duration? estimatedTimeRemaining;
+  
+  /// Current status of the upload
+  final UploadStatus status;
+  
+  /// Error message if upload failed
+  final String? error;
+  
+  /// Upload start time
+  final DateTime startTime;
+  
+  /// Last update time
+  final DateTime lastUpdate;
+  
   /// Progress percentage (0.0 to 1.0)
   double get progress => total > 0 ? uploaded / total : 0.0;
   
   /// Whether the upload is complete
-  bool get isComplete => uploaded >= total;
+  bool get isComplete => status == UploadStatus.completed;
+  
+  /// Whether the upload has failed
+  bool get hasFailed => status == UploadStatus.error;
+  
+  /// Whether the upload is in progress
+  bool get isUploading => status == UploadStatus.uploading;
+  
+  /// Whether the upload is paused
+  bool get isPaused => status == UploadStatus.paused;
+  
+  /// Whether the upload was cancelled
+  bool get isCancelled => status == UploadStatus.cancelled;
+  
+  /// Duration since upload started
+  Duration get elapsedTime => lastUpdate.difference(startTime);
+  
+  /// Average upload speed since start
+  double get averageSpeed {
+    final elapsed = elapsedTime.inMilliseconds;
+    return elapsed > 0 ? uploaded / (elapsed / 1000) : 0.0;
+  }
 
-  const UploadProgress({
+  UploadProgress({
     required this.uploaded,
     required this.total,
-  });
+    required this.fileName,
+    this.speed = 0.0,
+    this.estimatedTimeRemaining,
+    this.status = UploadStatus.waiting,
+    this.error,
+    DateTime? startTime,
+    DateTime? lastUpdate,
+  }) : startTime = startTime ?? DateTime.now(),
+       lastUpdate = lastUpdate ?? DateTime.now();
+
+  /// Creates a new progress instance with updated values
+  UploadProgress copyWith({
+    int? uploaded,
+    int? total,
+    String? fileName,
+    double? speed,
+    Duration? estimatedTimeRemaining,
+    UploadStatus? status,
+    String? error,
+    DateTime? startTime,
+    DateTime? lastUpdate,
+  }) {
+    return UploadProgress(
+      uploaded: uploaded ?? this.uploaded,
+      total: total ?? this.total,
+      fileName: fileName ?? this.fileName,
+      speed: speed ?? this.speed,
+      estimatedTimeRemaining: estimatedTimeRemaining ?? this.estimatedTimeRemaining,
+      status: status ?? this.status,
+      error: error ?? this.error,
+      startTime: startTime ?? this.startTime,
+      lastUpdate: lastUpdate ?? DateTime.now(),
+    );
+  }
+
+  /// Creates a progress instance for a starting upload
+  factory UploadProgress.starting({
+    required String fileName,
+    required int total,
+  }) {
+    return UploadProgress(
+      uploaded: 0,
+      total: total,
+      fileName: fileName,
+      status: UploadStatus.waiting,
+    );
+  }
+
+  /// Creates a progress instance for a completed upload
+  factory UploadProgress.completed({
+    required String fileName,
+    required int total,
+    required DateTime startTime,
+  }) {
+    return UploadProgress(
+      uploaded: total,
+      total: total,
+      fileName: fileName,
+      status: UploadStatus.completed,
+      startTime: startTime,
+    );
+  }
+
+  /// Creates a progress instance for a failed upload
+  factory UploadProgress.error({
+    required String fileName,
+    required int total,
+    required String error,
+    required DateTime startTime,
+    int uploaded = 0,
+  }) {
+    return UploadProgress(
+      uploaded: uploaded,
+      total: total,
+      fileName: fileName,
+      status: UploadStatus.error,
+      error: error,
+      startTime: startTime,
+    );
+  }
+
+  /// Calculates estimated time remaining based on current speed
+  Duration? calculateEstimatedTimeRemaining() {
+    if (speed <= 0 || uploaded >= total) return null;
+    
+    final remainingBytes = total - uploaded;
+    final estimatedSeconds = remainingBytes / speed;
+    
+    return Duration(seconds: estimatedSeconds.round());
+  }
+
+  /// Updates progress with new uploaded bytes and calculates speed
+  UploadProgress updateProgress(int newUploaded) {
+    final now = DateTime.now();
+    final timeDiff = now.difference(lastUpdate).inMilliseconds / 1000;
+    final bytesDiff = newUploaded - uploaded;
+    
+    final newSpeed = timeDiff > 0 ? bytesDiff / timeDiff : speed;
+    final estimatedTime = newSpeed > 0 ? 
+        Duration(seconds: ((total - newUploaded) / newSpeed).round()) : null;
+
+    return copyWith(
+      uploaded: newUploaded,
+      speed: newSpeed,
+      estimatedTimeRemaining: estimatedTime,
+      lastUpdate: now,
+      status: newUploaded >= total ? UploadStatus.completed : UploadStatus.uploading,
+    );
+  }
 
   @override
-  String toString() => 'UploadProgress(${(progress * 100).toStringAsFixed(1)}%)';
+  String toString() => 'UploadProgress($fileName: ${(progress * 100).toStringAsFixed(1)}%, '
+                      'Speed: ${_formatBytes(speed)}/s, Status: $status)';
+
+  static String _formatBytes(double bytes) {
+    if (bytes < 1024) return '${bytes.toStringAsFixed(0)} B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+  }
+}
+
+/// Status of an upload operation
+enum UploadStatus {
+  /// Upload is waiting to start
+  waiting,
+  
+  /// Upload is currently in progress
+  uploading,
+  
+  /// Upload has been paused by user
+  paused,
+  
+  /// Upload completed successfully
+  completed,
+  
+  /// Upload failed with an error
+  error,
+  
+  /// Upload was cancelled by user
+  cancelled,
+  
+  /// Upload is being retried after failure
+  retrying;
+
+  /// Whether the upload is in a terminal state (completed, error, cancelled)
+  bool get isTerminal => this == completed || this == error || this == cancelled;
+  
+  /// Whether the upload can be resumed
+  bool get canResume => this == paused || this == error;
+  
+  /// Whether the upload can be cancelled
+  bool get canCancel => this == waiting || this == uploading || this == paused || this == retrying;
+  
+  /// Whether the upload can be retried
+  bool get canRetry => this == error || this == cancelled;
 }
 
 /// Result of an upload operation

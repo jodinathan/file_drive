@@ -17,6 +17,8 @@
   "remove": "Remover",
   
   "home": "Início",
+  "homeFolder": "Início",
+  "rootFolder": "Início",
   "upload": "Enviar",
   "newFolder": "Nova Pasta",
   "useSelection": "Usar Seleção",

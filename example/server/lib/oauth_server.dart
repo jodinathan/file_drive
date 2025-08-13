@@ -5,28 +5,47 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:http/http.dart' as http;
+import 'package:path/path.dart' as path;
 
 // Tente importar config.dart, senão use o exemplo
 import 'config.dart' deferred as config;
 
-/// Servidor OAuth de exemplo para desenvolvimento do File Cloud widget
+/// Servidor OAuth e de Arquivos de exemplo para desenvolvimento do File Cloud widget
 class OAuthServer {
   late final Router _router;
   final Map<String, OAuthState> _states = {};
+  final Map<String, String> _tokens = {}; // Simple token storage
   final Random _random = Random.secure();
+  final String _storageRoot;
   
-  OAuthServer() {
+  OAuthServer({String? storageRoot}) 
+    : _storageRoot = storageRoot ?? './storage' {
+    _setupStorageDirectory();
     _setupRoutes();
+  }
+  
+  void _setupStorageDirectory() {
+    final storageDir = Directory(_storageRoot);
+    if (!storageDir.existsSync()) {
+      storageDir.createSync(recursive: true);
+      print('Created storage directory: $_storageRoot');
+    }
   }
   
   void _setupRoutes() {
     _router = Router()
-      // Endpoint para iniciar autenticação OAuth
+      // OAuth endpoints
       ..get('/auth/google', _handleAuthStart)
-      // Callback do Google OAuth
       ..get('/auth/callback', _handleCallback)
-      // Endpoint para recuperar tokens pelo state
       ..get('/auth/tokens/<state>', _handleGetTokens)
+      
+      // File API endpoints
+      ..get('/api/profile', _handleGetProfile)
+      ..get('/api/files', _handleListFiles)
+      ..post('/api/folders', _handleCreateFolder)
+      ..delete('/api/files/<fileId>', _handleDeleteFile)
+      ..post('/api/upload', _handleUploadFile)
+      
       // Health check
       ..get('/health', _handleHealth);
   }
@@ -131,10 +150,15 @@ class OAuthServer {
       // Armazena os tokens no state
       _states[state] = stateData.copyWith(tokens: tokenResponse);
       
+      // Armazena o token para uso nas APIs subsequentes
+      final accessToken = tokenResponse['access_token'] as String;
+      _tokens[state] = accessToken;
+      
       print('🎉 Tokens obtidos com sucesso para state: $state');
+      print('💾 Token armazenado para APIs: ${accessToken.substring(0, 10)}...');
       
       // Retorna para o app com o access token no parâmetro hid (igual ao exemplo funcional)
-      return _returnToApp(success: true, accessToken: tokenResponse['access_token']);
+      return _returnToApp(success: true, accessToken: accessToken);
       
     } catch (e) {
       print('❌ Erro no callback: $e');
@@ -227,12 +251,277 @@ class OAuthServer {
   }
   
   /// Health check endpoint
+  /// Get user profile
+  Future<Response> _handleGetProfile(Request request) async {
+    final authHeader = request.headers['authorization'];
+    if (authHeader == null || !authHeader.startsWith('Bearer ')) {
+      return Response.unauthorized('Bearer token required');
+    }
+
+    final token = authHeader.substring(7);
+    if (!_tokens.containsValue(token)) {
+      return Response.unauthorized('Invalid token');
+    }
+
+    return Response.ok(json.encode({
+      'id': 'local_user',
+      'name': 'Local Server User',
+      'email': 'user@localhost',
+      'photo_url': null,
+    }), headers: {'Content-Type': 'application/json'});
+  }
+
+  /// List files in a folder
+  Future<Response> _handleListFiles(Request request) async {
+    if (!_isAuthenticated(request)) {
+      return Response.unauthorized('Authentication required');
+    }
+
+    final folderId = request.url.queryParameters['folder'];
+    final folderPath = _getStoragePath(folderId);
+    
+    try {
+      final dir = Directory(folderPath);
+      if (!dir.existsSync()) {
+        return Response.ok(json.encode({
+          'files': [],
+          'has_next_page': false,
+        }), headers: {'Content-Type': 'application/json'});
+      }
+
+      final entries = <Map<String, dynamic>>[];
+      
+      await for (final entity in dir.list()) {
+        final stat = await entity.stat();
+        final isFolder = entity is Directory;
+        final name = path.basename(entity.path);
+        
+        // Skip hidden files and directories
+        if (name.startsWith('.')) continue;
+
+        entries.add({
+          'id': _generateFileId(entity.path),
+          'name': name,
+          'is_folder': isFolder,
+          'size': isFolder ? 0 : stat.size,
+          'modified_at': stat.modified.toIso8601String(),
+          'mime_type': isFolder ? null : _getMimeType(name),
+          'download_url': isFolder ? null : '/api/download/${_generateFileId(entity.path)}',
+          'metadata': {},
+        });
+      }
+
+      return Response.ok(json.encode({
+        'files': entries,
+        'has_next_page': false,
+      }), headers: {'Content-Type': 'application/json'});
+      
+    } catch (e) {
+      return Response.internalServerError(
+        body: json.encode({'error': 'Failed to list files: $e'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+  }
+
+  /// Create a new folder
+  Future<Response> _handleCreateFolder(Request request) async {
+    if (!_isAuthenticated(request)) {
+      return Response.unauthorized('Authentication required');
+    }
+
+    try {
+      final body = await request.readAsString();
+      final data = json.decode(body) as Map<String, dynamic>;
+      final name = data['name'] as String?;
+      final parentId = data['parent_id'] as String?;
+
+      if (name == null || name.isEmpty) {
+        return Response.badRequest(
+          body: json.encode({'error': 'Folder name is required'}),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+
+      final parentPath = _getStoragePath(parentId);
+      final folderPath = path.join(parentPath, name);
+      
+      final dir = Directory(folderPath);
+      if (dir.existsSync()) {
+        return Response(409, 
+          body: json.encode({'error': 'Folder already exists'}),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+
+      await dir.create(recursive: true);
+      final stat = await dir.stat();
+
+      final result = {
+        'id': _generateFileId(folderPath),
+        'name': name,
+        'is_folder': true,
+        'size': 0,
+        'modified_at': stat.modified.toIso8601String(),
+        'metadata': data['metadata'] ?? {},
+      };
+
+      return Response(201,
+        body: json.encode(result),
+        headers: {'Content-Type': 'application/json'},
+      );
+      
+    } catch (e) {
+      return Response.internalServerError(
+        body: json.encode({'error': 'Failed to create folder: $e'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+  }
+
+  /// Delete a file or folder
+  Future<Response> _handleDeleteFile(Request request) async {
+    if (!_isAuthenticated(request)) {
+      return Response.unauthorized('Authentication required');
+    }
+
+    final fileId = request.params['fileId'];
+    if (fileId == null) {
+      return Response.badRequest(
+        body: json.encode({'error': 'File ID is required'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+
+    try {
+      final filePath = _getFilePathFromId(fileId);
+      final entity = await FileSystemEntity.type(filePath);
+      
+      if (entity == FileSystemEntityType.notFound) {
+        return Response.notFound(
+          json.encode({'error': 'File not found'}),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+
+      if (entity == FileSystemEntityType.directory) {
+        await Directory(filePath).delete(recursive: true);
+      } else {
+        await File(filePath).delete();
+      }
+
+      return Response(204);
+      
+    } catch (e) {
+      return Response.internalServerError(
+        body: json.encode({'error': 'Failed to delete file: $e'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+  }
+
+  /// Upload a file
+  Future<Response> _handleUploadFile(Request request) async {
+    if (!_isAuthenticated(request)) {
+      return Response.unauthorized('Authentication required');
+    }
+
+    try {
+      // This is a simplified upload handler
+      // In a real implementation, you'd parse multipart/form-data
+      final parentId = request.url.queryParameters['parent_id'];
+      final fileName = request.url.queryParameters['file_name'] ?? 'uploaded_file';
+      
+      final parentPath = _getStoragePath(parentId);
+      final filePath = path.join(parentPath, fileName);
+      
+      final file = File(filePath);
+      final bytes = await request.read().expand((chunk) => chunk).toList();
+      await file.writeAsBytes(bytes);
+      
+      final stat = await file.stat();
+      
+      final result = {
+        'id': _generateFileId(filePath),
+        'name': fileName,
+        'is_folder': false,
+        'size': stat.size,
+        'modified_at': stat.modified.toIso8601String(),
+        'mime_type': _getMimeType(fileName),
+      };
+
+      return Response(201,
+        body: json.encode(result),
+        headers: {'Content-Type': 'application/json'},
+      );
+      
+    } catch (e) {
+      return Response.internalServerError(
+        body: json.encode({'error': 'Failed to upload file: $e'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+  }
+
+  // Helper methods
+  
+  bool _isAuthenticated(Request request) {
+    final authHeader = request.headers['authorization'];
+    if (authHeader == null || !authHeader.startsWith('Bearer ')) {
+      return false;
+    }
+    final token = authHeader.substring(7);
+    return _tokens.containsValue(token);
+  }
+
+  String _getStoragePath(String? folderId) {
+    if (folderId == null || folderId.isEmpty) {
+      return _storageRoot;
+    }
+    // Simple mapping: folder ID to relative path
+    // In a real implementation, you'd have a proper mapping
+    return path.join(_storageRoot, folderId.replaceAll('_', '/'));
+  }
+
+  String _generateFileId(String filePath) {
+    // Simple ID generation based on path
+    final relativePath = path.relative(filePath, from: _storageRoot);
+    return relativePath.replaceAll('/', '_').replaceAll('\\', '_');
+  }
+
+  String _getFilePathFromId(String fileId) {
+    final relativePath = fileId.replaceAll('_', '/');
+    return path.join(_storageRoot, relativePath);
+  }
+
+  String? _getMimeType(String fileName) {
+    final ext = path.extension(fileName).toLowerCase();
+    switch (ext) {
+      case '.txt': return 'text/plain';
+      case '.json': return 'application/json';
+      case '.pdf': return 'application/pdf';
+      case '.png': return 'image/png';
+      case '.jpg':
+      case '.jpeg': return 'image/jpeg';
+      case '.gif': return 'image/gif';
+      default: return 'application/octet-stream';
+    }
+  }
+
   Response _handleHealth(Request request) {
+    // Add a test token for development/testing
+    if (!_tokens.containsValue('test_token_dev')) {
+      _tokens['test_state'] = 'test_token_dev';
+      print('🧪 Token de teste adicionado: test_token_dev');
+    }
+    
     return Response.ok(
       json.encode({
         'status': 'healthy',
         'timestamp': DateTime.now().toIso8601String(),
         'active_states': _states.length,
+        'stored_tokens': _tokens.length,
+        'storage_root': _storageRoot,
       }),
       headers: {'Content-Type': 'application/json'},
     );

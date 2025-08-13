@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/file_entry.dart';
 
 /// A reusable card widget for displaying file entries
-class FileItemCard extends StatelessWidget {
+class FileItemCard extends StatefulWidget {
   /// The file entry to display
   final FileEntry file;
   
@@ -28,42 +28,70 @@ class FileItemCard extends StatelessWidget {
   });
 
   @override
+  State<FileItemCard> createState() => _FileItemCardState();
+}
+
+class _FileItemCardState extends State<FileItemCard> {
+  bool _isHovered = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     
-    return ListTile(
-      leading: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (showCheckbox) ...[
-            Checkbox(
-              value: isSelected,
-              onChanged: onCheckboxChanged,
-            ),
-            const SizedBox(width: 8),
-          ],
-          _buildFileIcon(theme),
-        ],
-      ),
-      title: Text(
-        file.name,
-        style: theme.textTheme.bodyMedium?.copyWith(
-          fontWeight: FontWeight.w500,
-          color: theme.colorScheme.onSurface,
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        decoration: BoxDecoration(
+          color: _getBackgroundColor(theme),
+          borderRadius: BorderRadius.circular(8),
         ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+        child: ListTile(
+          leading: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (widget.showCheckbox) ...[
+                Checkbox(
+                  value: widget.isSelected,
+                  onChanged: widget.onCheckboxChanged,
+                ),
+                const SizedBox(width: 8),
+              ],
+              _buildFileIcon(theme),
+            ],
+          ),
+          title: Text(
+            widget.file.name,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w500,
+              color: theme.colorScheme.onSurface,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: _buildSubtitle(),
+          onTap: widget.onTap,
+          selected: widget.isSelected,
+        ),
       ),
-      subtitle: _buildSubtitle(),
-      onTap: onTap,
-      selected: isSelected,
     );
+  }
+
+  Color _getBackgroundColor(ThemeData theme) {
+    if (widget.isSelected) {
+      return theme.colorScheme.primaryContainer.withOpacity(0.3);
+    } else if (_isHovered) {
+      return theme.colorScheme.surfaceVariant.withOpacity(0.5);
+    } else {
+      return Colors.transparent;
+    }
   }
 
   Widget _buildFileIcon(ThemeData theme) {
     return Icon(
-      file.isFolder ? Icons.folder : Icons.description,
-      color: file.isFolder
+      widget.file.isFolder ? Icons.folder : Icons.description,
+      color: widget.file.isFolder
           ? theme.colorScheme.primary
           : theme.colorScheme.onSurface,
     );
@@ -73,19 +101,19 @@ class FileItemCard extends StatelessWidget {
     final lines = <String>[];
     
     // Primeira linha: tamanho ou "Pasta"
-    if (file.size != null) {
-      lines.add('${(file.size! / 1024 / 1024).toStringAsFixed(1)} MB');
-    } else if (file.isFolder) {
+    if (widget.file.size != null) {
+      lines.add('${(widget.file.size! / 1024 / 1024).toStringAsFixed(1)} MB');
+    } else if (widget.file.isFolder) {
       lines.add('Pasta');
     }
     
     // Segunda linha: informações de data
     final dateParts = <String>[];
-    if (file.createdAt != null) {
-      dateParts.add('Criado: ${_formatDate(file.createdAt!)}');
+    if (widget.file.createdAt != null) {
+      dateParts.add('Criado: ${_formatDate(widget.file.createdAt!)}');
     }
-    if (file.modifiedAt != null) {
-      dateParts.add('Modificado: ${_formatDate(file.modifiedAt!)}');
+    if (widget.file.modifiedAt != null) {
+      dateParts.add('Modificado: ${_formatDate(widget.file.modifiedAt!)}');
     }
     
     if (dateParts.isNotEmpty) {

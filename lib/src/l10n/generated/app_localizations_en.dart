@@ -46,6 +46,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get home => 'Home';
 
   @override
+  String get homeFolder => 'Home';
+
+  @override
+  String get rootFolder => 'Home';
+
+  @override
   String get upload => 'Upload';
 
   @override

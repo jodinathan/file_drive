@@ -7,33 +7,33 @@ Implementar um sistema completo de upload de arquivos com indicador de progresso
 ## Implementação Plan
 
 ### Fase 1: Estrutura Base e Modelos
-- [ ] Task 1. **Criar modelo NavigationHistory** - Implementar classe para gerenciar histórico de navegação com suporte a voltar/avançar
-- [ ] Task 2. **Expandir UploadProgress** - Adicionar campos para nome do arquivo, tempo estimado, velocidade e status
-- [ ] Task 3. **Criar modelo UploadState** - Implementar enum para estados do upload (waiting, uploading, completed, error, cancelled)
-- [ ] Task 4. **Criar modelo DragDropState** - Implementar classe para gerenciar estado do drag & drop com feedback visual
-- [ ] Task 5. **Expandir FileEntry** - Adicionar método para validar se é possível criar subpastas
+- [x] Task 1. **Criar modelo NavigationHistory** - Implementar classe para gerenciar histórico de navegação com suporte a voltar/avançar
+- [x] Task 2. **Expandir UploadProgress** - Adicionar campos para nome do arquivo, tempo estimado, velocidade e status
+- [x] Task 3. **Criar modelo UploadState** - Implementar enum para estados do upload (waiting, uploading, completed, error, cancelled)
+- [x] Task 4. **Criar modelo DragDropState** - Implementar classe para gerenciar estado do drag & drop com feedback visual
+- [x] Task 5. **Expandir FileEntry** - Adicionar método para validar se é possível criar subpastas
 
 ### Fase 2: Widgets de Interface Base
-- [ ] Task 6. **Criar UploadProgressWidget** - Widget genérico para exibir progresso de upload individual
-- [ ] Task 7. **Criar UploadListWidget** - Lista de uploads em andamento/concluídos com ações (pausar, cancelar, retry)
-- [ ] Task 8. **Criar NavigationBarWidget** - Barra com botões home, voltar, avançar e breadcrumb melhorado
-- [ ] Task 9. **Criar CreateFolderDialog** - Dialog genérico para criação de nova pasta com validação
-- [ ] Task 10. **Criar DragDropOverlay** - Overlay translúcido para feedback durante drag & drop
+- [x] Task 6. **Criar UploadProgressWidget** - Widget genérico para exibir progresso de upload individual
+- [x] Task 7. **Criar UploadListWidget** - Lista de uploads em andamento/concluídos com ações (pausar, cancelar, retry)
+- [x] Task 8. **Criar NavigationBarWidget** - Barra com botões home, voltar, avançar e breadcrumb melhorado
+- [x] Task 9. **Criar CreateFolderDialog** - Dialog genérico para criação de nova pasta com validação
+- [x] Task 10. **Criar DragDropOverlay** - Overlay translúcido para feedback durante drag & drop
 
 ### Fase 3: Gestores de Estado
-- [ ] Task 11. **Implementar UploadManager** - Gerenciador central para filas de upload, progresso e retry logic
-- [ ] Task 12. **Implementar NavigationManager** - Gerenciador para histórico de navegação com stack para voltar/avançar
-- [ ] Task 13. **Implementar DragDropManager** - Gerenciador para eventos de drag & drop com validação de tipos de arquivo
-- [ ] Task 14. **Expandir FileCloudWidget state** - Adicionar estado para uploads, navegação e drag & drop
+- [x] Task 11. **Implementar UploadManager** - Gerenciador central para filas de upload, progresso e retry logic
+- [x] Task 12. **Implementar NavigationManager** - Gerenciador para histórico de navegação com stack para voltar/avançar
+- [x] Task 13. **Implementar DragDropManager** - Gerenciador para eventos de drag & drop com validação de tipos de arquivo
+- [x] Task 14. **Expandir FileCloudWidget state** - Adicionar estado para uploads, navegação e drag & drop
 
 ### Fase 4: Integração com Provedores
-- [ ] Task 15. **Expandir BaseCloudProvider** - Adicionar métodos abstratos para upload com progresso e criação de pastas
-- [ ] Task 16. **Implementar upload no GoogleDriveProvider** - Implementação específica com API do Google Drive
-- [ ] Task 17. **Adicionar createFolder no GoogleDriveProvider** - Implementação específica para criação de pastas
-- [ ] Task 18. **Implementar cancelamento de upload** - Lógica para cancelar uploads em andamento
+- [x] Task 15. **Expandir BaseCloudProvider** - Adicionar métodos abstratos para upload com progresso e criação de pastas
+- [x] Task 16. **Implementar upload no GoogleDriveProvider** - Implementação específica com API do Google Drive
+- [x] Task 17. **Adicionar createFolder no GoogleDriveProvider** - Implementação específica para criação de pastas
+- [x] Task 18. **Implementar cancelamento de upload** - Lógica para cancelar uploads em andamento
 
 ### Fase 5: Interface de Upload
-- [ ] Task 19. **Adicionar botão upload** - Botão para seleção manual de arquivos com filtros por tipo
+- [~] Task 19. **Adicionar botão upload** - Botão para seleção manual de arquivos com filtros por tipo
 - [ ] Task 20. **Implementar drag & drop zone** - Área na lista de arquivos que aceita arquivos arrastados
 - [ ] Task 21. **Adicionar feedback visual** - Overlay translúcido com animação durante drag over
 - [ ] Task 22. **Implementar validação de arquivos** - Verificar tamanho, tipo e permissões antes do upload

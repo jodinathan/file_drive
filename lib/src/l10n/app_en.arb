@@ -60,6 +60,16 @@
     "description": "Home button text"
   },
   
+  "homeFolder": "Home",
+  "@homeFolder": {
+    "description": "Home folder name"
+  },
+  
+  "rootFolder": "Home",
+  "@rootFolder": {
+    "description": "Root folder name"
+  },
+  
   "upload": "Upload",
   "@upload": {
     "description": "Upload button text"

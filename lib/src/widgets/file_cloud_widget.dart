@@ -1,20 +1,27 @@
 import 'package:flutter/material.dart';
+
+import 'package:file_picker/file_picker.dart';
 import '../models/cloud_account.dart';
 import '../models/account_status.dart';
 import '../models/file_entry.dart';
 import '../models/selection_config.dart';
 import '../providers/base_cloud_provider.dart';
 import '../providers/google_drive_provider.dart';
+import '../providers/custom_provider.dart';
 import '../storage/account_storage.dart';
 import '../auth/oauth_config.dart';
 import '../auth/oauth_manager.dart';
 import '../theme/app_constants.dart';
+import '../l10n/generated/app_localizations.dart';
+import '../managers/navigation_manager.dart';
 
 import '../utils/app_logger.dart';
 import 'provider_logo.dart';
 import 'provider_card.dart';
 import 'account_card.dart';
 import 'file_item_card.dart';
+import 'navigation_bar_widget.dart';
+import 'create_folder_dialog.dart';
 
 /// Main File Cloud widget that provides cloud storage integration
 class FileCloudWidget extends StatefulWidget {
@@ -55,14 +62,56 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
   List<String> _pathStack = [];
   bool _isLoading = false;
   String? _error;
-  List<FileEntry> _selectedFiles = [];
+  final List<FileEntry> _selectedFiles = [];
   bool _isSelectionMode = false;
   bool _isAddingAccount = false;
+  
+  // Upload management
+  final Map<String, UploadProgress> _activeUploads = {};
+  static const bool _debugSlowUpload = true; // Flag para teste de upload lento
+  void Function()? _uploadDialogUpdateCallback;
+  
+  // Calculate average upload progress
+  double get _averageUploadProgress {
+    if (_activeUploads.isEmpty) {
+      print('DEBUG: Nenhum upload ativo, retornando 0');
+      return 0.0;
+    }
+    
+    double totalProgress = 0.0;
+    int validUploads = 0;
+    
+    for (final progress in _activeUploads.values) {
+      if (progress.total > 0) {
+        final currentProgress = progress.uploaded / progress.total;
+        totalProgress += currentProgress;
+        validUploads++;
+        print('DEBUG: Upload ${progress.fileName}: ${progress.uploaded}/${progress.total} = ${currentProgress}');
+      } else {
+        print('DEBUG: Upload ${progress.fileName} tem total = 0');
+      }
+    }
+    
+    final result = validUploads > 0 ? totalProgress / validUploads : 0.0;
+    print('DEBUG: Progresso médio calculado: $result (validUploads: $validUploads)');
+    return result;
+  }
+
+  // New managers for upload, navigation, and drag & drop
+  // late UploadManager _uploadManager; // Comentado até implementação completa
+  late NavigationManager _navigationManager;
+  // late DragDropManager _dragDropManager; // Comentado até implementação completa
 
   @override
   void initState() {
     super.initState();
     AppLogger.systemInit('FileCloudWidget iniciado');
+    
+    // Initialize managers
+    // _uploadManager = UploadManager(); // Comentado até implementação completa
+    _navigationManager = NavigationManager();
+    // _dragDropManager = DragDropManager(); // Comentado até implementação completa
+    
     _initializeProviders();
     _loadAccounts();
   }
@@ -80,6 +129,16 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
           _providers[providerType] = GoogleDriveProvider();
           AppLogger.success('GoogleDriveProvider inicializado', component: 'Init');
           break;
+        case 'custom':
+          _providers[providerType] = CustomProvider(
+            config: CustomProviderConfig(
+              displayName: 'Meu Servidor',
+              baseUrl: 'http://localhost:3000',
+              logoWidget: const Icon(Icons.storage),
+            ),
+          );
+          AppLogger.success('CustomProvider inicializado', component: 'Init');
+          break;
         // TODO: Add other providers when implemented
         // case 'dropbox':
         //   _providers[providerType] = DropboxProvider();
@@ -90,6 +149,26 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
         default:
           AppLogger.warning('Provedor não implementado: $providerType', component: 'Init');
       }
+    }
+    
+    // Create default account for custom provider
+    if (_providers.containsKey('custom')) {
+      final now = DateTime.now();
+      _accountsByProvider['custom'] = [
+        CloudAccount(
+          id: 'local_server_default',
+          providerType: 'custom',
+          externalId: 'default_user_001',
+          name: 'Servidor Local',
+          email: 'admin@localhost',
+          accessToken: 'default_token',
+          refreshToken: null,
+          expiresAt: null,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      ];
+      AppLogger.success('Conta padrão criada para CustomProvider', component: 'Init');
     }
     
     // Set initial provider to first enabled provider
@@ -151,10 +230,39 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     }
   }
 
-  /// Handles authentication errors by updating account status and reloading accounts
+  /// Handles authentication errors by trying to refresh token first, then updating account status
   Future<void> _handleAuthenticationError(dynamic error, String component) async {
     if (error is CloudProviderException && error.statusCode == 401) {
-      AppLogger.warning('Erro de autenticação detectado, atualizando status da conta', component: component);
+      AppLogger.warning('Erro de autenticação detectado, tentando refresh token', component: component);
+      
+      if (_selectedAccount != null && _selectedAccount!.refreshToken != null) {
+        try {
+          // Try to refresh the token first
+          AppLogger.info('Tentando refresh do token para: ${_selectedAccount!.name}', component: component);
+          
+          final refreshedAccount = await _refreshAccountToken(_selectedAccount!);
+          
+          if (refreshedAccount != null) {
+            // Token refreshed successfully
+            _selectedAccount = refreshedAccount;
+            await widget.accountStorage.saveAccount(refreshedAccount);
+            AppLogger.success('Token refreshed com sucesso: ${refreshedAccount.name}', component: component);
+            
+            // Reinitialize provider with new token
+            final provider = _providers[_selectedProvider!]!;
+            provider.initialize(refreshedAccount);
+            
+            // Reload accounts to reflect the updated token in UI
+            await _reloadAccountsOnly();
+            return; // Success, no need to mark as revoked
+          }
+        } catch (refreshError) {
+          AppLogger.error('Falha ao fazer refresh do token', component: component, error: refreshError);
+        }
+      }
+      
+      // If refresh failed or no refresh token available, mark as revoked
+      AppLogger.warning('Marcando conta como revogada devido à falha de autenticação', component: component);
       
       // Update account status to revoked and save it
       if (_selectedAccount != null) {
@@ -169,6 +277,75 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
         await _reloadAccountsOnly();
       }
     }
+  }
+
+  /// Attempts to refresh the account token using OAuth manager
+  Future<CloudAccount?> _refreshAccountToken(CloudAccount account) async {
+    try {
+      AppLogger.info('Iniciando refresh token para provedor: ${account.providerType}', component: 'Auth');
+      
+      // Get OAuth configuration for the provider
+      final oauthConfig = widget.oauthConfig;
+      if (oauthConfig.providerType != account.providerType) {
+        AppLogger.error('OAuth config não corresponde ao tipo do provedor: ${oauthConfig.providerType} != ${account.providerType}', component: 'Auth');
+        return null;
+      }
+      
+      // Create OAuth manager instance
+      final oauthManager = OAuthManager();
+      
+      // Build refresh URL from the auth URL pattern
+      // Extract base URL from generateAuthUrl and create refresh endpoint
+      final authUrl = oauthConfig.generateAuthUrl('dummy');
+      final baseUrl = authUrl.split('/auth/')[0]; // Get base URL
+      final refreshUrl = '$baseUrl/auth/refresh';
+      
+      AppLogger.info('Usando refresh URL: $refreshUrl', component: 'Auth');
+      
+      // Attempt to refresh the token
+      final result = await oauthManager.refreshToken(
+        refreshUrl: refreshUrl,
+        refreshToken: account.refreshToken!,
+        clientId: null, // Most implementations don't need client ID for refresh
+      );
+      
+      if (result.isSuccess) {
+        // Update account with new tokens
+        final refreshedAccount = account.updateTokens(
+          accessToken: result.accessToken!,
+          refreshToken: result.refreshToken ?? account.refreshToken,
+          expiresAt: result.expiresAt,
+        );
+        
+        AppLogger.success('Token refreshed com sucesso', component: 'Auth');
+        return refreshedAccount;
+      } else {
+        AppLogger.warning('Refresh token falhou: ${result.error}', component: 'Auth');
+        return null;
+      }
+    } catch (e) {
+      AppLogger.error('Erro durante refresh token', component: 'Auth', error: e);
+      return null;
+    }
+  }
+
+  /// Checks if token needs refresh (expires within 5 minutes) and refreshes if needed
+  Future<CloudAccount?> _checkAndRefreshTokenIfNeeded(CloudAccount account) async {
+    // If no expiration time, assume token is still valid
+    if (account.expiresAt == null) {
+      return account;
+    }
+    
+    // Check if token expires within 5 minutes
+    final now = DateTime.now();
+    final expiresIn = account.expiresAt!.difference(now);
+    
+    if (expiresIn.inMinutes <= 5) {
+      AppLogger.info('Token expira em ${expiresIn.inMinutes} minutos, fazendo refresh preventivo', component: 'Auth');
+      return await _refreshAccountToken(account);
+    }
+    
+    return account;
   }
 
   /// Shows reconnection dialog for revoked accounts
@@ -261,7 +438,9 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     }
   }
 
-  Future<void> _loadFiles({String? folderId}) async {
+  Future<void> _loadFiles({String? folderId, bool skipNavigation = false}) async {
+    print('DEBUG: _loadFiles chamado com folderId: $folderId, skipNavigation: $skipNavigation');
+    
     if (_selectedAccount == null || _selectedProvider == null) {
       AppLogger.warning('Tentativa de carregar arquivos sem conta ou provedor selecionado', component: 'Files');
       return;
@@ -275,6 +454,14 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     });
 
     try {
+      // Check and refresh token if needed before making API calls
+      final refreshedAccount = await _checkAndRefreshTokenIfNeeded(_selectedAccount!);
+      if (refreshedAccount != null && refreshedAccount != _selectedAccount) {
+        _selectedAccount = refreshedAccount;
+        await widget.accountStorage.saveAccount(refreshedAccount);
+        AppLogger.info('Token atualizado preventivamente', component: 'Files');
+      }
+      
       final provider = _providers[_selectedProvider!]!;
       provider.initialize(_selectedAccount!);
       
@@ -286,12 +473,44 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
 
       setState(() {
         _currentFiles = filesPage.entries;
-        if (folderId != null) {
-          _pathStack.add(folderId);
-          AppLogger.debug('Pasta adicionada ao stack: $folderId', component: 'Files');
+        
+        // Only update navigation if not skipping (avoid double navigation)
+        if (!skipNavigation) {
+          print('DEBUG: Atualizando navegação no _loadFiles');
+          // Update navigation manager with folder information
+          if (folderId != null) {
+            // Get folder name from the file entry (if available in current list)
+            final folderName = _currentFiles.firstWhere(
+              (entry) => entry.id == folderId,
+              orElse: () => FileEntry(
+                id: folderId,
+                name: 'Pasta',
+                isFolder: true,
+                size: 0,
+                modifiedAt: DateTime.now(),
+              ),
+            ).name;
+            
+            _navigationManager.navigateToFolder(
+              folderId: folderId,
+              folderName: folderName,
+              providerType: _selectedProvider!,
+              accountId: _selectedAccount!.id,
+            );
+            _pathStack = _navigationManager.history.current?.pathComponents ?? [];
+          } else {
+            _navigationManager.navigateToFolder(
+              folderId: null,
+              folderName: _getRootFolderName(context),
+              providerType: _selectedProvider!,
+              accountId: _selectedAccount!.id,
+            );
+            _pathStack.clear();
+          }
         } else {
-          _pathStack.clear();
-          AppLogger.debug('Stack de pastas limpo', component: 'Files');
+          print('DEBUG: Pulando atualização de navegação');
+          // Just update _pathStack from current navigation state
+          _pathStack = _navigationManager.history.current?.pathComponents ?? [];
         }
       });
     } catch (e) {
@@ -430,9 +649,9 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     }
     
     AppLogger.info('Iniciando exclusão de ${_selectedFiles.length} arquivo(s)', component: 'FileOps');
-    _selectedFiles.forEach((file) {
+    for (final file in _selectedFiles) {
       AppLogger.debug('Arquivo para exclusão: ${file.name} (ID: ${file.id})', component: 'FileOps');
-    });
+    }
     
     final confirmed = await showDialog<bool>(
       context: context,
@@ -648,38 +867,526 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     
     // Also call the selection config callback if it exists
     if (widget.selectionConfig?.onSelectionConfirm != null && _selectedFiles.isNotEmpty) {
-      widget.selectionConfig!.onSelectionConfirm!(_selectedFiles);
+      widget.selectionConfig?.onSelectionConfirm!(_selectedFiles);
     }
+  }
+
+
+
+  Future<void> _createFolder() async {
+    if (_selectedAccount == null || _selectedProvider == null) {
+      AppLogger.warning('Tentativa de criar pasta sem conta ou provedor selecionado', component: 'Folder');
+      return;
+    }
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => const CreateFolderDialog(),
+    );
+
+    if (result != null && result.isNotEmpty) {
+      try {
+        final provider = _providers[_selectedProvider!]!;
+        provider.initialize(_selectedAccount!);
+
+        final currentFolderId = _navigationManager.currentFolderId;
+
+        await provider.createFolder(
+          name: result,
+          parentId: currentFolderId,
+        );
+
+        // Refresh file list
+        await _loadFiles(folderId: currentFolderId);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Pasta "$result" criada com sucesso!')),
+          );
+        }
+      } catch (e) {
+        AppLogger.error('Erro ao criar pasta', component: 'Folder', error: e);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erro ao criar pasta: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  void _handleNavigation(String action) {
+    print('DEBUG: _handleNavigation called with action: $action');
+    print('DEBUG: Estado atual do NavigationManager: $_navigationManager');
+    
+    switch (action) {
+      case 'home':
+        print('DEBUG: Navegando para home');
+        _navigationManager.navigateToFolder(
+          folderId: null,
+          folderName: _getRootFolderName(context),
+          providerType: _selectedProvider!,
+          accountId: _selectedAccount!.id,
+        );
+        _loadFiles();
+        break;
+      case 'back':
+        print('DEBUG: Tentando voltar. CanGoBack: ${_navigationManager.canGoBack}');
+        if (_navigationManager.canGoBack) {
+          final entry = _navigationManager.goBack();
+          print('DEBUG: Resultado do goBack: $entry');
+          if (entry != null) {
+            print('DEBUG: Carregando arquivos para folderId: ${entry.folderId} (skipNavigation=true)');
+            _loadFiles(folderId: entry.folderId, skipNavigation: true);
+          }
+        }
+        break;
+      case 'forward':
+        print('DEBUG: Tentando avançar. CanGoForward: ${_navigationManager.canGoForward}');
+        if (_navigationManager.canGoForward) {
+          final entry = _navigationManager.goForward();
+          print('DEBUG: Resultado do goForward: $entry');
+          if (entry != null) {
+            print('DEBUG: Carregando arquivos para folderId: ${entry.folderId} (skipNavigation=true)');
+            _loadFiles(folderId: entry.folderId, skipNavigation: true);
+          }
+        }
+        break;
+    }
+    
+    print('DEBUG: Estado após navegação: $_navigationManager');
+  }
+
+  Future<void> _uploadFiles() async {
+    if (_selectedAccount == null || _selectedProvider == null) {
+      AppLogger.warning('Upload cancelado: conta ou provedor não selecionado', component: 'Upload');
+      return;
+    }
+
+    final provider = _providers[_selectedProvider!]!;
+
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        type: FileType.any,
+        withData: true, // Force to load bytes data
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        AppLogger.info('Iniciando upload de ${result.files.length} arquivo(s)', component: 'Upload');
+        
+        int successCount = 0;
+        int failCount = 0;
+        
+        for (PlatformFile file in result.files) {
+          AppLogger.info('Processando arquivo: ${file.name} (${file.size} bytes)', component: 'Upload');
+          
+          if (file.bytes != null && file.bytes!.isNotEmpty) {
+            try {
+              AppLogger.info('Iniciando upload do arquivo: ${file.name}', component: 'Upload');
+              
+              final uploadId = '${file.name}_${DateTime.now().millisecondsSinceEpoch}';
+              
+              // Create initial upload progress
+              setState(() {
+                _activeUploads[uploadId] = UploadProgress(
+                  uploaded: 0,
+                  total: file.bytes!.length,
+                  fileName: file.name,
+                  status: UploadStatus.uploading,
+                );
+              });
+              
+              Stream<List<int>> fileStream;
+              int totalBytes = file.bytes!.length;
+              int uploadedBytes = 0;
+              
+              if (_debugSlowUpload) {
+                // Simulate slow upload by chunking the data and tracking progress manually
+                fileStream = _createSlowUploadStreamWithProgress(file.bytes!, uploadId, totalBytes);
+              } else {
+                fileStream = Stream.value(file.bytes!);
+              }
+              
+              // Upload file using bytes (works on all platforms)
+              final uploadStream = provider.uploadFile(
+                fileName: file.name,
+                fileBytes: fileStream,
+                parentId: _navigationManager.currentFolderId,
+                mimeType: file.extension != null ? 'application/${file.extension}' : null,
+              );
+              
+              if (_debugSlowUpload) {
+                // In debug mode, we're manually tracking progress
+                // Just wait for the final result
+                await for (final progress in uploadStream) {
+                  print('DEBUG: Progresso final do provider - ${progress.uploaded}/${progress.total} status: ${progress.status}');
+                  
+                  if (progress.isComplete) {
+                    AppLogger.success('Upload concluído: ${file.name}', component: 'Upload');
+                    setState(() {
+                      _activeUploads[uploadId] = progress;
+                    });
+                    _uploadDialogUpdateCallback?.call();
+                    successCount++;
+                    break;
+                  } else if (progress.status == UploadStatus.error) {
+                    AppLogger.error('Erro no upload: ${file.name} - ${progress.error}', component: 'Upload');
+                    setState(() {
+                      _activeUploads[uploadId] = progress;
+                    });
+                    _uploadDialogUpdateCallback?.call();
+                    failCount++;
+                    break;
+                  }
+                }
+              } else {
+                // Normal mode - rely on provider progress
+                // Listen to upload progress
+                await for (final progress in uploadStream) {
+                  print('DEBUG: Recebendo progresso - ${progress.uploaded}/${progress.total} status: ${progress.status}');
+                  print('DEBUG: Progress médio antes: $_averageUploadProgress');
+                  setState(() {
+                    _activeUploads[uploadId] = progress;
+                  });
+                  print('DEBUG: Progress médio depois: $_averageUploadProgress');
+                  print('DEBUG: Total uploads ativos: ${_activeUploads.length}');
+                  
+                  // Update upload dialog if it's open
+                  print('DEBUG: Chamando callback do dialog');
+                  _uploadDialogUpdateCallback?.call();
+                  
+                  AppLogger.info('Upload ${file.name}: ${progress.uploaded}/${progress.total} bytes', component: 'Upload');
+                  if (progress.isComplete) {
+                    AppLogger.success('Upload concluído: ${file.name}', component: 'Upload');
+                    _uploadDialogUpdateCallback?.call();
+                    successCount++;
+                    break;
+                  } else if (progress.status == UploadStatus.error) {
+                    AppLogger.error('Erro no upload: ${file.name} - ${progress.error}', component: 'Upload');
+                    _uploadDialogUpdateCallback?.call();
+                    failCount++;
+                    break;
+                  }
+                }
+              }
+            } catch (e) {
+              AppLogger.error('Erro ao fazer upload do arquivo ${file.name}', component: 'Upload', error: e);
+              failCount++;
+            }
+          } else {
+            AppLogger.warning('Ignorando arquivo ${file.name}: bytes não disponíveis (size: ${file.size})', component: 'Upload');
+            failCount++;
+          }
+        }
+        
+        if (mounted) {
+          String message;
+          Color backgroundColor;
+          
+          if (successCount > 0 && failCount == 0) {
+            message = '$successCount arquivo(s) enviado(s) com sucesso!';
+            backgroundColor = Colors.green;
+          } else if (successCount > 0 && failCount > 0) {
+            message = '$successCount arquivo(s) enviado(s) com sucesso, $failCount falharam.';
+            backgroundColor = Colors.orange;
+          } else if (failCount > 0) {
+            message = '$failCount arquivo(s) falharam no upload.';
+            backgroundColor = Colors.red;
+          } else {
+            message = 'Nenhum arquivo foi enviado.';
+            backgroundColor = Colors.grey;
+          }
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              backgroundColor: backgroundColor,
+            ),
+          );
+          
+          // Refresh the file list if any file was uploaded successfully
+          if (successCount > 0) {
+            await _loadFiles();
+          }
+        }
+      } else {
+        AppLogger.info('Nenhum arquivo selecionado', component: 'Upload');
+      }
+    } catch (e) {
+      AppLogger.error('Erro geral no upload de arquivos', component: 'Upload', error: e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao enviar arquivos: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showUploadList() {
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          // Register callback to update dialog from outside
+          _uploadDialogUpdateCallback = () {
+            print('DEBUG: Tentando atualizar dialog, mounted: ${context.mounted}');
+            if (context.mounted) {
+              setDialogState(() {
+                print('DEBUG: Atualizando estado do dialog');
+              });
+            }
+          };
+          
+          return AlertDialog(
+            title: Row(
+              children: [
+                const Icon(Icons.upload),
+                const SizedBox(width: 8),
+                Text('Uploads (${_activeUploads.length})'),
+              ],
+            ),
+            content: SizedBox(
+              width: double.maxFinite,
+              height: 400,
+              child: _activeUploads.isEmpty
+                  ? const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.cloud_upload, size: 64, color: Colors.grey),
+                          SizedBox(height: 16),
+                          Text('Nenhum upload em andamento'),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: _activeUploads.length,
+                      itemBuilder: (context, index) {
+                        final uploadId = _activeUploads.keys.elementAt(index);
+                        final progress = _activeUploads[uploadId]!;
+                        return _buildUploadItem(progress);
+                      },
+                    ),
+            ),
+            actions: [
+              if (_activeUploads.isNotEmpty)
+                TextButton(
+                  onPressed: () {
+                    _clearCompletedUploads();
+                    setDialogState(() {}); // Update dialog
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Limpar Concluídos'),
+                ),
+              TextButton(
+                onPressed: () {
+                  _uploadDialogUpdateCallback = null; // Clear callback
+                  Navigator.of(context).pop();
+                },
+                child: const Text('Fechar'),
+              ),
+            ],
+          );
+        },
+      ),
+    ).then((_) {
+      // Clear callback when dialog is closed
+      _uploadDialogUpdateCallback = null;
+    });
+  }
+
+  Widget _buildUploadItem(UploadProgress progress) {
+    final percentage = progress.total > 0 
+        ? (progress.uploaded / progress.total * 100).round()
+        : 0;
+    
+    final statusIcon = switch (progress.status) {
+      UploadStatus.waiting => const Icon(Icons.schedule, color: Colors.grey),
+      UploadStatus.uploading => const Icon(Icons.cloud_upload, color: Colors.blue),
+      UploadStatus.completed => const Icon(Icons.check_circle, color: Colors.green),
+      UploadStatus.error => const Icon(Icons.error, color: Colors.red),
+      UploadStatus.paused => const Icon(Icons.pause_circle, color: Colors.orange),
+      UploadStatus.cancelled => const Icon(Icons.cancel, color: Colors.grey),
+      UploadStatus.retrying => const Icon(Icons.refresh, color: Colors.orange),
+    };
+
+    final statusText = switch (progress.status) {
+      UploadStatus.waiting => 'Aguardando',
+      UploadStatus.uploading => '$percentage%',
+      UploadStatus.completed => 'Concluído',
+      UploadStatus.error => 'Erro',
+      UploadStatus.paused => 'Pausado',
+      UploadStatus.cancelled => 'Cancelado',
+      UploadStatus.retrying => 'Tentando novamente',
+    };
+
+    return Card(
+      child: ListTile(
+        leading: statusIcon,
+        title: Text(
+          progress.fileName,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (progress.status == UploadStatus.uploading) ...[
+              LinearProgressIndicator(value: progress.total > 0 ? progress.uploaded / progress.total : 0),
+              const SizedBox(height: 4),
+              Text('${_formatBytes(progress.uploaded)} / ${_formatBytes(progress.total)}'),
+              if (progress.speed != null)
+                Text('${_formatBytes(progress.speed!.round())}/s'),
+            ] else ...[
+              Text(statusText),
+              if (progress.error != null)
+                Text(
+                  progress.error!,
+                  style: const TextStyle(color: Colors.red, fontSize: 12),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+            ],
+          ],
+        ),
+        trailing: progress.status == UploadStatus.uploading
+            ? IconButton(
+                icon: const Icon(Icons.cancel),
+                onPressed: () {
+                  // TODO: Implementar cancelamento de upload
+                },
+              )
+            : null,
+      ),
+    );
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes < 1024) return '${bytes}B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)}KB';
+    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)}MB';
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)}GB';
+  }
+
+  void _clearCompletedUploads() {
+    setState(() {
+      _activeUploads.removeWhere((key, progress) => 
+          progress.status == UploadStatus.completed ||
+          progress.status == UploadStatus.error ||
+          progress.status == UploadStatus.cancelled);
+    });
+    _uploadDialogUpdateCallback?.call();
+  }
+
+  Stream<List<int>> _createSlowUploadStreamWithProgress(List<int> bytes, String uploadId, int totalBytes) async* {
+    const chunkSize = 1024 * 4; // 4KB chunks
+    const delayBetweenChunks = Duration(milliseconds: 100); // 100ms delay
+    int uploadedBytes = 0;
+    
+    AppLogger.info('Criando stream de upload lento com progresso: ${bytes.length} bytes em chunks de ${chunkSize}B', component: 'Upload');
+    
+    for (int i = 0; i < bytes.length; i += chunkSize) {
+      final end = (i + chunkSize).clamp(0, bytes.length);
+      final chunk = bytes.sublist(i, end);
+      uploadedBytes += chunk.length;
+      
+      // Update progress manually BEFORE yielding the chunk
+      setState(() {
+        _activeUploads[uploadId] = UploadProgress(
+          uploaded: uploadedBytes,
+          total: totalBytes,
+          fileName: _activeUploads[uploadId]?.fileName ?? 'unknown',
+          status: uploadedBytes >= totalBytes ? UploadStatus.completed : UploadStatus.uploading,
+        );
+      });
+      
+      // Update dialog
+      _uploadDialogUpdateCallback?.call();
+      
+      AppLogger.debug('Enviando chunk ${i ~/ chunkSize + 1}: ${chunk.length} bytes (${uploadedBytes}/${totalBytes})', component: 'Upload');
+      print('DEBUG: Progresso manual atualizado: $uploadedBytes/$totalBytes');
+      
+      yield chunk;
+      
+      // Add delay to simulate slow upload
+      if (i + chunkSize < bytes.length) {
+        await Future.delayed(delayBetweenChunks);
+      }
+    }
+    
+    AppLogger.info('Stream de upload lento concluído', component: 'Upload');
+  }
+
+  Stream<List<int>> _createSlowUploadStream(List<int> bytes) async* {
+    const chunkSize = 1024 * 4; // 4KB chunks
+    const delayBetweenChunks = Duration(milliseconds: 100); // 100ms delay
+    
+    AppLogger.info('Criando stream de upload lento: ${bytes.length} bytes em chunks de ${chunkSize}B', component: 'Upload');
+    
+    for (int i = 0; i < bytes.length; i += chunkSize) {
+      final end = (i + chunkSize).clamp(0, bytes.length);
+      final chunk = bytes.sublist(i, end);
+      
+      AppLogger.debug('Enviando chunk ${i ~/ chunkSize + 1}: ${chunk.length} bytes', component: 'Upload');
+      yield chunk;
+      
+      // Add delay to simulate slow upload
+      if (i + chunkSize < bytes.length) {
+        await Future.delayed(delayBetweenChunks);
+      }
+    }
+    
+    AppLogger.info('Stream de upload lento concluído', component: 'Upload');
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(AppConstants.radiusL),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+    // Set context for navigation manager to use translations
+    _navigationManager.setContext(context);
+    
+    return Stack(
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(AppConstants.radiusL),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Coluna 1: Lista de Provedores
+              _buildProviderColumn(),
+              
+              // Divisor vertical
+              Container(
+                width: 1,
+                color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+              ),
+              
+              // Coluna 2: Conteúdo Principal
+              Expanded(
+                child: _buildMainContent(),
+              ),
+            ],
+          ),
         ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Coluna 1: Lista de Provedores
-          _buildProviderColumn(),
-          
-          // Divisor vertical
-          Container(
-            width: 1,
-            color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
-          ),
-          
-          // Coluna 2: Conteúdo Principal
-          Expanded(
-            child: _buildMainContent(),
-          ),
-        ],
-      ),
+        
+        // Drag & Drop Overlay (simplified)
+        // TODO: Implement proper drag & drop detection
+        const SizedBox.shrink(),
+      ],
     );
   }
 
@@ -747,6 +1454,78 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
           height: 1,
           color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
         ),
+        
+        // Navigation bar (nova adição)
+        if (_selectedAccount != null)
+          NavigationBarWidget(
+            navigationHistory: _navigationManager.history,
+            onGoHome: () => _handleNavigation('home'),
+            onGoBack: _navigationManager.canGoBack ? () => _handleNavigation('back') : null,
+            onGoForward: _navigationManager.canGoForward ? () => _handleNavigation('forward') : null,
+            onBreadcrumbTap: (index) {
+              final entry = _navigationManager.navigateToIndex(index);
+              if (entry != null) {
+                _loadFiles(folderId: entry.folderId, skipNavigation: true);
+              }
+            },
+            onCreateFolder: _createFolder,
+            onUpload: _uploadFiles,
+          ),
+        
+        // Upload controls and list
+        if (_selectedAccount != null) ...[
+          Container(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                const Spacer(),
+                // Upload status indicator with progress bar
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () {
+                        _showUploadList();
+                      },
+                      icon: const Icon(Icons.upload),
+                      label: Text('${_activeUploads.length} uploads'),
+                    ),
+                    if (_activeUploads.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Builder(builder: (context) {
+                        print('DEBUG: Renderizando barra de progresso, valor: $_averageUploadProgress');
+                        return Container(
+                          width: 120,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                          child: FractionallySizedBox(
+                            alignment: Alignment.centerLeft,
+                            widthFactor: _averageUploadProgress,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.blue,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+          
+          // Divisor
+          Container(
+            height: 1,
+            color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+          ),
+        ],
         
         // Navegação de arquivos
         Expanded(
@@ -998,9 +1777,6 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
 
     return Column(
       children: [
-        // Navigation breadcrumb
-        if (_pathStack.isNotEmpty) _buildBreadcrumb(),
-        
         // File list
         Expanded(
           child: _currentFiles.isEmpty
@@ -1017,37 +1793,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     );
   }
 
-  Widget _buildBreadcrumb() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          TextButton.icon(
-            onPressed: () {
-              setState(() {
-                _pathStack.clear();
-              });
-              _loadFiles();
-            },
-            icon: const Icon(Icons.home, size: 16),
-            label: const Text('Início'),
-          ),
-          if (_pathStack.isNotEmpty) ...[
-            const Icon(Icons.chevron_right, size: 16),
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _pathStack.removeLast();
-                });
-                _loadFiles(folderId: _pathStack.isNotEmpty ? _pathStack.last : null);
-              },
-              child: const Text('Voltar'),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
+
 
   Widget _buildFileItem(FileEntry file) {
     final isSelected = _selectedFiles.contains(file);
@@ -1057,16 +1803,36 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       isSelected: isSelected,
       showCheckbox: widget.selectionConfig != null,
       onTap: () {
-        if (widget.selectionConfig != null) {
-          _toggleFileSelection(file);
-        } else if (file.isFolder) {
+        if (file.isFolder) {
+          // Always navigate into folders when clicked
           _loadFiles(folderId: file.id);
+        } else if (widget.selectionConfig != null) {
+          // Only toggle selection for files when in selection mode
+          _toggleFileSelection(file);
         }
       },
       onCheckboxChanged: widget.selectionConfig != null 
           ? (_) => _toggleFileSelection(file)
           : null,
     );
+  }
+
+  String _getLocalizedText(String fallback, String Function(AppLocalizations) localizationGetter) {
+    try {
+      // Use Localizations.of directly to avoid the null assertion in AppLocalizations.of
+      final localizations = Localizations.of<AppLocalizations>(context, AppLocalizations);
+      if (localizations != null) {
+        return localizationGetter(localizations);
+      }
+    } catch (e, stackTrace) {
+      debugPrint('Localization error: $e');
+      debugPrint('Stack trace: $stackTrace');
+    }
+    return fallback;
+  }
+
+  String _getRootFolderName(BuildContext context) {
+    return _getLocalizedText('Root Folder', (l) => l.rootFolder);
   }
 
   Widget _buildSelectionControls() {

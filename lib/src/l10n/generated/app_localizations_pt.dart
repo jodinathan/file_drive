@@ -46,6 +46,12 @@ class AppLocalizationsPt extends AppLocalizations {
   String get home => 'Início';
 
   @override
+  String get homeFolder => 'Início';
+
+  @override
+  String get rootFolder => 'Início';
+
+  @override
   String get upload => 'Enviar';
 
   @override
@@ -253,6 +259,12 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get home => 'Início';
+
+  @override
+  String get homeFolder => 'Início';
+
+  @override
+  String get rootFolder => 'Início';
 
   @override
   String get upload => 'Enviar';

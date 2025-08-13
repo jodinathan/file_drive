@@ -171,6 +171,18 @@ abstract class AppLocalizations {
   /// **'Home'**
   String get home;
 
+  /// Home folder name
+  ///
+  /// In en, this message translates to:
+  /// **'Home'**
+  String get homeFolder;
+
+  /// Root folder name
+  ///
+  /// In en, this message translates to:
+  /// **'Home'**
+  String get rootFolder;
+
   /// Upload button text
   ///
   /// In en, this message translates to:

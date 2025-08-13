@@ -54,6 +54,8 @@ class ProviderLogo extends StatelessWidget {
         return Icons.cloud;
       case 'onedrive':
         return Icons.cloud_outlined;
+      case 'custom':
+        return Icons.storage;
       default:
         return Icons.storage;
     }
@@ -68,6 +70,8 @@ class ProviderLogo extends StatelessWidget {
         return const Color(0xFF0061FF); // Dropbox Blue
       case 'onedrive':
         return const Color(0xFF0078D4); // Microsoft Blue
+      case 'custom':
+        return const Color(0xFF6B7280); // Gray
       default:
         return Colors.grey;
     }
@@ -84,6 +88,8 @@ class ProviderHelper {
         return 'Dropbox';
       case 'onedrive':
         return 'OneDrive';
+      case 'custom':
+        return 'Local Server';
       default:
         return providerType;
     }
@@ -93,7 +99,8 @@ class ProviderHelper {
   static bool isProviderEnabled(String providerType) {
     switch (providerType) {
       case 'google_drive':
-        return true; // Google Drive is implemented
+      case 'custom':
+        return true; // Google Drive and Custom provider are implemented
       case 'dropbox':
       case 'onedrive':
         return false; // Not yet implemented
@@ -104,6 +111,6 @@ class ProviderHelper {
 
   /// Get list of enabled providers only
   static List<String> getEnabledProviders() {
-    return ['google_drive']; // Only return actually implemented providers
+    return ['google_drive', 'custom']; // Return actually implemented providers
   }
 }

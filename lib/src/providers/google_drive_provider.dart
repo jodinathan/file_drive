@@ -173,6 +173,21 @@ class GoogleDriveProvider extends BaseCloudProvider {
     }
   }
   
+  /// Cancels an ongoing upload operation
+  Future<void> cancelUpload(String uploadId) async {
+    // Implementation depends on how upload tracking is implemented
+    // For now, this is a placeholder as the current upload implementation
+    // doesn't support cancellation tracking
+    print('Upload cancellation requested: $uploadId');
+    
+    // In a full implementation, this would:
+    // 1. Track active uploads by ID
+    // 2. Cancel the underlying HTTP request
+    // 3. Clean up any temporary resources
+    
+    throw UnimplementedError('Upload cancellation not yet implemented');
+  }
+
   @override
   Future<FileEntry> createFolder({
     required String name,
@@ -258,7 +273,12 @@ class GoogleDriveProvider extends BaseCloudProvider {
         driveFile.mimeType = mimeType;
       }
       
-      yield UploadProgress(uploaded: 0, total: totalSize);
+      yield UploadProgress(
+        uploaded: 0,
+        total: totalSize,
+        fileName: fileName,
+        status: UploadStatus.uploading,
+      );
       
       final media = drive.Media(
         Stream.fromIterable([bytes]),
@@ -272,7 +292,12 @@ class GoogleDriveProvider extends BaseCloudProvider {
         $fields: 'id,name,mimeType,size,modifiedTime,parents',
       );
       
-      yield UploadProgress(uploaded: totalSize, total: totalSize);
+      yield UploadProgress(
+        uploaded: totalSize,
+        total: totalSize,
+        fileName: fileName,
+        status: UploadStatus.completed,
+      );
       
     } catch (e) {
       _handleApiError(e as Exception);

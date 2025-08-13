@@ -59,6 +59,136 @@ class FileEntry {
     this.metadata = const {},
   });
 
+  /// Whether this folder can have subfolders created in it
+  bool get canCreateSubfolders {
+    if (!isFolder) return false;
+    
+    // Check if creation is explicitly disabled in metadata
+    final canCreate = metadata['canCreateSubfolders'];
+    if (canCreate is bool) return canCreate;
+    
+    // Default to true for folders unless explicitly disabled
+    return true;
+  }
+
+  /// Whether files can be uploaded to this folder
+  bool get canUploadFiles {
+    if (!isFolder) return false;
+    
+    // Check if upload is explicitly disabled in metadata
+    final canUpload = metadata['canUploadFiles'];
+    if (canUpload is bool) return canUpload;
+    
+    // Default to true for folders unless explicitly disabled
+    return true;
+  }
+
+  /// Gets the maximum file size allowed for uploads to this folder
+  int? get maxUploadSize {
+    final maxSize = metadata['maxUploadSize'];
+    if (maxSize is int) return maxSize;
+    return null; // No limit
+  }
+
+  /// Gets allowed file types for uploads to this folder
+  List<String>? get allowedFileTypes {
+    final types = metadata['allowedFileTypes'];
+    if (types is List) return List<String>.from(types);
+    return null; // All types allowed
+  }
+
+  /// Whether this entry is in a shared folder
+  bool get isInSharedFolder {
+    final shared = metadata['isShared'];
+    if (shared is bool) return shared;
+    return false;
+  }
+
+  /// Gets the quota information for this folder
+  FolderQuota? get quota {
+    final quotaData = metadata['quota'];
+    if (quotaData is Map<String, dynamic>) {
+      return FolderQuota.fromJson(quotaData);
+    }
+    return null;
+  }
+
+  /// Validates if a file can be uploaded to this folder
+  FileUploadValidation validateUpload({
+    required String fileName,
+    required int fileSize,
+    String? mimeType,
+  }) {
+    if (!isFolder) {
+      return FileUploadValidation.error('Cannot upload to a file');
+    }
+
+    if (!canUploadFiles) {
+      return FileUploadValidation.error('Upload not allowed in this folder');
+    }
+
+    // Check file size limit
+    final maxSize = maxUploadSize;
+    if (maxSize != null && fileSize > maxSize) {
+      return FileUploadValidation.error('File size exceeds limit');
+    }
+
+    // Check file type restrictions
+    final allowedTypes = allowedFileTypes;
+    if (allowedTypes != null && allowedTypes.isNotEmpty) {
+      final extension = fileName.toLowerCase().split('.').last;
+      final mimeTypeAllowed = mimeType != null && allowedTypes.contains(mimeType);
+      final extensionAllowed = allowedTypes.any((type) => 
+          type.toLowerCase() == extension || 
+          type.toLowerCase() == '.$extension');
+      
+      if (!mimeTypeAllowed && !extensionAllowed) {
+        return FileUploadValidation.error('File type not allowed');
+      }
+    }
+
+    // Check quota if available
+    final folderQuota = quota;
+    if (folderQuota != null && !folderQuota.canUpload(fileSize)) {
+      return FileUploadValidation.error('Not enough space available');
+    }
+
+    return FileUploadValidation.success();
+  }
+
+  /// Validates if a subfolder can be created in this folder
+  FolderCreationValidation validateSubfolderCreation({
+    required String folderName,
+  }) {
+    if (!isFolder) {
+      return FolderCreationValidation.error('Cannot create folder inside a file');
+    }
+
+    if (!canCreateSubfolders) {
+      return FolderCreationValidation.error('Subfolder creation not allowed');
+    }
+
+    // Validate folder name
+    if (folderName.trim().isEmpty) {
+      return FolderCreationValidation.error('Folder name cannot be empty');
+    }
+
+    // Check for invalid characters (basic validation)
+    final invalidChars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
+    for (final char in invalidChars) {
+      if (folderName.contains(char)) {
+        return FolderCreationValidation.error('Invalid character: $char');
+      }
+    }
+
+    // Check length limit
+    if (folderName.length > 255) {
+      return FolderCreationValidation.error('Folder name too long');
+    }
+
+    return FolderCreationValidation.success();
+  }
+
   /// Creates a copy of this FileEntry with some fields replaced
   FileEntry copyWith({
     String? id,
@@ -150,6 +280,87 @@ class FileEntry {
   @override
   String toString() {
     return 'FileEntry(id: $id, name: $name, isFolder: $isFolder)';
+  }
+}
+
+/// Validation result for file uploads
+class FileUploadValidation {
+  /// Whether the validation passed
+  final bool isValid;
+  
+  /// Error message if validation failed
+  final String? error;
+
+  const FileUploadValidation._(this.isValid, this.error);
+
+  /// Creates a successful validation result
+  factory FileUploadValidation.success() {
+    return const FileUploadValidation._(true, null);
+  }
+
+  /// Creates a failed validation result
+  factory FileUploadValidation.error(String message) {
+    return FileUploadValidation._(false, message);
+  }
+}
+
+/// Validation result for folder creation
+class FolderCreationValidation {
+  /// Whether the validation passed
+  final bool isValid;
+  
+  /// Error message if validation failed
+  final String? error;
+
+  const FolderCreationValidation._(this.isValid, this.error);
+
+  /// Creates a successful validation result
+  factory FolderCreationValidation.success() {
+    return const FolderCreationValidation._(true, null);
+  }
+
+  /// Creates a failed validation result
+  factory FolderCreationValidation.error(String message) {
+    return FolderCreationValidation._(false, message);
+  }
+}
+
+/// Represents folder quota information
+class FolderQuota {
+  /// Total space in bytes
+  final int total;
+  
+  /// Used space in bytes
+  final int used;
+  
+  /// Available space in bytes
+  int get available => total - used;
+  
+  /// Whether there's enough space for a file
+  bool canUpload(int fileSize) => available >= fileSize;
+  
+  /// Usage percentage (0.0 to 1.0)
+  double get usagePercentage => total > 0 ? used / total : 0.0;
+
+  const FolderQuota({
+    required this.total,
+    required this.used,
+  });
+
+  /// Creates quota from JSON data
+  factory FolderQuota.fromJson(Map<String, dynamic> json) {
+    return FolderQuota(
+      total: json['total'] as int,
+      used: json['used'] as int,
+    );
+  }
+
+  /// Converts quota to JSON
+  Map<String, dynamic> toJson() {
+    return {
+      'total': total,
+      'used': used,
+    };
   }
 }
 

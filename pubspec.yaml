@@ -36,6 +36,9 @@ dependencies:
   # SVG support for provider logos
   flutter_svg: ^2.0.10
   googleapis: ^14.0.0
+  
+  # File picker for upload functionality
+  file_picker: ^8.0.0
 
 dev_dependencies:
   flutter_test:
