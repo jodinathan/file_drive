@@ -19,6 +19,9 @@ class ProviderCard extends StatelessWidget {
   
   /// Widget customizável para o logo (para CustomProvider)
   final Widget? customLogoWidget;
+  
+  /// Se deve mostrar o contador de contas (para CustomProvider)
+  final bool showAccountCount;
 
   const ProviderCard({
     super.key,
@@ -27,6 +30,7 @@ class ProviderCard extends StatelessWidget {
     required this.accounts,
     required this.onTap,
     this.customLogoWidget,
+    this.showAccountCount = true,
   });
 
   @override
@@ -89,8 +93,8 @@ class ProviderCard extends StatelessWidget {
                 
                 const SizedBox(height: AppConstants.spacingS),
                 
-                // Contador de contas com melhor visual
-                Container(
+                // Contador de contas com melhor visual - apenas se showAccountCount for true
+                if (showAccountCount) Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: AppConstants.paddingS, 
                     vertical: AppConstants.paddingXS,

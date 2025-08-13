@@ -126,3 +126,58 @@ lib/
 - ✅ **Novos Campos**: `createdAt` é opcional e não quebra código existente
 - ✅ **Tema**: Mantém consistência com o design system existente
 - ✅ **Performance**: Melhorias não impactam performance
+
+## 6. Custom Provider para Cenários Enterprise
+
+### Funcionalidade Adicionada
+Nova flag `showAccountManagement` no `CustomProviderConfig` para desabilitar o sistema de gerenciamento de contas em cenários enterprise onde a autenticação é handled externamente.
+
+### Características
+- **Flag `showAccountManagement`**: Permite desabilitar completamente a UI de contas
+- **Conta Temporária Automática**: Quando desabilitado, cria conta temporária automaticamente
+- **UI Simplificada**: Remove carrossel de contas, botões "Adicionar Conta" e contadores
+- **Acesso Direto**: Usuário vai direto para o navegador de arquivos
+- **Compatibilidade Total**: Flag opcional (padrão `true`) mantém comportamento existente
+
+### Benefícios para Enterprise
+- ✅ **Sem UI de contas** desnecessária para sistemas já autenticados
+- ✅ **Sem botões de adição** de conta quando não aplicável
+- ✅ **Sem contadores** de contas na interface
+- ✅ **Navegação direta** para arquivos sem etapas intermediárias
+- ✅ **Perfeito para LDAP/SSO** onde usuário já está autenticado
+- ✅ **Interface limpa** para ferramentas internas corporativas
+
+### Exemplo de Uso
+
+```dart
+CustomProvider(
+  config: CustomProviderConfig(
+    displayName: 'Enterprise Storage',
+    baseUrl: 'https://storage.company.com',
+    showAccountManagement: false, // 🔑 Desabilita gerenciamento de contas
+    providerType: 'enterprise_storage',
+    logoWidget: Icon(Icons.business, color: Colors.blue),
+  ),
+)
+```
+
+### Casos de Uso Ideais
+- **Sistemas Enterprise** com autenticação LDAP/Active Directory
+- **Ferramentas Internas** onde usuários já estão logados
+- **Servidores Corporativos** sem necessidade de OAuth
+- **Aplicações B2B** que precisam de interface simplificada
+- **Ambientes Controlados** onde autenticação é externa
+
+### Código Afetado
+- `lib/src/providers/custom_provider.dart:16` - Nova flag `showAccountManagement`
+- `lib/src/widgets/provider_card.dart:24` - Parâmetro `showAccountCount` condicional
+- `lib/src/widgets/provider_logo.dart:117` - Método `getShowAccountManagement()`
+- `lib/src/widgets/file_cloud_widget.dart:1490` - Seção de contas condicionalizável
+- `lib/src/widgets/file_cloud_widget.dart:194` - Lógica de conta temporária
+- `example/custom_provider_no_accounts_example.dart` - Exemplo completo
+
+### Localização do Exemplo
+```
+example/
+└── custom_provider_no_accounts_example.dart  # Exemplo enterprise completo
+```

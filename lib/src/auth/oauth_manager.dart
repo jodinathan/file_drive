@@ -50,9 +50,12 @@ class OAuthManager {
       // Check for token in hid parameter (based on working example)
       if (queryParams.containsKey('hid')) {
         final accessToken = queryParams['hid'];
+        final refreshToken = queryParams['refresh_token']; // 🔑 Captura refresh token
+        
         if (accessToken != null && accessToken.isNotEmpty) {
           return OAuthResult.success(
             accessToken: accessToken,
+            refreshToken: refreshToken, // 🔑 Inclui refresh token
             additionalData: queryParams,
           );
         }

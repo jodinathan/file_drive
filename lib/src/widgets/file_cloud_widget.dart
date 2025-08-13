@@ -8,6 +8,7 @@ import '../models/selection_config.dart';
 import '../providers/base_cloud_provider.dart';
 import '../providers/google_drive_provider.dart';
 import '../providers/custom_provider.dart';
+import '../providers/local_server_provider.dart';
 import '../storage/account_storage.dart';
 import '../auth/oauth_config.dart';
 import '../auth/oauth_manager.dart';
@@ -129,15 +130,11 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
           _providers[providerType] = GoogleDriveProvider();
           AppLogger.success('GoogleDriveProvider inicializado', component: 'Init');
           break;
-        case 'custom':
-          _providers[providerType] = CustomProvider(
-            config: CustomProviderConfig(
-              displayName: 'Meu Servidor',
-              baseUrl: 'http://localhost:3000',
-              logoWidget: const Icon(Icons.storage),
-            ),
+        case 'local_server':
+          _providers[providerType] = LocalServerProvider(
+            serverUrl: 'http://localhost:8080',
           );
-          AppLogger.success('CustomProvider inicializado', component: 'Init');
+          AppLogger.success('LocalServerProvider inicializado', component: 'Init');
           break;
         // TODO: Add other providers when implemented
         // case 'dropbox':
@@ -154,24 +151,24 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     // Set providers map in ProviderHelper for custom logo access
     ProviderHelper.setProvidersMap(_providers);
     
-    // Create default account for custom provider
-    if (_providers.containsKey('custom')) {
+    // Create default account for local server provider
+    if (_providers.containsKey('local_server')) {
       final now = DateTime.now();
-      _accountsByProvider['custom'] = [
+      _accountsByProvider['local_server'] = [
         CloudAccount(
           id: 'local_server_default',
-          providerType: 'custom',
-          externalId: 'default_user_001',
-          name: 'Servidor Local',
-          email: 'admin@localhost',
-          accessToken: 'default_token',
+          providerType: 'local_server',
+          externalId: 'local_user',
+          name: 'Local Server User',
+          email: 'user@localhost',
+          accessToken: 'test_token_dev', // Uses test token from server
           refreshToken: null,
           expiresAt: null,
           createdAt: now,
           updatedAt: now,
         ),
       ];
-      AppLogger.success('Conta padrão criada para CustomProvider', component: 'Init');
+      AppLogger.success('Conta padrão criada para LocalServerProvider', component: 'Init');
     }
     
     // Set initial provider to first enabled provider
@@ -188,6 +185,36 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     });
 
     try {
+      // Check if current provider needs account management
+      final showAccountManagement = ProviderHelper.getShowAccountManagement(_selectedProvider ?? '');
+      
+      if (!showAccountManagement && _selectedProvider != null) {
+        // For providers without account management, create a temporary account
+        AppLogger.info('Provider $_selectedProvider não usa gerenciamento de contas, criando conta temporária', component: 'Accounts');
+        
+        final tempAccount = CloudAccount(
+          id: 'temp_${_selectedProvider!}_account',
+          providerType: _selectedProvider!,
+          name: 'Enterprise User',
+          email: 'user@enterprise.com',
+          accessToken: 'temp_access_token',
+          refreshToken: null,
+          status: AccountStatus.ok,
+          expiresAt: DateTime.now().add(const Duration(days: 365)), // Valid for a year
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          externalId: 'temp_external_id',
+        );
+        
+        _accountsByProvider.clear();
+        _accountsByProvider[_selectedProvider!] = [tempAccount];
+        _selectedAccount = tempAccount;
+        
+        AppLogger.info('Conta temporária criada e selecionada para $_selectedProvider', component: 'Accounts');
+        await _loadFiles();
+        return;
+      }
+      
       final accounts = await widget.accountStorage.getAccounts();
       AppLogger.info('${accounts.length} contas carregadas do storage', component: 'Accounts');
       
@@ -583,6 +610,17 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       final result = await oauthManager.authenticate(widget.oauthConfig);
       
       AppLogger.info('Resultado OAuth - Sucesso: ${result.isSuccess}', component: 'Auth');
+      
+      // LOG DETALHADO: Verificar se refresh token foi recebido
+      print('🔍 DEBUG: OAuth Result Details:');
+      print('   Success: ${result.isSuccess}');
+      print('   Access Token exists: ${result.accessToken != null}');
+      print('   Access Token (last 10 chars): ${result.accessToken?.substring((result.accessToken?.length ?? 0) - 10)}');
+      print('   Refresh Token exists: ${result.refreshToken != null}');
+      print('   Refresh Token (last 10 chars): ${result.refreshToken?.substring((result.refreshToken?.length ?? 0) - 10)}');
+      print('   Expires At: ${result.expiresAt}');
+      print('   Additional Data: ${result.additionalData}');
+      
       if (result.accessToken != null) {
         AppLogger.debug('Token de acesso recebido', component: 'Auth');
       } else {
@@ -1462,6 +1500,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
                   isSelected: _selectedProvider == providerType,
                   accounts: accounts,
                   customLogoWidget: ProviderHelper.getCustomLogoWidget(providerType),
+                  showAccountCount: ProviderHelper.getShowAccountManagement(providerType),
                   onTap: () {
                     setState(() {
                       _selectedProvider = providerType;
@@ -1486,13 +1525,15 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
 
   /// Segunda coluna: Conteúdo principal com layout melhorado
   Widget _buildMainContent() {
+    final showAccountManagement = ProviderHelper.getShowAccountManagement(_selectedProvider ?? '');
+    
     return Column(
       children: [
-        // Seção de contas com altura fixa e sem overflow
-        _buildAccountSection(),
+        // Seção de contas com altura fixa e sem overflow - apenas se showAccountManagement for true
+        if (showAccountManagement) _buildAccountSection(),
         
-        // Divisor horizontal
-        Container(
+        // Divisor horizontal - apenas se showAccountManagement for true
+        if (showAccountManagement) Container(
           height: 1,
           color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
         ),

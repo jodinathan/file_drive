@@ -29,6 +29,48 @@ class OAuthServer {
     if (!storageDir.existsSync()) {
       storageDir.createSync(recursive: true);
       print('Created storage directory: $_storageRoot');
+      
+      // Create sample files for testing
+      _createSampleFiles();
+    }
+  }
+  
+  void _createSampleFiles() {
+    try {
+      // Create Documents folder with sample files
+      final docsDir = Directory(path.join(_storageRoot, 'Documents'));
+      docsDir.createSync(recursive: true);
+      
+      File(path.join(docsDir.path, 'README.txt')).writeAsStringSync(
+        'Welcome to Local File Server!\n\nThis is a sample text file for testing the file drive widget.\n\nYou can:\n- Upload new files\n- Download existing files\n- Create folders\n- Delete files and folders\n\nEnjoy testing!'
+      );
+      
+      File(path.join(docsDir.path, 'sample_data.json')).writeAsStringSync(
+        json.encode({
+          'server': 'Local File Server',
+          'version': '1.0.0',
+          'features': ['upload', 'download', 'create_folder', 'delete'],
+          'created': DateTime.now().toIso8601String(),
+        })
+      );
+      
+      // Create Images folder with a sample text file (representing an image)
+      final imagesDir = Directory(path.join(_storageRoot, 'Images'));
+      imagesDir.createSync(recursive: true);
+      
+      File(path.join(imagesDir.path, 'placeholder.txt')).writeAsStringSync(
+        'This folder is for images. Upload your PNG, JPG, or GIF files here!'
+      );
+      
+      // Create a root level file
+      File(path.join(_storageRoot, 'server_info.txt')).writeAsStringSync(
+        'Local File Server - Running on ${Platform.localHostname}:${Platform.environment['PORT'] ?? '8080'}\n\nThis server simulates a cloud storage provider using your local file system.\nAll files are stored in: $_storageRoot\n\nHappy testing!'
+      );
+      
+      print('✅ Sample files created in storage directory');
+      
+    } catch (e) {
+      print('⚠️  Warning: Could not create sample files: $e');
     }
   }
   
@@ -38,6 +80,7 @@ class OAuthServer {
       ..get('/auth/google', _handleAuthStart)
       ..get('/auth/callback', _handleCallback)
       ..get('/auth/tokens/<state>', _handleGetTokens)
+      ..post('/auth/refresh', _handleRefreshToken) // 🔑 Novo endpoint de refresh
       
       // File API endpoints
       ..get('/api/profile', _handleGetProfile)
@@ -45,6 +88,7 @@ class OAuthServer {
       ..post('/api/folders', _handleCreateFolder)
       ..delete('/api/files/<fileId>', _handleDeleteFile)
       ..post('/api/upload', _handleUploadFile)
+      ..get('/api/download/<fileId>', _handleDownloadFile)
       
       // Health check
       ..get('/health', _handleHealth);
@@ -152,13 +196,23 @@ class OAuthServer {
       
       // Armazena o token para uso nas APIs subsequentes
       final accessToken = tokenResponse['access_token'] as String;
+      final refreshToken = tokenResponse['refresh_token'] as String?;
       _tokens[state] = accessToken;
       
       print('🎉 Tokens obtidos com sucesso para state: $state');
       print('💾 Token armazenado para APIs: ${accessToken.substring(0, 10)}...');
+      print('🔄 Refresh Token exists: ${refreshToken != null}');
+      if (refreshToken != null) {
+        print('🔄 Refresh Token (last 10 chars): ${refreshToken.substring(refreshToken.length - 10)}');
+      }
       
-      // Retorna para o app com o access token no parâmetro hid (igual ao exemplo funcional)
-      return _returnToApp(success: true, accessToken: accessToken);
+      // Retorna para o app com tokens completos via query params
+      return _returnToApp(
+        success: true, 
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+        state: state, // Inclui state para buscar tokens completos se necessário
+      );
       
     } catch (e) {
       print('❌ Erro no callback: $e');
@@ -250,6 +304,95 @@ class OAuthServer {
     }
   }
   
+  /// Refresh access token using refresh token
+  Future<Response> _handleRefreshToken(Request request) async {
+    try {
+      await config.loadLibrary();
+      
+      // Parse request body
+      final body = await request.readAsString();
+      final formData = Uri.splitQueryString(body);
+      
+      final grantType = formData['grant_type'];
+      final refreshToken = formData['refresh_token'];
+      
+      print('🔄 Refresh Token Request:');
+      print('   Grant Type: $grantType');
+      print('   Refresh Token (last 10 chars): ${refreshToken?.substring((refreshToken?.length ?? 0) - 10)}');
+      
+      // Validate request
+      if (grantType != 'refresh_token' || refreshToken == null || refreshToken.isEmpty) {
+        print('❌ Invalid refresh token request');
+        return Response.badRequest(
+          body: json.encode({
+            'error': 'invalid_request',
+            'error_description': 'Missing or invalid grant_type or refresh_token',
+          }),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+      
+      // Call Google's token endpoint to refresh
+      final response = await http.post(
+        Uri.parse(config.ServerConfig.googleTokenUrl),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: {
+          'client_id': config.ServerConfig.googleClientId,
+          'client_secret': config.ServerConfig.googleClientSecret,
+          'refresh_token': refreshToken,
+          'grant_type': 'refresh_token',
+        },
+      );
+      
+      print('🔄 Google Refresh Response:');
+      print('   Status: ${response.statusCode}');
+      print('   Body: ${response.body}');
+      
+      if (response.statusCode != 200) {
+        print('❌ Google refresh failed: ${response.statusCode}');
+        return Response(response.statusCode,
+          body: json.encode({
+            'error': 'invalid_grant',
+            'error_description': 'Refresh token is invalid or expired',
+          }),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+      
+      final data = json.decode(response.body) as Map<String, dynamic>;
+      
+      if (data.containsKey('error')) {
+        print('❌ Google refresh error: ${data['error']}');
+        return Response.badRequest(
+          body: json.encode(data),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+      
+      print('✅ Token refreshed successfully');
+      print('   New Access Token (last 10 chars): ${(data['access_token'] as String).substring((data['access_token'] as String).length - 10)}');
+      
+      // Return the refreshed tokens
+      return Response.ok(
+        json.encode(data),
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+      );
+      
+    } catch (e) {
+      print('❌ Exception during refresh: $e');
+      return Response.internalServerError(
+        body: json.encode({
+          'error': 'server_error',
+          'error_description': 'Internal server error during token refresh',
+        }),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+  }
+
   /// Health check endpoint
   /// Get user profile
   Future<Response> _handleGetProfile(Request request) async {
@@ -463,6 +606,53 @@ class OAuthServer {
     }
   }
 
+  /// Download a file
+  Future<Response> _handleDownloadFile(Request request) async {
+    if (!_isAuthenticated(request)) {
+      return Response.unauthorized('Authentication required');
+    }
+
+    final fileId = request.params['fileId'];
+    if (fileId == null) {
+      return Response.badRequest(
+        body: json.encode({'error': 'File ID is required'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+
+    try {
+      final filePath = _getFilePathFromId(fileId);
+      final file = File(filePath);
+      
+      if (!file.existsSync()) {
+        return Response.notFound(
+          json.encode({'error': 'File not found'}),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+
+      final fileName = path.basename(filePath);
+      final mimeType = _getMimeType(fileName) ?? 'application/octet-stream';
+      final fileSize = await file.length();
+      
+      return Response.ok(
+        file.openRead(),
+        headers: {
+          'Content-Type': mimeType,
+          'Content-Length': fileSize.toString(),
+          'Content-Disposition': 'attachment; filename="$fileName"',
+          'Access-Control-Allow-Origin': '*',
+        },
+      );
+      
+    } catch (e) {
+      return Response.internalServerError(
+        body: json.encode({'error': 'Failed to download file: $e'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+  }
+
   // Helper methods
   
   bool _isAuthenticated(Request request) {
@@ -504,6 +694,13 @@ class OAuthServer {
       case '.jpg':
       case '.jpeg': return 'image/jpeg';
       case '.gif': return 'image/gif';
+      case '.docx': return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      case '.pptx': return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+      case '.xlsx': return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      case '.zip': return 'application/zip';
+      case '.rar': return 'application/x-rar-compressed';
+      case '.mp4': return 'video/mp4';
+      case '.mp3': return 'audio/mpeg';
       default: return 'application/octet-stream';
     }
   }
@@ -528,11 +725,27 @@ class OAuthServer {
   }
   
   /// Retorna para o app (web ou mobile)
-  Response _returnToApp({bool success = false, String? error, String? accessToken}) {
+  Response _returnToApp({
+    bool success = false, 
+    String? error, 
+    String? accessToken,
+    String? refreshToken,
+    String? state,
+  }) {
     final queryParams = <String, String>{};
     
     if (success && accessToken != null) {
-      queryParams['hid'] = accessToken; // Passa o access token via hid (igual ao exemplo funcional)
+      queryParams['hid'] = accessToken; // Mantém compatibilidade
+      
+      // Inclui refresh token se disponível
+      if (refreshToken != null) {
+        queryParams['refresh_token'] = refreshToken;
+      }
+      
+      // Inclui state para fallback
+      if (state != null) {
+        queryParams['state'] = state;
+      }
     } else if (success) {
       queryParams['success'] = 'true';
     }

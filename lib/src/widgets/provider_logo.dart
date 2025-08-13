@@ -40,6 +40,11 @@ class ProviderLogo extends StatelessWidget {
   }
 
   Widget _buildProviderLogo() {
+    // For local_server, always use icon instead of SVG
+    if (providerType == 'local_server') {
+      return _buildProviderIcon();
+    }
+    
     // Try to load provider logo from package assets
     final assetPath = 'packages/file_cloud/assets/logos/$providerType.svg';
     
@@ -70,6 +75,8 @@ class ProviderLogo extends StatelessWidget {
         return Icons.cloud_outlined;
       case 'custom':
         return Icons.storage;
+      case 'local_server':
+        return Icons.dns;
       default:
         return Icons.storage;
     }
@@ -86,6 +93,8 @@ class ProviderLogo extends StatelessWidget {
         return const Color(0xFF0078D4); // Microsoft Blue
       case 'custom':
         return const Color(0xFF6B7280); // Gray
+      case 'local_server':
+        return const Color(0xFF10B981); // Emerald Green
       default:
         return Colors.grey;
     }
@@ -112,6 +121,23 @@ class ProviderHelper {
     }
     return null;
   }
+  
+  /// Check if provider should show account management features
+  static bool getShowAccountManagement(String providerType) {
+    if (_providersMap == null) return true; // Default to true for standard providers
+    
+    final provider = _providersMap![providerType];
+    if (provider is CustomProvider) {
+      return provider.config.showAccountManagement;
+    }
+    
+    // Local server should not show account management (like custom provider)
+    if (providerType == 'local_server') {
+      return false;
+    }
+    
+    return true; // Default to true for all other providers
+  }
 
   static String getDisplayName(String providerType) {
     switch (providerType) {
@@ -122,6 +148,8 @@ class ProviderHelper {
       case 'onedrive':
         return 'OneDrive';
       case 'custom':
+        return 'Enterprise Storage';
+      case 'local_server':
         return 'Local Server';
       default:
         return providerType;
@@ -132,8 +160,9 @@ class ProviderHelper {
   static bool isProviderEnabled(String providerType) {
     switch (providerType) {
       case 'google_drive':
+      case 'local_server':
+        return true; // Google Drive and Local Server providers are implemented
       case 'custom':
-        return true; // Google Drive and Custom provider are implemented
       case 'dropbox':
       case 'onedrive':
         return false; // Not yet implemented
@@ -144,6 +173,6 @@ class ProviderHelper {
 
   /// Get list of enabled providers only
   static List<String> getEnabledProviders() {
-    return ['google_drive', 'custom']; // Return actually implemented providers
+    return ['google_drive', 'local_server']; // Return actually implemented providers
   }
 }

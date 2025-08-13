@@ -82,6 +82,16 @@ class CustomProvider extends BaseCloudProvider {
 
   @override
   Future<UserProfile> getUserProfile() async {
+    // If no account management, return mock profile
+    if (!config.showAccountManagement) {
+      return UserProfile(
+        id: 'enterprise_user',
+        name: 'Enterprise User',
+        email: 'user@enterprise.com',
+        photoUrl: null,
+      );
+    }
+    
     final headers = _getAuthHeaders();
     final response = await _httpClient.get(
       Uri.parse('${config.baseUrl}/api/profile'),
@@ -110,6 +120,11 @@ class CustomProvider extends BaseCloudProvider {
     String? pageToken,
     int pageSize = 50,
   }) async {
+    // If no account management, return mock file list for demo
+    if (!config.showAccountManagement) {
+      return _getMockFileList(folderId);
+    }
+    
     final headers = _getAuthHeaders();
     final queryParams = <String, String>{};
     
@@ -147,6 +162,20 @@ class CustomProvider extends BaseCloudProvider {
     required String name,
     String? parentId,
   }) async {
+    // If no account management, return mock created folder
+    if (!config.showAccountManagement) {
+      final now = DateTime.now();
+      return FileEntry(
+        id: 'mock_folder_${DateTime.now().millisecondsSinceEpoch}',
+        name: name,
+        isFolder: true,
+        size: 0,
+        modifiedAt: now,
+        createdAt: now,
+        mimeType: null,
+      );
+    }
+    
     final headers = _getAuthHeaders();
     headers['Content-Type'] = 'application/json';
 
@@ -177,6 +206,12 @@ class CustomProvider extends BaseCloudProvider {
     required String entryId,
     bool permanent = false,
   }) async {
+    // If no account management, just pretend deletion worked
+    if (!config.showAccountManagement) {
+      print('🗑️ Mock deletion of entry: $entryId');
+      return;
+    }
+    
     final headers = _getAuthHeaders();
     final uri = Uri.parse('${config.baseUrl}/api/files/$entryId').replace(
       queryParameters: permanent ? {'permanent': 'true'} : null,
@@ -394,5 +429,121 @@ class CustomProvider extends BaseCloudProvider {
       downloadUrl: data['download_url'],
       thumbnailUrl: data['thumbnail_url'],
     );
+  }
+  
+  /// Returns mock file list for demo when no account management
+  FileListPage _getMockFileList(String? folderId) {
+    final now = DateTime.now();
+    
+    if (folderId == null) {
+      // Root folder - show some sample folders and files
+      return FileListPage(
+        entries: [
+          FileEntry(
+            id: 'folder_documents',
+            name: 'Documents',
+            isFolder: true,
+            size: 0,
+            modifiedAt: now.subtract(const Duration(days: 2)),
+            createdAt: now.subtract(const Duration(days: 30)),
+            mimeType: null,
+          ),
+          FileEntry(
+            id: 'folder_images',
+            name: 'Images', 
+            isFolder: true,
+            size: 0,
+            modifiedAt: now.subtract(const Duration(days: 1)),
+            createdAt: now.subtract(const Duration(days: 15)),
+            mimeType: null,
+          ),
+          FileEntry(
+            id: 'file_report',
+            name: 'Enterprise Report.pdf',
+            isFolder: false,
+            size: 2456789,
+            modifiedAt: now.subtract(const Duration(hours: 3)),
+            createdAt: now.subtract(const Duration(days: 5)),
+            mimeType: 'application/pdf',
+            downloadUrl: null,
+          ),
+          FileEntry(
+            id: 'file_presentation',
+            name: 'Company Presentation.pptx',
+            isFolder: false,
+            size: 8965432,
+            modifiedAt: now.subtract(const Duration(days: 1)),
+            createdAt: now.subtract(const Duration(days: 7)),
+            mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            downloadUrl: null,
+          ),
+        ],
+        nextPageToken: null,
+        hasMore: false,
+      );
+    } else if (folderId == 'folder_documents') {
+      // Documents folder
+      return FileListPage(
+        entries: [
+          FileEntry(
+            id: 'doc_policy',
+            name: 'Security Policy.docx',
+            isFolder: false,
+            size: 156789,
+            modifiedAt: now.subtract(const Duration(days: 2)),
+            createdAt: now.subtract(const Duration(days: 10)),
+            mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            downloadUrl: null,
+          ),
+          FileEntry(
+            id: 'doc_manual',
+            name: 'User Manual.pdf',
+            isFolder: false,
+            size: 3456789,
+            modifiedAt: now.subtract(const Duration(days: 5)),
+            createdAt: now.subtract(const Duration(days: 20)),
+            mimeType: 'application/pdf',
+            downloadUrl: null,
+          ),
+        ],
+        nextPageToken: null,
+        hasMore: false,
+      );
+    } else if (folderId == 'folder_images') {
+      // Images folder
+      return FileListPage(
+        entries: [
+          FileEntry(
+            id: 'img_logo',
+            name: 'Company Logo.png',
+            isFolder: false,
+            size: 245678,
+            modifiedAt: now.subtract(const Duration(hours: 12)),
+            createdAt: now.subtract(const Duration(days: 3)),
+            mimeType: 'image/png',
+            downloadUrl: null,
+          ),
+          FileEntry(
+            id: 'img_banner',
+            name: 'Marketing Banner.jpg',
+            isFolder: false,
+            size: 567890,
+            modifiedAt: now.subtract(const Duration(days: 1)),
+            createdAt: now.subtract(const Duration(days: 4)),
+            mimeType: 'image/jpeg',
+            downloadUrl: null,
+          ),
+        ],
+        nextPageToken: null,
+        hasMore: false,
+      );
+    } else {
+      // Empty folder or unknown
+      return FileListPage(
+        entries: [],
+        nextPageToken: null,
+        hasMore: false,
+      );
+    }
   }
 }
