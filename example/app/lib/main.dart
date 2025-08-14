@@ -312,8 +312,8 @@ class _HomePageState extends State<HomePage> {
     return FileCloudWidget(
       cropConfig: CropConfig.custom(
         aspectRatio: 9.0 / 6.0,
-        minWidth: 300,
-        minHeight: 200,
+        minWidth: 500,
+        minHeight: 300,
         enforceAspectRatio: true,
       ),
       accountStorage: _accountStorage,

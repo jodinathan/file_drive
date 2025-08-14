@@ -40,6 +40,10 @@ class _CropPanelWidgetState extends State<CropPanelWidget> {
   bool _isLoadingImage = false;
   String? _errorMessage;
   final Map<String, Size> _detectedDimensions = {}; // Cache for detected dimensions
+  
+  // Current crop dimensions in image pixels
+  int _currentCropWidth = 0;
+  int _currentCropHeight = 0;
 
   @override
   void initState() {
@@ -51,6 +55,7 @@ class _CropPanelWidgetState extends State<CropPanelWidget> {
 
   @override
   void dispose() {
+    _cropController?.removeListener(_updateCropDimensions);
     _cropController?.dispose();
     super.dispose();
   }
@@ -111,6 +116,8 @@ class _CropPanelWidgetState extends State<CropPanelWidget> {
     setState(() {
       _isLoadingImage = true;
       _errorMessage = null;
+      _currentCropWidth = 0;
+      _currentCropHeight = 0;
     });
 
     try {
@@ -122,14 +129,45 @@ class _CropPanelWidgetState extends State<CropPanelWidget> {
         defaultCrop: const Rect.fromLTRB(0.1, 0.1, 0.9, 0.9),
       );
       
+      // Add listener to track crop changes
+      _cropController!.addListener(_updateCropDimensions);
+      
       setState(() {
         _isLoadingImage = false;
+      });
+      
+      // Initialize crop dimensions after a delay
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted) {
+          _updateCropDimensions();
+        }
       });
     } catch (e) {
       setState(() {
         _isLoadingImage = false;
         _errorMessage = 'Error loading image: $e';
       });
+    }
+  }
+
+  void _updateCropDimensions() {
+    if (_cropController == null) return;
+    
+    try {
+      final cropSize = _cropController!.cropSize;
+      if (cropSize.width > 0 && cropSize.height > 0) {
+        final newWidth = cropSize.width.ceil();
+        final newHeight = cropSize.height.ceil();
+        
+        if (_currentCropWidth != newWidth || _currentCropHeight != newHeight) {
+          setState(() {
+            _currentCropWidth = newWidth;
+            _currentCropHeight = newHeight;
+          });
+        }
+      }
+    } catch (e) {
+      // Ignore errors during dimension updates
     }
   }
 
@@ -384,30 +422,137 @@ class _CropPanelWidgetState extends State<CropPanelWidget> {
                     decoration: BoxDecoration(
                       color: Theme.of(context).colorScheme.surfaceContainerHighest,
                     ),
-                    child: Row(
+                    child: Column(
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _croppedFiles[_currentIndex].name,
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _getImageDimensionsText(_croppedFiles[_currentIndex]),
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                            if (widget.cropConfig != null) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                'Crop: ${widget.cropConfig!.description}',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: Theme.of(context).colorScheme.primary,
+                        // All info in one compact line
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              // Image name and dimensions
+                              Expanded(
+                                flex: 3,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      _croppedFiles[_currentIndex].name,
+                                      style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      _getImageDimensionsText(_croppedFiles[_currentIndex]),
+                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 10),
+                                    ),
+                                  ],
                                 ),
                               ),
+                              
+                              // Crop ratio info
+                              if (widget.cropConfig != null) ...[
+                                Expanded(
+                                  flex: 2,
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.aspect_ratio, size: 12, color: Colors.grey[600]),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Ratio: ${widget.cropConfig!.description}',
+                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                          fontSize: 10,
+                                          color: Colors.grey[600],
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                              
+                              // Current crop dimensions
+                              if (!_isLoadingImage && _currentCropWidth > 0 && _currentCropHeight > 0) ...[
+                                Expanded(
+                                  flex: 2,
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.crop,
+                                        size: 12,
+                                        color: Theme.of(context).colorScheme.primary,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Crop: ${_currentCropWidth}×${_currentCropHeight}',
+                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w500,
+                                          color: Theme.of(context).colorScheme.primary,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                              
+                              // Minimum requirements
+                              if (widget.cropConfig?.minWidth != null || widget.cropConfig?.minHeight != null) ...[
+                                Expanded(
+                                  flex: 2,
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.straighten, size: 12, color: Colors.grey[600]),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Min: ${widget.cropConfig?.minWidth ?? '?'}×${widget.cropConfig?.minHeight ?? '?'}',
+                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                          fontSize: 10,
+                                          color: Colors.grey[600],
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                              
+                              // Validation indicators
+                              if (widget.cropConfig?.minWidth != null || widget.cropConfig?.minHeight != null) ...[
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (widget.cropConfig?.minWidth != null)
+                                      Icon(
+                                        _currentCropWidth >= widget.cropConfig!.minWidth!
+                                            ? Icons.check_circle
+                                            : Icons.error,
+                                        size: 14,
+                                        color: _currentCropWidth >= widget.cropConfig!.minWidth!
+                                            ? Colors.green
+                                            : Colors.red,
+                                      ),
+                                    if (widget.cropConfig?.minHeight != null) ...[
+                                      const SizedBox(width: 2),
+                                      Icon(
+                                        _currentCropHeight >= widget.cropConfig!.minHeight!
+                                            ? Icons.check_circle
+                                            : Icons.error,
+                                        size: 14,
+                                        color: _currentCropHeight >= widget.cropConfig!.minHeight!
+                                            ? Colors.green
+                                            : Colors.red,
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
                       ],
                     ),
@@ -501,21 +646,76 @@ class _CropPanelWidgetState extends State<CropPanelWidget> {
 
     print('🔍 DEBUG: Loading image for crop with URL: $imageUrl');
 
-    return CropImage(
-      controller: _cropController!,
-      image: Image.network(
-        imageUrl,
-        fit: BoxFit.contain,
-        errorBuilder: (context, error, stackTrace) {
-          print('❌ Error loading image from URL: $imageUrl');
-          print('❌ Error: $error');
-          return const Center(
-            child: Text('Error loading image'),
-          );
-        },
-      ),
-      paddingSize: 25.0,
-      alwaysMove: true,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Calculate minimumImageSize if we have crop config with minWidth/minHeight
+        double? minimumImageSize;
+        
+        if (widget.cropConfig != null && 
+            (widget.cropConfig!.minWidth != null || widget.cropConfig!.minHeight != null) &&
+            currentFile.width != null && currentFile.height != null) {
+          
+          // Original image dimensions
+          final imageWidth = currentFile.width!.toDouble();
+          final imageHeight = currentFile.height!.toDouble();
+
+          // Available screen dimensions
+          final availableWidth = constraints.maxWidth - 50; // Subtract padding
+          final availableHeight = constraints.maxHeight - 50;
+
+          // Calculate how the image will be displayed (maintaining aspect ratio)
+          final imageRatio = imageWidth / imageHeight;
+          final screenRatio = availableWidth / availableHeight;
+
+          // Calculate the actual display size of the image
+          double displayWidth;
+          double displayHeight;
+          
+          if (imageRatio > screenRatio) {
+            // Width constrained
+            displayWidth = availableWidth;
+            displayHeight = availableWidth / imageRatio;
+          } else {
+            // Height constrained
+            displayHeight = availableHeight;
+            displayWidth = availableHeight * imageRatio;
+          }
+
+          // Calculate the scaling factor between original and display
+          final scaleFactorWidth = displayWidth / imageWidth;
+          final scaleFactorHeight = displayHeight / imageHeight;
+
+          // Convert minimum requirements from image pixels to display pixels
+          final minDisplayWidth = (widget.cropConfig!.minWidth ?? 100) * scaleFactorWidth;
+          final minDisplayHeight = (widget.cropConfig!.minHeight ?? 100) * scaleFactorHeight;
+
+          // Use the larger constraint to ensure both minimums are satisfied, rounded up
+          minimumImageSize = max(minDisplayWidth, minDisplayHeight).ceilToDouble();
+          
+          print('🔍 DEBUG: Image: ${imageWidth}x${imageHeight}, Display: ${displayWidth}x${displayHeight}');
+          print('🔍 DEBUG: Scale factors: ${scaleFactorWidth}x${scaleFactorHeight}');
+          print('🔍 DEBUG: Min requirements: ${widget.cropConfig!.minWidth}x${widget.cropConfig!.minHeight}');
+          print('🔍 DEBUG: Calculated minimumImageSize: $minimumImageSize');
+        }
+
+        return CropImage(
+          controller: _cropController!,
+          image: Image.network(
+            imageUrl,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) {
+              print('❌ Error loading image from URL: $imageUrl');
+              print('❌ Error: $error');
+              return const Center(
+                child: Text('Error loading image'),
+              );
+            },
+          ),
+          paddingSize: 25.0,
+          alwaysMove: true,
+          minimumImageSize: minimumImageSize ?? 50.0, // Use calculated value or small default
+        );
+      },
     );
   }
 }
