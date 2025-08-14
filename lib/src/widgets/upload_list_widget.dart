@@ -134,7 +134,7 @@ class _UploadListWidgetState extends State<UploadListWidget> {
     return Container(
       padding: const EdgeInsets.all(AppConstants.paddingM),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(AppConstants.radiusM),
           topRight: Radius.circular(AppConstants.radiusM),

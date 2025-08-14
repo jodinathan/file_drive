@@ -121,7 +121,7 @@ class UploadProgressWidget extends StatelessWidget {
       children: [
         LinearProgressIndicator(
           value: uploadState.progress.progress,
-          backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
           valueColor: AlwaysStoppedAnimation<Color>(_getStatusColor(context)),
           borderRadius: BorderRadius.circular(4),
         ),

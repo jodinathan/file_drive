@@ -4,7 +4,6 @@ import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 import '../models/file_entry.dart';
-import '../models/cloud_account.dart';
 import '../models/provider_capabilities.dart';
 import 'base_cloud_provider.dart';
 
@@ -38,7 +37,6 @@ class CustomProviderConfig {
 class CustomProvider extends BaseCloudProvider {
   final CustomProviderConfig config;
   late http.Client _httpClient;
-  CloudAccount? _currentAccount;
 
   @override
   String get providerType => config.providerType;
@@ -55,16 +53,8 @@ class CustomProvider extends BaseCloudProvider {
   /// Whether to show account management features
   bool get showAccountManagement => config.showAccountManagement;
 
-  @override
-  CloudAccount? get currentAccount => _currentAccount;
-
   CustomProvider({required this.config}) {
     _httpClient = http.Client();
-  }
-
-  @override
-  void initialize(CloudAccount account) {
-    _currentAccount = account;
   }
 
   @override
@@ -77,40 +67,6 @@ class CustomProvider extends BaseCloudProvider {
       canChunkedUpload: false,
       hasThumbnails: false,
       maxPageSize: 100,
-    );
-  }
-
-  @override
-  Future<UserProfile> getUserProfile() async {
-    // If no account management, return mock profile
-    if (!config.showAccountManagement) {
-      return UserProfile(
-        id: 'enterprise_user',
-        name: 'Enterprise User',
-        email: 'user@enterprise.com',
-        photoUrl: null,
-      );
-    }
-    
-    final headers = _getAuthHeaders();
-    final response = await _httpClient.get(
-      Uri.parse('${config.baseUrl}/api/profile'),
-      headers: headers,
-    );
-
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return UserProfile(
-        id: data['id'] ?? 'custom_user',
-        name: data['name'] ?? 'Local User',
-        email: data['email'] ?? 'user@localhost',
-        photoUrl: data['photo_url'],
-      );
-    }
-
-    throw CloudProviderException(
-      'Failed to get user profile: ${response.statusCode}',
-      statusCode: response.statusCode,
     );
   }
 
@@ -265,9 +221,7 @@ class CustomProvider extends BaseCloudProvider {
       totalBytesReceived = allBytes.length;
       
       // For first chunk, we don't know total yet
-      if (estimatedTotal == null) {
-        estimatedTotal = totalBytesReceived; // Start with what we have
-      }
+      estimatedTotal ??= totalBytesReceived;
       
       // Emit progress for each chunk received
       final progressObj = UploadProgress(
@@ -278,7 +232,7 @@ class CustomProvider extends BaseCloudProvider {
         speed: chunk.length / 0.05, // Simulate speed based on chunk size
       );
       
-      print('DEBUG CustomProvider: Emitindo progresso ${progressObj.uploaded}/${progressObj.total} para ${fileName}');
+      print('DEBUG CustomProvider: Emitindo progresso ${progressObj.uploaded}/${progressObj.total} para $fileName');
       yield progressObj;
       
       // Update estimated total to match current progress for smoother progress bar
@@ -329,7 +283,6 @@ class CustomProvider extends BaseCloudProvider {
     // Send the actual request
     try {
       final response = await request.send();
-      final responseData = await response.stream.bytesToString();
 
       if (response.statusCode == 201) {
         yield UploadProgress(
@@ -397,12 +350,6 @@ class CustomProvider extends BaseCloudProvider {
     );
   }
 
-  @override
-  Future<CloudAccount> refreshAuth(CloudAccount account) async {
-    // For this local server implementation, we don't need to refresh tokens
-    // In a real implementation, you would refresh the OAuth token here
-    return account;
-  }
 
   @override
   void dispose() {
@@ -411,9 +358,8 @@ class CustomProvider extends BaseCloudProvider {
   }
 
   Map<String, String> _getAuthHeaders() {
-    final token = _currentAccount?.accessToken;
     return {
-      'Authorization': 'Bearer $token',
+      'Authorization': 'Bearer dev',
       'Content-Type': 'application/json',
     };
   }

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../lib/src/widgets/crop_panel_widget.dart';
-import '../lib/src/models/image_file_entry.dart';
-import '../lib/src/models/file_entry.dart';
-import '../lib/src/models/crop_config.dart';
+import 'package:file_cloud/src/widgets/crop_panel_widget.dart';
+import 'package:file_cloud/src/models/image_file_entry.dart';
+import 'package:file_cloud/src/models/file_entry.dart';
+import 'package:file_cloud/src/models/crop_config.dart';
 
 /// Example demonstrating the crop panel with automatic dimension detection
 class CropExampleApp extends StatelessWidget {

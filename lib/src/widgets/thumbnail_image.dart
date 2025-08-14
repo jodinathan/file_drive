@@ -143,7 +143,7 @@ class _ThumbnailImageState extends State<ThumbnailImage> {
       width: widget.size,
       height: widget.size,
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
         borderRadius: BorderRadius.circular(widget.borderRadius),
       ),
       child: Icon(

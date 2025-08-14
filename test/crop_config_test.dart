@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import '../lib/src/models/crop_config.dart';
+import 'package:file_cloud/src/models/crop_config.dart';
 
 void main() {
   group('CropConfig Tests', () {

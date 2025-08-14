@@ -83,7 +83,7 @@ class _FileItemCardState extends State<FileItemCard> {
     if (widget.isSelected) {
       return theme.colorScheme.primaryContainer.withOpacity(0.3);
     } else if (_isHovered) {
-      return theme.colorScheme.surfaceVariant.withOpacity(0.5);
+      return theme.colorScheme.surfaceContainerHighest.withOpacity(0.5);
     } else {
       return Colors.transparent;
     }

@@ -325,7 +325,7 @@ class OAuthServer {
       
       print('🔄 Refresh Token Request:');
       print('   Grant Type: $grantType');
-      print('   Refresh Token (last 10 chars): ${refreshToken?.substring((refreshToken?.length ?? 0) - 10)}');
+      print('   Refresh Token (last 10 chars): ${refreshToken?.substring((refreshToken.length) - 10)}');
       
       // Validate request
       if (grantType != 'refresh_token' || refreshToken == null || refreshToken.isEmpty) {

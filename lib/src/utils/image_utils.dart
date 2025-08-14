@@ -61,9 +61,7 @@ class ImageUtils {
       
       // Determine content type
       String? contentType = lookupMimeType(imagePath);
-      if (contentType == null) {
-        contentType = lookupMimeType('', headerBytes: bytes);
-      }
+      contentType ??= lookupMimeType('', headerBytes: bytes);
 
       return (
         source: imagePath,
@@ -210,7 +208,7 @@ class ImageUtils {
 
   /// Gets a readable description of image dimensions
   static String formatImageDimensions(int width, int height) {
-    return '${width}×${height}';
+    return '$width×$height';
   }
 
   /// Gets the file extension from a filename

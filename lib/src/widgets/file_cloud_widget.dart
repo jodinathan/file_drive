@@ -274,20 +274,18 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
           if (provider is AccountBasedProvider) {
             final refreshedAccount = await provider.refreshAuth(_selectedAccount!);
             
-            if (refreshedAccount != null) {
-              // Token refreshed successfully via provider
-              _selectedAccount = refreshedAccount;
-              await widget.accountStorage.saveAccount(refreshedAccount);
-              AppLogger.success('Token refreshed via provider com sucesso: ${refreshedAccount.name}', component: component);
-              
-              // Reinitialize provider with new token
-              provider.initialize(refreshedAccount);
-              
-              // Reload accounts to reflect the updated token in UI
-              await _reloadAccountsOnly();
-              return; // Success, no need to mark as revoked
-            }
-          }
+            // Token refreshed successfully via provider
+            _selectedAccount = refreshedAccount;
+            await widget.accountStorage.saveAccount(refreshedAccount);
+            AppLogger.success('Token refreshed via provider com sucesso: ${refreshedAccount.name}', component: component);
+            
+            // Reinitialize provider with new token
+            provider.initialize(refreshedAccount);
+            
+            // Reload accounts to reflect the updated token in UI
+            await _reloadAccountsOnly();
+            return; // Success, no need to mark as revoked
+                    }
           
           // Fallback to OAuth manager refresh if provider refresh fails
           final refreshedAccount = await _refreshAccountToken(_selectedAccount!);
@@ -845,7 +843,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
                       Container(
                         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                         decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surfaceVariant,
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -1235,7 +1233,6 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
               
               Stream<List<int>> fileStream;
               int totalBytes = file.bytes!.length;
-              int uploadedBytes = 0;
               
               if (_debugSlowUpload) {
                 // Simulate slow upload by chunking the data and tracking progress manually
@@ -1389,7 +1386,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
               children: [
                 const Icon(Icons.upload),
                 const SizedBox(width: 8),
-                Text('Uploads (${_activeUploadsCount})'),
+                Text('Uploads ($_activeUploadsCount)'),
               ],
             ),
             content: SizedBox(
@@ -1482,8 +1479,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
               LinearProgressIndicator(value: progress.total > 0 ? progress.uploaded / progress.total : 0),
               const SizedBox(height: 4),
               Text('${_formatBytes(progress.uploaded)} / ${_formatBytes(progress.total)}'),
-              if (progress.speed != null)
-                Text('${_formatBytes(progress.speed!.round())}/s'),
+              Text('${_formatBytes(progress.speed.round())}/s'),
             ] else ...[
               Text(statusText),
               if (progress.error != null)
@@ -1554,31 +1550,9 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       // Update dialog
       _uploadDialogUpdateCallback?.call();
       
-      AppLogger.debug('Enviando chunk ${i ~/ chunkSize + 1}: ${chunk.length} bytes (${uploadedBytes}/${totalBytes})', component: 'Upload');
+      AppLogger.debug('Enviando chunk ${i ~/ chunkSize + 1}: ${chunk.length} bytes ($uploadedBytes/$totalBytes)', component: 'Upload');
       print('DEBUG: Progresso manual atualizado: $uploadedBytes/$totalBytes');
       
-      yield chunk;
-      
-      // Add delay to simulate slow upload
-      if (i + chunkSize < bytes.length) {
-        await Future.delayed(delayBetweenChunks);
-      }
-    }
-    
-    AppLogger.info('Stream de upload lento concluído', component: 'Upload');
-  }
-
-  Stream<List<int>> _createSlowUploadStream(List<int> bytes) async* {
-    const chunkSize = 1024 * 4; // 4KB chunks
-    const delayBetweenChunks = Duration(milliseconds: 100); // 100ms delay
-    
-    AppLogger.info('Criando stream de upload lento: ${bytes.length} bytes em chunks de ${chunkSize}B', component: 'Upload');
-    
-    for (int i = 0; i < bytes.length; i += chunkSize) {
-      final end = (i + chunkSize).clamp(0, bytes.length);
-      final chunk = bytes.sublist(i, end);
-      
-      AppLogger.debug('Enviando chunk ${i ~/ chunkSize + 1}: ${chunk.length} bytes', component: 'Upload');
       yield chunk;
       
       // Add delay to simulate slow upload
@@ -1895,7 +1869,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       height: cardHeight, // Altura igual ao card da conta
       // Removida margem left pois agora está fora do carrossel
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
@@ -1911,7 +1885,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               color: _isAddingAccount 
-                  ? Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5)
+                  ? Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5)
                   : null,
             ),
             child: Column(

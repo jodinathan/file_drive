@@ -1,11 +1,9 @@
 import 'dart:math';
-import 'dart:ui' as ui;
 import 'dart:async';
 import 'dart:io' as io;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:crop_image/crop_image.dart';
-import 'package:flutter/services.dart';
 
 import '../models/image_file_entry.dart';
 import '../utils/image_utils.dart' hide ImageInfo;
@@ -293,7 +291,7 @@ class _ImageCropDialogState extends State<ImageCropDialog> {
       completer.complete(size);
       stream.removeListener(listener);
     }, onError: (exception, stackTrace) {
-      print('🔍 DEBUG: Failed to get dimensions from ${url}: $exception');
+      print('🔍 DEBUG: Failed to get dimensions from $url: $exception');
       // For URL encoding issues, we'll use default dimensions
       if (url.startsWith('/api/')) {
         print('🔍 DEBUG: Using default dimensions due to URL encoding issue');

@@ -10,5 +10,6 @@ dependencies:
   shelf_router: ^1.1.4
   http: ^1.2.0
 
+  path: any
 dev_dependencies:
   lints: ^5.0.0

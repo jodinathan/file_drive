@@ -263,7 +263,7 @@ class _CropPanelWidgetState extends State<CropPanelWidget> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceVariant,
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
                     ),
                   child: Column(
                     children: [
@@ -382,7 +382,7 @@ class _CropPanelWidgetState extends State<CropPanelWidget> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceVariant,
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
                     ),
                     child: Row(
                       children: [

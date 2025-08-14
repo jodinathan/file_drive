@@ -7,40 +7,40 @@ import '../l10n/generated/app_localizations.dart';
 class NavigationBarWidget extends StatelessWidget {
   /// Current navigation history
   final NavigationHistory navigationHistory;
-  
+
   /// Callback when user wants to go home (root)
   final VoidCallback? onGoHome;
-  
+
   /// Callback when user wants to go back
   final VoidCallback? onGoBack;
-  
+
   /// Callback when user wants to go forward
   final VoidCallback? onGoForward;
-  
+
   /// Callback when user clicks on a breadcrumb item
   final void Function(int index)? onBreadcrumbTap;
-  
+
   /// Callback when user wants to create a new folder
   final VoidCallback? onCreateFolder;
-  
+
   /// Callback when user wants to upload files
   final VoidCallback? onUpload;
-  
+
   /// Callback when user wants to view upload list
   final VoidCallback? onViewUploads;
-  
+
   /// Number of active uploads
   final int activeUploadsCount;
-  
+
   /// Average upload progress (0.0 to 1.0)
   final double uploadProgress;
-  
+
   /// Whether to show the upload button
   final bool showUploadButton;
-  
+
   /// Whether to show the create folder button
   final bool showCreateFolderButton;
-  
+
   /// Maximum breadcrumb items to show before truncating
   final int maxBreadcrumbItems;
 
@@ -85,7 +85,7 @@ class NavigationBarWidget extends StatelessWidget {
               _buildActionButtons(context),
             ],
           ),
-          
+
           // Breadcrumb row (mobile-friendly)
           if (_shouldShowSeparateBreadcrumb(context)) ...[
             const SizedBox(height: AppConstants.spacingS),
@@ -109,26 +109,26 @@ class NavigationBarWidget extends StatelessWidget {
             foregroundColor: Theme.of(context).colorScheme.primary,
           ),
         ),
-        
+
         // Back button
         IconButton(
           onPressed: navigationHistory.canGoBack ? onGoBack : null,
           icon: const Icon(Icons.arrow_back),
           tooltip: 'Voltar',
           style: IconButton.styleFrom(
-            foregroundColor: navigationHistory.canGoBack 
+            foregroundColor: navigationHistory.canGoBack
                 ? Theme.of(context).colorScheme.primary
                 : Theme.of(context).colorScheme.onSurface.withOpacity(0.38),
           ),
         ),
-        
+
         // Forward button
         IconButton(
           onPressed: navigationHistory.canGoForward ? onGoForward : null,
           icon: const Icon(Icons.arrow_forward),
           tooltip: 'Avançar',
           style: IconButton.styleFrom(
-            foregroundColor: navigationHistory.canGoForward 
+            foregroundColor: navigationHistory.canGoForward
                 ? Theme.of(context).colorScheme.primary
                 : Theme.of(context).colorScheme.onSurface.withOpacity(0.38),
           ),
@@ -142,26 +142,28 @@ class NavigationBarWidget extends StatelessWidget {
       // Show simplified breadcrumb on small screens
       final current = navigationHistory.current;
       if (current == null) return const SizedBox.shrink();
-      
+
       return Container(
         padding: const EdgeInsets.symmetric(
           horizontal: AppConstants.paddingS,
           vertical: 4,
         ),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+          color: Theme.of(
+            context,
+          ).colorScheme.surfaceContainerHighest.withOpacity(0.5),
           borderRadius: BorderRadius.circular(AppConstants.radiusS),
         ),
         child: Text(
           current.folderName,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w500,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
           overflow: TextOverflow.ellipsis,
         ),
       );
     }
-    
+
     return _buildFullBreadcrumb(context);
   }
 
@@ -172,23 +174,27 @@ class NavigationBarWidget extends StatelessWidget {
     // Build breadcrumb from current entry's pathComponents
     final pathComponents = current.pathComponents;
     final items = <BreadcrumbItem>[];
-    
+
     // Always show Home first
-    items.add(BreadcrumbItem(
-      label: current.isRoot ? current.folderName : 'Home',
-      historyIndex: 0,
-      isClickable: !current.isRoot,
-    ));
-    
+    items.add(
+      BreadcrumbItem(
+        label: current.isRoot ? current.folderName : 'Home',
+        historyIndex: 0,
+        isClickable: !current.isRoot,
+      ),
+    );
+
     // Add path components if not at root
     if (pathComponents.isNotEmpty) {
       for (int i = 0; i < pathComponents.length; i++) {
         final isLast = i == pathComponents.length - 1;
-        items.add(BreadcrumbItem(
-          label: pathComponents[i],
-          historyIndex: i + 1,
-          isClickable: !isLast,
-        ));
+        items.add(
+          BreadcrumbItem(
+            label: pathComponents[i],
+            historyIndex: i + 1,
+            isClickable: !isLast,
+          ),
+        );
       }
     }
 
@@ -198,7 +204,9 @@ class NavigationBarWidget extends StatelessWidget {
         vertical: 4,
       ),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerHighest.withOpacity(0.3),
         borderRadius: BorderRadius.circular(AppConstants.radiusS),
       ),
       child: Row(
@@ -206,9 +214,7 @@ class NavigationBarWidget extends StatelessWidget {
           Expanded(
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              child: Row(
-                children: _buildBreadcrumbItems(context, items),
-              ),
+              child: Row(children: _buildBreadcrumbItems(context, items)),
             ),
           ),
         ],
@@ -220,8 +226,8 @@ class NavigationBarWidget extends StatelessWidget {
     final history = navigationHistory.entries;
     if (history.isEmpty) return const SizedBox.shrink();
 
-    final currentIndex = navigationHistory.length > 0 
-        ? navigationHistory.length - 1 
+    final currentIndex = navigationHistory.length > 0
+        ? navigationHistory.length - 1
         : -1;
     final visibleItems = _getVisibleBreadcrumbItems(history, currentIndex);
 
@@ -232,28 +238,28 @@ class NavigationBarWidget extends StatelessWidget {
         vertical: 4,
       ),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerHighest.withOpacity(0.3),
         borderRadius: BorderRadius.circular(AppConstants.radiusS),
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        child: Row(
-          children: _buildBreadcrumbItems(context, visibleItems),
-        ),
+        child: Row(children: _buildBreadcrumbItems(context, visibleItems)),
       ),
     );
   }
 
   List<Widget> _buildBreadcrumbItems(
-    BuildContext context, 
+    BuildContext context,
     List<BreadcrumbItem> items,
   ) {
     final widgets = <Widget>[];
-    
+
     for (int i = 0; i < items.length; i++) {
       final item = items[i];
       final isLast = i == items.length - 1;
-      
+
       // Add breadcrumb item
       widgets.add(
         GestureDetector(
@@ -261,24 +267,23 @@ class NavigationBarWidget extends StatelessWidget {
               ? () => onBreadcrumbTap!(item.historyIndex)
               : null,
           child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 8,
-              vertical: 4,
-            ),
-            decoration: item.isClickable ? BoxDecoration(
-              borderRadius: BorderRadius.circular(AppConstants.radiusS),
-              color: Colors.transparent,
-            ) : null,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: item.isClickable
+                ? BoxDecoration(
+                    borderRadius: BorderRadius.circular(AppConstants.radiusS),
+                    color: Colors.transparent,
+                  )
+                : null,
             child: Text(
               item.label,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: isLast 
+                color: isLast
                     ? Theme.of(context).colorScheme.onSurface
                     : item.isClickable
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
                 fontWeight: isLast ? FontWeight.w600 : FontWeight.w400,
-                decoration: item.isClickable && !isLast 
+                decoration: item.isClickable && !isLast
                     ? TextDecoration.underline
                     : null,
               ),
@@ -286,7 +291,7 @@ class NavigationBarWidget extends StatelessWidget {
           ),
         ),
       );
-      
+
       // Add separator (except for last item)
       if (!isLast) {
         widgets.add(
@@ -301,7 +306,7 @@ class NavigationBarWidget extends StatelessWidget {
         );
       }
     }
-    
+
     return widgets;
   }
 
@@ -319,7 +324,7 @@ class NavigationBarWidget extends StatelessWidget {
               foregroundColor: Theme.of(context).colorScheme.primary,
             ),
           ),
-        
+
         // Upload button
         if (showUploadButton) ...[
           FilledButton.icon(
@@ -333,13 +338,13 @@ class NavigationBarWidget extends StatelessWidget {
               ),
             ),
           ),
-          
+
           // Upload counter with divider - sempre presente mas invisível quando zero
           const SizedBox(width: AppConstants.spacingS),
           Container(
             height: 24,
             width: 1,
-            color: activeUploadsCount > 0 
+            color: activeUploadsCount > 0
                 ? Theme.of(context).colorScheme.outline.withOpacity(0.3)
                 : Colors.transparent,
           ),
@@ -369,7 +374,9 @@ class NavigationBarWidget extends StatelessWidget {
                   height: 3,
                   margin: const EdgeInsets.only(top: 2),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.outline.withOpacity(0.5),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.outline.withOpacity(0.5),
                     borderRadius: BorderRadius.circular(1.5),
                   ),
                   child: FractionallySizedBox(
@@ -395,58 +402,64 @@ class NavigationBarWidget extends StatelessWidget {
     int currentIndex,
   ) {
     if (history.isEmpty) return [];
-    
+
     final items = <BreadcrumbItem>[];
-    
+
     // If we have too many items, show truncation
     if (history.length > maxBreadcrumbItems) {
       // Always show root
-      items.add(BreadcrumbItem(
-        label: history.first.folderName,
-        historyIndex: 0,
-        isClickable: true,
-      ));
-      
+      items.add(
+        BreadcrumbItem(
+          label: history.first.folderName,
+          historyIndex: 0,
+          isClickable: true,
+        ),
+      );
+
       // Add ellipsis if needed
       if (currentIndex > maxBreadcrumbItems - 2) {
-        items.add(BreadcrumbItem(
-          label: '...',
-          historyIndex: -1,
-          isClickable: false,
-        ));
-        
+        items.add(
+          BreadcrumbItem(label: '...', historyIndex: -1, isClickable: false),
+        );
+
         // Show last few items
         final startIndex = currentIndex - (maxBreadcrumbItems - 3);
         for (int i = startIndex; i <= currentIndex; i++) {
           if (i > 0 && i < history.length) {
-            items.add(BreadcrumbItem(
-              label: history[i].folderName,
-              historyIndex: i,
-              isClickable: i != currentIndex,
-            ));
+            items.add(
+              BreadcrumbItem(
+                label: history[i].folderName,
+                historyIndex: i,
+                isClickable: i != currentIndex,
+              ),
+            );
           }
         }
       } else {
         // Show items from beginning up to current
         for (int i = 1; i <= currentIndex && i < maxBreadcrumbItems; i++) {
-          items.add(BreadcrumbItem(
-            label: history[i].folderName,
-            historyIndex: i,
-            isClickable: i != currentIndex,
-          ));
+          items.add(
+            BreadcrumbItem(
+              label: history[i].folderName,
+              historyIndex: i,
+              isClickable: i != currentIndex,
+            ),
+          );
         }
       }
     } else {
       // Show all items
       for (int i = 0; i < history.length; i++) {
-        items.add(BreadcrumbItem(
-          label: history[i].folderName,
-          historyIndex: i,
-          isClickable: i != currentIndex,
-        ));
+        items.add(
+          BreadcrumbItem(
+            label: history[i].folderName,
+            historyIndex: i,
+            isClickable: i != currentIndex,
+          ),
+        );
       }
     }
-    
+
     return items;
   }
 
@@ -456,7 +469,7 @@ class NavigationBarWidget extends StatelessWidget {
 
   String _getUploadText(BuildContext context) {
     try {
-      return AppLocalizations.of(context)?.upload ?? 'Upload';
+      return AppLocalizations.of(context).upload;
     } catch (e) {
       return 'Upload';
     }

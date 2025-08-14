@@ -168,7 +168,7 @@ void main() {
 
   group('FileEntry Thumbnail Edge Cases', () {
     test('should handle very long thumbnail URLs', () {
-      final longUrl = 'https://example.com/' + 'a' * 2000 + '.jpg';
+      final longUrl = 'https://example.com/${'a' * 2000}.jpg';
       
       final file = FileEntry(
         id: 'test-id',

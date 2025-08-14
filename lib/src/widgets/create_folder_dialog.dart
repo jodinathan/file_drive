@@ -93,7 +93,7 @@ class _CreateFolderDialogState extends State<CreateFolderDialog> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(AppConstants.paddingS),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
                     borderRadius: BorderRadius.circular(AppConstants.radiusS),
                   ),
                   child: Row(
@@ -165,7 +165,7 @@ class _CreateFolderDialogState extends State<CreateFolderDialog> {
     return Container(
       padding: const EdgeInsets.all(AppConstants.paddingS),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.3),
         borderRadius: BorderRadius.circular(AppConstants.radiusS),
       ),
       child: Column(

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:http/http.dart' as http;
 import '../providers/account_based_provider.dart';
@@ -406,8 +405,6 @@ class GoogleDriveProvider extends AccountBasedProvider {
       );
     }
 
-    // Google OAuth2 token refresh endpoint
-    const tokenUrl = 'https://oauth2.googleapis.com/token';
     
     // 🚨 SECURITY: Client credentials should NEVER be hardcoded!
     // They should come from secure configuration or environment variables

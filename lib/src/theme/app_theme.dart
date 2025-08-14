@@ -109,7 +109,7 @@ class AppTheme {
       // Input Decoration Theme
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: baseColorScheme.surfaceVariant.withOpacity(0.5),
+        fillColor: baseColorScheme.surfaceContainerHighest.withOpacity(0.5),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppConstants.radiusM),
           borderSide: BorderSide.none,
@@ -165,8 +165,8 @@ class AppTheme {
       // Progress Indicator Theme
       progressIndicatorTheme: ProgressIndicatorThemeData(
         color: baseColorScheme.primary,
-        circularTrackColor: baseColorScheme.surfaceVariant,
-        linearTrackColor: baseColorScheme.surfaceVariant,
+        circularTrackColor: baseColorScheme.surfaceContainerHighest,
+        linearTrackColor: baseColorScheme.surfaceContainerHighest,
       ),
       
       // Divider Theme
@@ -232,11 +232,9 @@ class AppTheme {
     onError: Color(0xFFFFFFFF),
     errorContainer: Color(0xFFFFCDD2),
     onErrorContainer: Color(0xFFB71C1C),
-    background: Color(0xFFFAFAFA),
-    onBackground: Color(0xFF212121),
     surface: Color(0xFFFFFFFF),
     onSurface: Color(0xFF212121),
-    surfaceVariant: Color(0xFFF5F5F5),
+    surfaceContainerHighest: Color(0xFFF5F5F5),
     onSurfaceVariant: Color(0xFF616161),
     outline: Color(0xFFBDBDBD),
     outlineVariant: Color(0xFFE0E0E0),
@@ -267,11 +265,9 @@ class AppTheme {
     onError: Color(0xFFB71C1C),
     errorContainer: Color(0xFFC62828),
     onErrorContainer: Color(0xFFFFEBEE),
-    background: Color(0xFF121212),
-    onBackground: Color(0xFFE0E0E0),
     surface: Color(0xFF1E1E1E),
     onSurface: Color(0xFFE0E0E0),
-    surfaceVariant: Color(0xFF2C2C2C),
+    surfaceContainerHighest: Color(0xFF2C2C2C),
     onSurfaceVariant: Color(0xFFBDBDBD),
     outline: Color(0xFF757575),
     outlineVariant: Color(0xFF424242),

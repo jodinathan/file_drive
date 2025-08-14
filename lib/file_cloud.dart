@@ -1,5 +1,5 @@
 /// File Cloud Widget - A Flutter widget for accessing cloud storage providers
-library file_cloud;
+library;
 
 // Export public models
 export 'src/models/file_entry.dart';

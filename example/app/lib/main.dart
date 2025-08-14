@@ -207,7 +207,7 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('File Cloud Example'),
-        backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
         actions: [
           // Menu de três pontos com opções de exemplo
           PopupMenuButton<String>(
@@ -601,7 +601,7 @@ class _HomePageState extends State<HomePage> {
       label: Text(label),
       backgroundColor: enabled
           ? Theme.of(context).colorScheme.primaryContainer
-          : Theme.of(context).colorScheme.surfaceVariant,
+          : Theme.of(context).colorScheme.surfaceContainerHighest,
       side: BorderSide(
         color: enabled
             ? Theme.of(context).colorScheme.primary

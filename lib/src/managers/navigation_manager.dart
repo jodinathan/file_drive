@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import '../models/navigation_history.dart';
 import '../models/file_entry.dart';
