@@ -7,6 +7,7 @@ export 'src/models/cloud_account.dart';
 export 'src/models/account_status.dart';
 export 'src/models/provider_capabilities.dart';
 export 'src/models/selection_config.dart';
+export 'src/models/crop_config.dart';
 
 // Export storage interfaces
 export 'src/storage/account_storage.dart';

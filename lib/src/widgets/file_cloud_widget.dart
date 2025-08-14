@@ -6,6 +6,7 @@ import '../models/account_status.dart';
 import '../models/file_entry.dart';
 import '../models/image_file_entry.dart';
 import '../models/selection_config.dart';
+import '../models/crop_config.dart';
 import '../providers/base_cloud_provider.dart';
 import '../providers/google_drive_provider.dart';
 import '../providers/local_server_provider.dart';
@@ -23,7 +24,7 @@ import 'provider_card.dart';
 import 'account_card.dart';
 import 'file_item_card.dart';
 import 'image_file_item_card.dart';
-import 'image_crop_dialog.dart';
+import 'crop_panel_widget.dart';
 import 'navigation_bar_widget.dart';
 import 'create_folder_dialog.dart';
 
@@ -44,20 +45,8 @@ class FileCloudWidget extends StatefulWidget {
   /// Initial provider type to show ('google_drive', 'dropbox', 'onedrive')
   final String? initialProvider;
   
-  /// Enable image cropping functionality
-  final bool enableImageCrop;
-  
-  /// Minimum aspect ratio for image cropping
-  final double? cropMinRatio;
-  
-  /// Maximum aspect ratio for image cropping
-  final double? cropMaxRatio;
-  
-  /// Minimum width for cropped images
-  final int? cropMinWidth;
-  
-  /// Minimum height for cropped images
-  final int? cropMinHeight;
+  /// Crop configuration for image editing (if provided, enables crop functionality)
+  final CropConfig? cropConfig;
   
   /// Callback when an image is cropped
   final Function(ImageFileEntry)? onImageCropped;
@@ -69,11 +58,7 @@ class FileCloudWidget extends StatefulWidget {
     this.selectionConfig,
     this.onFilesSelected,
     this.initialProvider,
-    this.enableImageCrop = false,
-    this.cropMinRatio,
-    this.cropMaxRatio,
-    this.cropMinWidth,
-    this.cropMinHeight,
+    this.cropConfig,
     this.onImageCropped,
   });
 
@@ -93,6 +78,8 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
   final List<FileEntry> _selectedFiles = [];
   bool _isSelectionMode = false;
   bool _isAddingAccount = false;
+  bool _showCropPanel = false;
+  List<ImageFileEntry> _croppableImageFiles = [];
   
   // Upload management
   final Map<String, UploadProgress> _activeUploads = {};
@@ -1009,6 +996,41 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
   }
 
   void _useSelection() {
+    print('🔍 DEBUG _useSelection:');
+    print('   - selectedFiles count: ${_selectedFiles.length}');
+    print('   - selectedFiles types: ${_selectedFiles.map((f) => f.runtimeType).toList()}');
+    
+    // Check if crop is enabled and we have selected image files
+    if (widget.cropConfig != null && _selectedFiles.isNotEmpty) {
+      // Try to get both existing ImageFileEntry and convert FileEntry to ImageFileEntry
+      final allImageFiles = <ImageFileEntry>[];
+      
+      for (final file in _selectedFiles) {
+        if (file is ImageFileEntry && file.canBeCropped()) {
+          allImageFiles.add(file);
+        } else if (!file.isFolder && file.mimeType != null && file.mimeType!.startsWith('image/')) {
+          final imageEntry = ImageFileEntry.tryCreateImageFileEntry(file);
+          if (imageEntry != null && imageEntry.canBeCropped()) {
+            allImageFiles.add(imageEntry);
+          }
+        }
+      }
+      
+      print('   - Found ${allImageFiles.length} croppable images');
+      
+      if (allImageFiles.isNotEmpty) {
+        print('   - Showing crop panel!');
+        // Store the converted image files for the crop panel
+        _croppableImageFiles = allImageFiles;
+        setState(() {
+          _showCropPanel = true;
+        });
+        return;
+      }
+    }
+    
+    print('   - Using original behavior');
+    // Original behavior for non-crop cases
     if (widget.onFilesSelected != null && _selectedFiles.isNotEmpty) {
       widget.onFilesSelected!(_selectedFiles);
     }
@@ -1017,6 +1039,55 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     if (widget.selectionConfig?.onSelectionConfirm != null && _selectedFiles.isNotEmpty) {
       widget.selectionConfig?.onSelectionConfirm!(_selectedFiles);
     }
+  }
+  void _handleCropCompleted(List<ImageFileEntry> croppedFiles) {
+    // Update the selected files with the cropped versions
+    for (int i = 0; i < _selectedFiles.length; i++) {
+      final selectedFile = _selectedFiles[i];
+      if (selectedFile is ImageFileEntry) {
+        final croppedFile = croppedFiles.firstWhere(
+          (file) => file.id == selectedFile.id,
+          orElse: () => selectedFile,
+        );
+        _selectedFiles[i] = croppedFile;
+        
+        // Also update in the current files list
+        final currentIndex = _currentFiles.indexWhere((file) => file.id == selectedFile.id);
+        if (currentIndex != -1) {
+          _currentFiles[currentIndex] = croppedFile;
+        }
+      }
+    }
+    
+    setState(() {
+      _showCropPanel = false;
+      _croppableImageFiles = [];
+    });
+    
+    // Trigger callback for cropped images
+    if (widget.onImageCropped != null) {
+      for (final croppedFile in croppedFiles) {
+        if (croppedFile.hasCropData()) {
+          widget.onImageCropped!(croppedFile);
+        }
+      }
+    }
+    
+    // Complete the selection process
+    if (widget.onFilesSelected != null && _selectedFiles.isNotEmpty) {
+      widget.onFilesSelected!(_selectedFiles);
+    }
+    
+    if (widget.selectionConfig?.onSelectionConfirm != null && _selectedFiles.isNotEmpty) {
+      widget.selectionConfig?.onSelectionConfirm!(_selectedFiles);
+    }
+  }
+
+  void _handleCropCancelled() {
+    setState(() {
+      _showCropPanel = false;
+      _croppableImageFiles = [];
+    });
   }
 
 
@@ -1525,9 +1596,24 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
     // Set context for navigation manager to use translations
     _navigationManager.setContext(context);
+    
+    // Show crop panel if active
+    if (_showCropPanel) {
+      print('🔍 DEBUG build - crop panel:');
+      print('   - _croppableImageFiles count: ${_croppableImageFiles.length}');
+      print('   - _croppableImageFiles names: ${_croppableImageFiles.map((f) => f.name).toList()}');
+      
+      return CropPanelWidget(
+        imageFiles: _croppableImageFiles,
+        cropConfig: widget.cropConfig,
+        onCropCompleted: _handleCropCompleted,
+        onCancel: _handleCropCancelled,
+      );
+    }
     
     return Stack(
       children: [
@@ -1958,58 +2044,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
 
 
 
-  /// Opens the image crop dialog for the given image entry
-  Future<void> _openImageCrop(ImageFileEntry imageEntry) async {
-    try {
-      final croppedEntry = await showImageCropDialog(
-        context,
-        imageEntry: imageEntry,
-        minRatio: widget.cropMinRatio,
-        maxRatio: widget.cropMaxRatio,
-        minWidth: widget.cropMinWidth,
-        minHeight: widget.cropMinHeight,
-      );
 
-      if (croppedEntry != null) {
-        // Update the file in the current files list
-        setState(() {
-          final index = _currentFiles.indexWhere((f) => f.id == imageEntry.id);
-          if (index != -1) {
-            _currentFiles[index] = croppedEntry;
-          }
-        });
-
-        // Call the callback if provided
-        if (widget.onImageCropped != null) {
-          widget.onImageCropped!(croppedEntry);
-        }
-
-        // Show success message
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                croppedEntry.hasCropData() 
-                    ? 'Image cropped successfully!'
-                    : 'Crop applied to image!',
-              ),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      AppLogger.error('Error opening image crop dialog', component: 'ImageCrop', error: e);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error opening crop dialog: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
 
   Widget _buildFileItem(FileEntry file) {
     final isSelected = _selectedFiles.contains(file);
@@ -2018,15 +2053,14 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     print('🔍 DEBUG: Building file item for: ${file.name}');
     print('   - isFolder: ${file.isFolder}');
     print('   - mimeType: ${file.mimeType}');
-    print('   - enableImageCrop: ${widget.enableImageCrop}');
     
-    // Check if this is an image file and crop is enabled
-    if (widget.enableImageCrop && !file.isFolder) {
-      print('   - Checking if image for crop...');
+    // Check if this is an image file - always use ImageFileItemCard for images
+    if (!file.isFolder) {
+      print('   - Checking if image...');
       final imageEntry = ImageFileEntry.tryCreateImageFileEntry(file);
       print('   - imageEntry created: ${imageEntry != null}');
       if (imageEntry != null) {
-        print('   - Using ImageFileItemCard with crop functionality');
+        print('   - Using ImageFileItemCard');
         return ImageFileItemCard(
           imageEntry: imageEntry,
           isSelected: isSelected,
@@ -2039,7 +2073,6 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
           onCheckboxChanged: widget.selectionConfig != null 
               ? (_) => _toggleFileSelection(file)
               : null,
-          onCropRequested: _openImageCrop,
         );
       }
     }

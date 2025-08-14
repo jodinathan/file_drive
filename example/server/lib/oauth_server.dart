@@ -620,11 +620,6 @@ class OAuthServer {
   /// Download a file
   Future<Response> _handleDownloadFile(Request request) async {
     print('🔍 Download request initiated');
-    
-    if (!_isAuthenticated(request)) {
-      print('❌ Authentication failed');
-      return Response.unauthorized('Authentication required');
-    }
 
     final fileId = request.params['fileId'];
     print('📁 Raw fileId from URL: "$fileId"');

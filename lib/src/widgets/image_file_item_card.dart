@@ -4,7 +4,7 @@ import '../models/image_file_entry.dart';
 import '../utils/image_utils.dart';
 import 'file_item_card.dart';
 
-/// Specialized card for displaying image files with crop functionality
+/// Specialized card for displaying image files
 class ImageFileItemCard extends StatelessWidget {
   /// The image file entry to display
   final ImageFileEntry imageEntry;
@@ -20,9 +20,6 @@ class ImageFileItemCard extends StatelessWidget {
   
   /// Callback when checkbox state changes
   final ValueChanged<bool?>? onCheckboxChanged;
-  
-  /// Callback when crop is requested
-  final ValueChanged<ImageFileEntry>? onCropRequested;
 
   const ImageFileItemCard({
     super.key,
@@ -31,13 +28,11 @@ class ImageFileItemCard extends StatelessWidget {
     this.showCheckbox = false,
     this.onTap,
     this.onCheckboxChanged,
-    this.onCropRequested,
   });
 
   @override
   Widget build(BuildContext context) {
-    // For non-image files or when crop functionality is not enabled,
-    // fall back to the standard FileItemCard
+    // For non-image files, fall back to the standard FileItemCard
     if (!imageEntry.isImage) {
       return FileItemCard(
         file: imageEntry,
@@ -195,14 +190,25 @@ class ImageFileItemCard extends StatelessWidget {
                   ],
                 ),
               ),
-              
-              // Action menu
-              _buildActionMenu(context),
             ],
           ),
         ),
       ),
     );
+  }
+
+  /// Builds a complete URL from a potentially relative URL
+  String _buildCompleteUrl(String url) {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url; // Already complete
+    }
+    if (url.startsWith('/')) {
+      // Relative URL - build complete URL
+      // For local server, try to get base URL from current context or use default
+      final defaultBaseUrl = 'http://localhost:8080';
+      return '$defaultBaseUrl$url';
+    }
+    return url; // Return as-is for other cases
   }
 
   Widget _buildImageThumbnail() {
@@ -218,7 +224,7 @@ class ImageFileItemCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(7),
         child: imageEntry.thumbnailUrl != null
             ? Image.network(
-                imageEntry.thumbnailUrl!,
+                _buildCompleteUrl(imageEntry.thumbnailUrl!),
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) => _buildImageIcon(),
               )
@@ -278,86 +284,6 @@ class ImageFileItemCard extends StatelessWidget {
                 color: Colors.white,
                 size: 8,
               ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildActionMenu(BuildContext context) {
-    return PopupMenuButton<String>(
-      icon: const Icon(Icons.more_vert),
-      onSelected: (value) {
-        switch (value) {
-          case 'crop':
-            if (onCropRequested != null) {
-              onCropRequested!(imageEntry);
-            }
-            break;
-          case 'download':
-            // TODO: Implement download functionality
-            break;
-          case 'share':
-            // TODO: Implement share functionality
-            break;
-          case 'delete':
-            // TODO: Implement delete functionality
-            break;
-        }
-      },
-      itemBuilder: (context) => [
-        // Crop option (only for images that can be cropped)
-        if (imageEntry.canBeCropped() && onCropRequested != null)
-          PopupMenuItem<String>(
-            value: 'crop',
-            child: Row(
-              children: [
-                Icon(
-                  imageEntry.hasCropData() ? Icons.edit : Icons.crop,
-                  size: 20,
-                ),
-                const SizedBox(width: 12),
-                Text(imageEntry.hasCropData() ? 'Edit Crop' : 'Crop Image'),
-              ],
-            ),
-          ),
-        
-        // Download option
-        if (imageEntry.canDownload)
-          const PopupMenuItem<String>(
-            value: 'download',
-            child: Row(
-              children: [
-                Icon(Icons.download, size: 20),
-                SizedBox(width: 12),
-                Text('Download'),
-              ],
-            ),
-          ),
-        
-        // Share option
-        if (imageEntry.canShare)
-          const PopupMenuItem<String>(
-            value: 'share',
-            child: Row(
-              children: [
-                Icon(Icons.share, size: 20),
-                SizedBox(width: 12),
-                Text('Share'),
-              ],
-            ),
-          ),
-        
-        // Delete option
-        if (imageEntry.canDelete)
-          const PopupMenuItem<String>(
-            value: 'delete',
-            child: Row(
-              children: [
-                Icon(Icons.delete, size: 20, color: Colors.red),
-                SizedBox(width: 12),
-                Text('Delete', style: TextStyle(color: Colors.red)),
-              ],
             ),
           ),
       ],

@@ -86,8 +86,8 @@ class _HomePageState extends State<HomePage> {
         await _testServerConnection();
         
       } catch (e) {
-        // If config is missing, show instructions
-        _showInstructions = true;
+        // If config is missing, show instructions but don't set the flag
+        // _showInstructions = true; // Commented out to always show widget
       }
       
       if (mounted) {
@@ -310,7 +310,12 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildFileCloudWidget() {
     return FileCloudWidget(
-      enableImageCrop: true,
+      cropConfig: CropConfig.custom(
+        aspectRatio: 9.0 / 6.0,
+        minWidth: 300,
+        minHeight: 200,
+        enforceAspectRatio: true,
+      ),
       accountStorage: _accountStorage,
       oauthConfig: _oauthConfig,
       selectionConfig: SelectionConfig(
