@@ -136,11 +136,19 @@ class LocalServerProvider extends BaseCloudProvider {
   Stream<List<int>> downloadFile({
     required String fileId,
   }) async* {
+    print('📥 LocalServerProvider.downloadFile called with fileId: "$fileId"');
+    print('📥 FileId type: ${fileId.runtimeType}');
+    print('📥 FileId length: ${fileId.length}');
+    print('📥 FileId bytes: ${fileId.codeUnits}');
+    
     final response = await _makeRequest('GET', '/api/download/$fileId');
     
     if (response.statusCode == 200) {
+      print('✅ Download successful for fileId: "$fileId"');
       yield response.bodyBytes;
     } else {
+      print('❌ Download failed for fileId: "$fileId" - Status: ${response.statusCode}');
+      print('❌ Response body: ${response.body}');
       throw CloudProviderException(
         'Failed to download file: ${response.statusCode}',
         statusCode: response.statusCode,
@@ -236,7 +244,14 @@ class LocalServerProvider extends BaseCloudProvider {
     String? body,
     Map<String, String>? headers,
   }) async {
+    print('🌐 Making $method request to path: "$path"');
+    print('🌐 Path bytes: ${path.codeUnits}');
+    
     final uri = Uri.parse('$serverUrl$path');
+    print('🌐 Final URI: "$uri"');
+    print('🌐 URI path: "${uri.path}"');
+    print('🌐 URI path bytes: ${uri.path.codeUnits}');
+    
     final requestHeaders = {
       'Authorization': 'Bearer $testToken', // Uses test token directly
       ...?headers,

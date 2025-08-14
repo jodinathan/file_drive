@@ -619,12 +619,21 @@ class OAuthServer {
 
   /// Download a file
   Future<Response> _handleDownloadFile(Request request) async {
+    print('🔍 Download request initiated');
+    
     if (!_isAuthenticated(request)) {
+      print('❌ Authentication failed');
       return Response.unauthorized('Authentication required');
     }
 
     final fileId = request.params['fileId'];
+    print('📁 Raw fileId from URL: "$fileId"');
+    print('📁 FileId type: ${fileId.runtimeType}');
+    print('📁 FileId length: ${fileId?.length}');
+    print('📁 FileId bytes: ${fileId?.codeUnits}');
+    
     if (fileId == null) {
+      print('❌ File ID is null');
       return Response.badRequest(
         body: json.encode({'error': 'File ID is required'}),
         headers: {'Content-Type': 'application/json'},
@@ -633,11 +642,26 @@ class OAuthServer {
 
     try {
       final filePath = _getFilePathFromId(fileId);
+      print('📂 Resolved file path: "$filePath"');
+      
       final file = File(filePath);
+      print('📂 File exists check: ${file.existsSync()}');
       
       if (!file.existsSync()) {
+        print('❌ File not found at path: "$filePath"');
+        print('🔍 Checking parent directory exists: ${Directory(path.dirname(filePath)).existsSync()}');
+        
+        // Lista arquivos no diretório pai para debug
+        final parentDir = Directory(path.dirname(filePath));
+        if (parentDir.existsSync()) {
+          print('📋 Files in parent directory:');
+          await for (final entity in parentDir.list()) {
+            print('  - ${path.basename(entity.path)} (${entity.runtimeType})');
+          }
+        }
+        
         return Response.notFound(
-          json.encode({'error': 'File not found'}),
+          json.encode({'error': 'File not found', 'path': filePath, 'fileId': fileId}),
           headers: {'Content-Type': 'application/json'},
         );
       }
@@ -646,12 +670,17 @@ class OAuthServer {
       final mimeType = _getMimeType(fileName) ?? 'application/octet-stream';
       final fileSize = await file.length();
       
+      // Encode filename for Content-Disposition header (RFC 5987)
+      final encodedFileName = Uri.encodeComponent(fileName);
+      print('📂 Original filename: "$fileName"');
+      print('📂 Encoded filename: "$encodedFileName"');
+      
       return Response.ok(
         file.openRead(),
         headers: {
           'Content-Type': mimeType,
           'Content-Length': fileSize.toString(),
-          'Content-Disposition': 'attachment; filename="$fileName"',
+          'Content-Disposition': 'attachment; filename*=UTF-8\'\'$encodedFileName',
           'Access-Control-Allow-Origin': '*',
         },
       );
@@ -687,12 +716,26 @@ class OAuthServer {
   String _generateFileId(String filePath) {
     // Simple ID generation based on path
     final relativePath = path.relative(filePath, from: _storageRoot);
-    return relativePath.replaceAll('/', '_').replaceAll('\\', '_');
+    final fileId = relativePath.replaceAll('/', '_').replaceAll('\\', '_');
+    print('🆔 Generated fileId from path "$filePath" -> "$fileId"');
+    print('🆔 FileId bytes: ${fileId.codeUnits}');
+    return fileId;
   }
 
   String _getFilePathFromId(String fileId) {
-    final relativePath = fileId.replaceAll('_', '/');
-    return path.join(_storageRoot, relativePath);
+    print('🔄 Converting fileId to path: "$fileId"');
+    print('🔄 FileId bytes: ${fileId.codeUnits}');
+    
+    // Decode URL encoding first
+    final decodedFileId = Uri.decodeComponent(fileId);
+    print('🔄 Decoded fileId: "$decodedFileId"');
+    print('🔄 Decoded fileId bytes: ${decodedFileId.codeUnits}');
+    
+    final relativePath = decodedFileId.replaceAll('_', '/');
+    final fullPath = path.join(_storageRoot, relativePath);
+    print('🔄 Relative path: "$relativePath"');
+    print('🔄 Full path: "$fullPath"');
+    return fullPath;
   }
 
   String? _getMimeType(String fileName) {

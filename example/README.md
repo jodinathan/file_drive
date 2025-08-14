@@ -139,6 +139,73 @@ flutter run -d android
 flutter run -d ios
 ```
 
+## 🖼️ Testando Funcionalidade de Crop de Imagens
+
+O exemplo agora inclui suporte completo para crop de imagens. Use o arquivo `custom_provider_no_accounts_example.dart` configurado com crop ativado.
+
+### Executar Exemplo com Crop
+
+```bash
+# No diretório submodules/file_drive
+flutter run -t example/main.dart
+```
+
+### Funcionalidades de Crop Disponíveis
+
+✅ **Crop Ativado**: `enableImageCrop: true`  
+✅ **Proporções**: Min 0.5, Max 2.0  
+✅ **Tamanho Mínimo**: 200x200 pixels  
+✅ **Formatos Suportados**: JPEG, PNG, GIF, WebP  
+✅ **Callbacks**: `onImageCropped` com informações detalhadas  
+
+### Como Testar o Crop
+
+1. **Execute o exemplo**: `flutter run -t example/main.dart`
+2. **Navegue para a pasta Images**: Você verá uma pasta chamada "Images" na tela principal
+3. **Acesse os arquivos de imagem**: Clique na pasta "Images" para ver arquivos de exemplo como:
+   - Company Logo.png
+   - Marketing Banner.jpg
+4. **Encontre o botão de crop**: Em cada arquivo de imagem, clique no menu de **3 pontos (⋮)** no lado direito
+5. **Selecione "Crop Image"**: No menu suspenso, escolha a opção "Crop Image" ou "Edit Crop"
+6. **Ajuste a área**: Mova e redimensione a área de seleção na tela de crop
+7. **Confirme**: Clique em "Confirmar" para aplicar o crop
+8. **Veja o resultado**: Um dialog mostrará informações detalhadas do crop
+
+### Onde Encontrar o Botão de Crop
+
+🔍 **Localização do Botão**: 
+- O botão de crop **NÃO** é um botão separado visível
+- Está dentro do **menu de 3 pontos verticais (⋮)** no lado direito de cada arquivo de imagem
+- Aparece apenas para arquivos de imagem (PNG, JPG, GIF, WebP)
+- Só aparece quando `enableImageCrop: true` está configurado
+
+📱 **Passos Visuais**:
+1. Veja um arquivo de imagem na lista
+2. No lado direito do arquivo, procure o ícone **⋮** (três pontos verticais)
+3. Clique nos três pontos para abrir o menu
+4. Selecione **"Crop Image"** ou **"Edit Crop"** no menu suspenso
+
+⚠️ **Se não conseguir ver o menu**:
+- Certifique-se de que está na pasta "Images"
+- Verifique se é um arquivo de imagem (não uma pasta)
+- O menu aparece apenas em arquivos, não em pastas
+
+### Informações Exibidas no Crop
+
+- Nome do arquivo
+- Dimensões originais da imagem
+- Dimensões da área cropada
+- Posição do crop (x, y)
+
+### Debugging do Crop
+
+O console mostrará logs detalhados:
+```
+I/flutter: Image cropped: exemplo.jpg
+I/flutter: Original size: 1920x1080
+I/flutter: Crop area: 100,50 800x600
+```
+
 ## 🧪 Testando a Integração
 
 ### 1. Verificar o Servidor

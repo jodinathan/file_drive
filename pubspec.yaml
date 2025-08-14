@@ -39,6 +39,10 @@ dependencies:
   
   # File picker for upload functionality
   file_picker: ^8.0.0
+  
+  # Image cropping functionality
+  crop_image: ^1.0.16
+  mime: ^2.0.0
 
 dev_dependencies:
   flutter_test:

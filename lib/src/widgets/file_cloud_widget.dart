@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import '../models/cloud_account.dart';
 import '../models/account_status.dart';
 import '../models/file_entry.dart';
+import '../models/image_file_entry.dart';
 import '../models/selection_config.dart';
 import '../providers/base_cloud_provider.dart';
 import '../providers/google_drive_provider.dart';
@@ -21,6 +22,8 @@ import 'provider_logo.dart';
 import 'provider_card.dart';
 import 'account_card.dart';
 import 'file_item_card.dart';
+import 'image_file_item_card.dart';
+import 'image_crop_dialog.dart';
 import 'navigation_bar_widget.dart';
 import 'create_folder_dialog.dart';
 
@@ -40,6 +43,24 @@ class FileCloudWidget extends StatefulWidget {
   
   /// Initial provider type to show ('google_drive', 'dropbox', 'onedrive')
   final String? initialProvider;
+  
+  /// Enable image cropping functionality
+  final bool enableImageCrop;
+  
+  /// Minimum aspect ratio for image cropping
+  final double? cropMinRatio;
+  
+  /// Maximum aspect ratio for image cropping
+  final double? cropMaxRatio;
+  
+  /// Minimum width for cropped images
+  final int? cropMinWidth;
+  
+  /// Minimum height for cropped images
+  final int? cropMinHeight;
+  
+  /// Callback when an image is cropped
+  final Function(ImageFileEntry)? onImageCropped;
 
   const FileCloudWidget({
     super.key,
@@ -48,6 +69,12 @@ class FileCloudWidget extends StatefulWidget {
     this.selectionConfig,
     this.onFilesSelected,
     this.initialProvider,
+    this.enableImageCrop = false,
+    this.cropMinRatio,
+    this.cropMaxRatio,
+    this.cropMinWidth,
+    this.cropMinHeight,
+    this.onImageCropped,
   });
 
   @override
@@ -1931,9 +1958,94 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
 
 
 
+  /// Opens the image crop dialog for the given image entry
+  Future<void> _openImageCrop(ImageFileEntry imageEntry) async {
+    try {
+      final croppedEntry = await showImageCropDialog(
+        context,
+        imageEntry: imageEntry,
+        minRatio: widget.cropMinRatio,
+        maxRatio: widget.cropMaxRatio,
+        minWidth: widget.cropMinWidth,
+        minHeight: widget.cropMinHeight,
+      );
+
+      if (croppedEntry != null) {
+        // Update the file in the current files list
+        setState(() {
+          final index = _currentFiles.indexWhere((f) => f.id == imageEntry.id);
+          if (index != -1) {
+            _currentFiles[index] = croppedEntry;
+          }
+        });
+
+        // Call the callback if provided
+        if (widget.onImageCropped != null) {
+          widget.onImageCropped!(croppedEntry);
+        }
+
+        // Show success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                croppedEntry.hasCropData() 
+                    ? 'Image cropped successfully!'
+                    : 'Crop applied to image!',
+              ),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      AppLogger.error('Error opening image crop dialog', component: 'ImageCrop', error: e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error opening crop dialog: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Widget _buildFileItem(FileEntry file) {
     final isSelected = _selectedFiles.contains(file);
     
+    // Debug logging
+    print('🔍 DEBUG: Building file item for: ${file.name}');
+    print('   - isFolder: ${file.isFolder}');
+    print('   - mimeType: ${file.mimeType}');
+    print('   - enableImageCrop: ${widget.enableImageCrop}');
+    
+    // Check if this is an image file and crop is enabled
+    if (widget.enableImageCrop && !file.isFolder) {
+      print('   - Checking if image for crop...');
+      final imageEntry = ImageFileEntry.tryCreateImageFileEntry(file);
+      print('   - imageEntry created: ${imageEntry != null}');
+      if (imageEntry != null) {
+        print('   - Using ImageFileItemCard with crop functionality');
+        return ImageFileItemCard(
+          imageEntry: imageEntry,
+          isSelected: isSelected,
+          showCheckbox: widget.selectionConfig != null,
+          onTap: () {
+            if (widget.selectionConfig != null) {
+              _toggleFileSelection(file);
+            }
+          },
+          onCheckboxChanged: widget.selectionConfig != null 
+              ? (_) => _toggleFileSelection(file)
+              : null,
+          onCropRequested: _openImageCrop,
+        );
+      }
+    }
+    
+    print('   - Using standard FileItemCard');
+    // Default to standard FileItemCard
     return FileItemCard(
       file: file,
       isSelected: isSelected,

@@ -209,14 +209,43 @@ class _HomePageState extends State<HomePage> {
         title: const Text('File Cloud Example'),
         backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
         actions: [
-          IconButton(
-            onPressed: () {
-              setState(() {
-                _showInstructions = !_showInstructions;
-              });
+          // Menu de três pontos com opções de exemplo
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              switch (value) {
+                case 'remove_accounts':
+                  _removeAllAccounts();
+                  break;
+                case 'toggle_instructions':
+                  setState(() {
+                    _showInstructions = !_showInstructions;
+                  });
+                  break;
+              }
             },
-            icon: Icon(_showInstructions ? Icons.dashboard : Icons.help_outline),
-            tooltip: _showInstructions ? 'Mostrar Widget' : 'Mostrar Instruções',
+            itemBuilder: (context) => [
+              PopupMenuItem<String>(
+                value: 'remove_accounts',
+                child: const Row(
+                  children: [
+                    Icon(Icons.delete_forever, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('Remover Todas as Contas'),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              PopupMenuItem<String>(
+                value: 'toggle_instructions',
+                child: Row(
+                  children: [
+                    Icon(_showInstructions ? Icons.dashboard : Icons.help_outline),
+                    const SizedBox(width: 8),
+                    Text(_showInstructions ? 'Mostrar Widget' : 'Mostrar Instruções'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -280,110 +309,65 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildFileCloudWidget() {
-    return Column(
-      children: [
-        // Botão de exemplo para remover todas as contas (apenas no exemplo)
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.1),
-          child: Card(
-            color: Theme.of(context).colorScheme.errorContainer,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.delete_sweep,
-                    color: Theme.of(context).colorScheme.onErrorContainer,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Funcionalidade de Exemplo',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onErrorContainer,
-                        fontWeight: FontWeight.bold,
+    return FileCloudWidget(
+      enableImageCrop: true,
+      accountStorage: _accountStorage,
+      oauthConfig: _oauthConfig,
+      selectionConfig: SelectionConfig(
+        minSelection: 1,
+        maxSelection: 5,
+        allowFolders: false,
+        onSelectionConfirm: (files) {
+          // Show selected files in a dialog
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: Text('${files.length} arquivos selecionados'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: files.map((file) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      Icon(
+                        file.isFolder ? Icons.folder : Icons.description,
+                        size: 16,
                       ),
-                    ),
-                  ),
-                  FilledButton.tonalIcon(
-                    onPressed: () => _removeAllAccounts(),
-                    icon: const Icon(Icons.delete_forever),
-                    label: const Text('Remover Todas as Contas'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Theme.of(context).colorScheme.error,
-                      foregroundColor: Theme.of(context).colorScheme.onError,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        // Widget principal do FileCloud
-        Expanded(
-          child: FileCloudWidget(
-            accountStorage: _accountStorage,
-            oauthConfig: _oauthConfig,
-            selectionConfig: SelectionConfig(
-              minSelection: 1,
-              maxSelection: 5,
-              allowFolders: false,
-              onSelectionConfirm: (files) {
-                // Show selected files in a dialog
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: Text('${files.length} arquivos selecionados'),
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: files.map((file) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Row(
-                          children: [
-                            Icon(
-                              file.isFolder ? Icons.folder : Icons.description,
-                              size: 16,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(child: Text(file.name)),
-                          ],
-                        ),
-                      )).toList(),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('Cancelar'),
-                      ),
-                      FilledButton(
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('${files.length} arquivos selecionados!'),
-                            ),
-                          );
-                        },
-                        child: const Text('OK'),
-                      ),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(file.name)),
                     ],
                   ),
-                );
-              },
-            ),
-            onFilesSelected: (files) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${files.length} arquivos selecionados via callback!'),
+                )).toList(),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancelar'),
                 ),
-              );
-            },
+                FilledButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('${files.length} arquivos selecionados!'),
+                      ),
+                    );
+                  },
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+      onFilesSelected: (files) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${files.length} arquivos selecionados via callback!'),
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 
