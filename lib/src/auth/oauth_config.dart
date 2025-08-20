@@ -1,5 +1,15 @@
-/// Configuration for OAuth2 authentication
+import '../enums/cloud_provider_type.dart';
+import '../enums/oauth_scope.dart';
+import '../enums/provider_scope_mapper.dart';
+
+/// Configuration for OAuth2 authentication with generic provider support
 class OAuthConfig {
+  /// Cloud provider type for this OAuth configuration
+  final CloudProviderType providerType;
+  
+  /// Set of OAuth scopes required for this configuration
+  final Set<OAuthScope> requiredScopes;
+  
   /// URL generator function for starting OAuth flow
   /// Should return URL like: http://server.com/auth/google?state=<state>
   final String Function(String state) generateAuthUrl;
@@ -12,15 +22,97 @@ class OAuthConfig {
   /// For web, this should be an https URL
   final String redirectScheme;
   
-  /// Provider type identifier (e.g., 'google_drive')
-  final String providerType;
+  /// Configuration identifier for multi-tenant scenarios
+  final String? configurationId;
 
   const OAuthConfig({
+    required this.providerType,
+    required this.requiredScopes,
     required this.generateAuthUrl,
     required this.generateTokenUrl,
     required this.redirectScheme,
-    required this.providerType,
+    this.configurationId,
   });
+
+  /// Creates an OAuthConfig from provider configuration
+  factory OAuthConfig.fromProviderConfig({
+    required CloudProviderType providerType,
+    required Set<OAuthScope> requiredScopes,
+    required String baseUrl,
+    required String redirectScheme,
+    String? configurationId,
+  }) {
+    // Validate that provider supports all required scopes
+    ProviderScopeMapper.validateScopes(requiredScopes, providerType);
+    
+    return OAuthConfig(
+      providerType: providerType,
+      requiredScopes: requiredScopes,
+      redirectScheme: redirectScheme,
+      configurationId: configurationId,
+      generateAuthUrl: (state) => '$baseUrl/auth/${providerType.name}?state=$state',
+      generateTokenUrl: (state) => '$baseUrl/auth/tokens/$state',
+    );
+  }
+
+  /// Gets the provider-specific scope strings for this configuration
+  List<String> get providerScopes {
+    return ProviderScopeMapper.mapScopesToProvider(requiredScopes, providerType);
+  }
+
+  /// Gets the provider type identifier string (deprecated)
+  @Deprecated('Use providerType enum directly instead of string identifier')
+  String get providerTypeString => providerType.name;
+
+  /// Creates a copy of this configuration with updated values
+  OAuthConfig copyWith({
+    CloudProviderType? providerType,
+    Set<OAuthScope>? requiredScopes,
+    String Function(String state)? generateAuthUrl,
+    String Function(String state)? generateTokenUrl,
+    String? redirectScheme,
+    String? configurationId,
+  }) {
+    return OAuthConfig(
+      providerType: providerType ?? this.providerType,
+      requiredScopes: requiredScopes ?? this.requiredScopes,
+      generateAuthUrl: generateAuthUrl ?? this.generateAuthUrl,
+      generateTokenUrl: generateTokenUrl ?? this.generateTokenUrl,
+      redirectScheme: redirectScheme ?? this.redirectScheme,
+      configurationId: configurationId ?? this.configurationId,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    
+    return other is OAuthConfig &&
+        other.providerType == providerType &&
+        other.requiredScopes.length == requiredScopes.length &&
+        other.requiredScopes.every(requiredScopes.contains) &&
+        other.redirectScheme == redirectScheme &&
+        other.configurationId == configurationId;
+  }
+
+  @override
+  int get hashCode {
+    return Object.hash(
+      providerType,
+      requiredScopes,
+      redirectScheme,
+      configurationId,
+    );
+  }
+
+  @override
+  String toString() {
+    return 'OAuthConfig('
+        'providerType: $providerType, '
+        'requiredScopes: ${requiredScopes.map((s) => s.name).join(', ')}, '
+        'redirectScheme: $redirectScheme'
+        ')';
+  }
 }
 
 /// Result of OAuth authentication

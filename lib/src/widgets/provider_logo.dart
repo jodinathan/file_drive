@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../enums/cloud_provider_type.dart';
 import '../providers/custom_provider.dart';
 import '../providers/base_cloud_provider.dart';
 
 /// Widget for displaying provider logos with fallback to icons
 class ProviderLogo extends StatelessWidget {
   /// Provider type identifier
-  final String providerType;
+  final CloudProviderType providerType;
   
   /// Size of the logo/icon
   final double size;
@@ -42,12 +43,12 @@ class ProviderLogo extends StatelessWidget {
 
   Widget _buildProviderLogo() {
     // For local_server, always use icon instead of SVG
-    if (providerType == 'local_server') {
+    if (providerType == CloudProviderType.localServer) {
       return _buildProviderIcon();
     }
     
     // Try to load provider logo from package assets
-    final assetPath = 'packages/file_cloud/assets/logos/$providerType.svg';
+    final assetPath = 'packages/file_cloud/assets/logos/${providerType.name}.svg';
     
     return SvgPicture.asset(
       assetPath,
@@ -66,38 +67,34 @@ class ProviderLogo extends StatelessWidget {
   }
 
   /// Get fallback icon for provider
-  IconData _getProviderIcon(String providerType) {
+  IconData _getProviderIcon(CloudProviderType providerType) {
     switch (providerType) {
-      case 'google_drive':
+      case CloudProviderType.googleDrive:
         return Icons.drive_eta;
-      case 'dropbox':
+      case CloudProviderType.dropbox:
         return Icons.cloud;
-      case 'onedrive':
+      case CloudProviderType.oneDrive:
         return Icons.cloud_outlined;
-      case 'custom':
+      case CloudProviderType.custom:
         return Icons.storage;
-      case 'local_server':
+      case CloudProviderType.localServer:
         return Icons.dns;
-      default:
-        return Icons.storage;
     }
   }
 
   /// Get brand color for provider
-  Color _getProviderColor(String providerType) {
+  Color _getProviderColor(CloudProviderType providerType) {
     switch (providerType) {
-      case 'google_drive':
+      case CloudProviderType.googleDrive:
         return const Color(0xFF4285F4); // Google Blue
-      case 'dropbox':
+      case CloudProviderType.dropbox:
         return const Color(0xFF0061FF); // Dropbox Blue
-      case 'onedrive':
+      case CloudProviderType.oneDrive:
         return const Color(0xFF0078D4); // Microsoft Blue
-      case 'custom':
+      case CloudProviderType.custom:
         return const Color(0xFF6B7280); // Gray
-      case 'local_server':
+      case CloudProviderType.localServer:
         return const Color(0xFF10B981); // Emerald Green
-      default:
-        return Colors.grey;
     }
   }
 }
@@ -113,10 +110,10 @@ class ProviderHelper {
   }
   
   /// Get custom logo widget for a provider
-  static Widget? getCustomLogoWidget(String providerType) {
+  static Widget? getCustomLogoWidget(CloudProviderType providerType) {
     if (_providersMap == null) return null;
     
-    final provider = _providersMap![providerType];
+    final provider = _providersMap![providerType.name];
     if (provider is CustomProvider) {
       return provider.config.logoWidget;
     }
@@ -124,7 +121,7 @@ class ProviderHelper {
   }
   
   /// Check if provider should show account management features
-  static bool getShowAccountManagement(String providerType) {
+  static bool getShowAccountManagement(CloudProviderType providerType) {
     if (_providersMap == null) return true; // Default to true for standard providers
     
     final provider = _providersMap![providerType];
@@ -140,40 +137,25 @@ class ProviderHelper {
     return true; // Default to true for all other providers
   }
 
-  static String getDisplayName(String providerType) {
-    switch (providerType) {
-      case 'google_drive':
-        return 'Google Drive';
-      case 'dropbox':
-        return 'Dropbox';
-      case 'onedrive':
-        return 'OneDrive';
-      case 'custom':
-        return 'Enterprise Storage';
-      case 'local_server':
-        return 'Local Server';
-      default:
-        return providerType;
-    }
+  static String getDisplayName(CloudProviderType providerType) {
+    return providerType.displayName;
   }
 
   /// Check if provider is currently supported/configured
-  static bool isProviderEnabled(String providerType) {
+  static bool isProviderEnabled(CloudProviderType providerType) {
     switch (providerType) {
-      case 'google_drive':
-      case 'local_server':
+      case CloudProviderType.googleDrive:
+      case CloudProviderType.localServer:
         return true; // Google Drive and Local Server providers are implemented
-      case 'custom':
-      case 'dropbox':
-      case 'onedrive':
+      case CloudProviderType.custom:
+      case CloudProviderType.dropbox:
+      case CloudProviderType.oneDrive:
         return false; // Not yet implemented
-      default:
-        return false;
     }
   }
 
   /// Get list of enabled providers only
-  static List<String> getEnabledProviders() {
-    return ['google_drive', 'local_server']; // Return actually implemented providers
+  static List<CloudProviderType> getEnabledProviders() {
+    return [CloudProviderType.googleDrive, CloudProviderType.localServer]; // Return actually implemented providers
   }
 }

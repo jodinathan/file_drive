@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import '../enums/cloud_provider_type.dart';
 import '../models/cloud_account.dart';
 import '../theme/app_constants.dart';
 import 'provider_logo.dart';
 
 /// Widget para exibir informações de um provedor de nuvem
 class ProviderCard extends StatelessWidget {
-  /// Tipo do provedor (google_drive, dropbox, etc.)
-  final String providerType;
+  /// Tipo do provedor
+  final CloudProviderType providerType;
   
   /// Se este provedor está selecionado
   final bool isSelected;

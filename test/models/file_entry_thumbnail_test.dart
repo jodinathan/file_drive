@@ -1,5 +1,5 @@
+import 'package:file_cloud/file_cloud.dart';
 import 'package:flutter_test/flutter_test.dart';
-import '../lib/src/models/file_entry.dart';
 
 void main() {
   group('FileEntry Thumbnail Tests', () {

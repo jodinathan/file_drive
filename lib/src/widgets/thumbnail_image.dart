@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/app_logger.dart';
 
 /// A widget that displays file thumbnails with fallback support
 class ThumbnailImage extends StatefulWidget {
@@ -110,8 +111,8 @@ class _ThumbnailImageState extends State<ThumbnailImage> {
           });
           
           // Log thumbnail loading error for debugging
-          print('Thumbnail loading failed for URL: ${widget.thumbnailUrl}');
-          print('Error: $error');
+          AppLogger.warning('Thumbnail loading failed for URL: ${widget.thumbnailUrl}', component: 'ThumbnailImage');
+          AppLogger.debug('Error: $error', component: 'ThumbnailImage');
           
           widget.onError?.call();
           return _buildFallbackIcon();

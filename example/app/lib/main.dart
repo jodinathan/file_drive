@@ -13,8 +13,8 @@ void main() async {
     await config.loadLibrary();
   } catch (e) {
     if (kDebugMode) {
-      print('⚠️  config.dart não encontrado, usando configuração de exemplo');
-      print('📝 Copie lib/config.example.dart para lib/config.dart e configure');
+      debugPrint('⚠️  config.dart não encontrado, usando configuração de exemplo');
+      debugPrint('📝 Copie lib/config.example.dart para lib/config.dart e configure');
     }
   }
   
@@ -79,7 +79,8 @@ class _HomePageState extends State<HomePage> {
           generateAuthUrl: (state) => '$serverBaseUrl/auth/google?state=$state',
           generateTokenUrl: (state) => '$serverBaseUrl/auth/tokens/$state',
           redirectScheme: redirectScheme,
-          providerType: 'google_drive',
+          providerType: CloudProviderType.googleDrive,
+          requiredScopes: {OAuthScope.readFiles, OAuthScope.writeFiles},
         );
         
         // Test server connectivity
@@ -450,7 +451,7 @@ class _HomePageState extends State<HomePage> {
   Widget _buildAccountExample() {
     final account = CloudAccount(
       id: 'example-1',
-      providerType: 'google_drive',
+      providerType: CloudProviderType.googleDrive.name,
       externalId: 'user@example.com',
       accessToken: 'example-token',
       name: 'João Silva',

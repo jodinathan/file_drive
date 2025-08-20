@@ -1,4 +1,6 @@
 import '../models/file_entry.dart';
+import '../enums/cloud_provider_type.dart';
+import '../enums/oauth_scope.dart';
 import '../models/provider_capabilities.dart';
 
 /// Progress information for upload operations
@@ -298,8 +300,8 @@ class CloudProviderException implements Exception {
 
 /// Abstract base class for cloud storage providers
 abstract class BaseCloudProvider {
-  /// Unique identifier for this provider type
-  String get providerType;
+  /// Cloud provider type for this provider
+  CloudProviderType get providerType;
   
   /// Display name for this provider
   String get displayName;
@@ -312,6 +314,13 @@ abstract class BaseCloudProvider {
   
   /// Gets the capabilities of this provider
   ProviderCapabilities getCapabilities();
+  
+  /// Gets the OAuth scopes required by this provider
+  Set<OAuthScope> get requiredScopes;
+  
+  /// Unique identifier for this provider type (deprecated)
+  @Deprecated('Use providerType enum directly instead of string identifier')
+  String get providerTypeString => providerType.name;
   
   /// Lists files and folders in the specified folder
   /// 

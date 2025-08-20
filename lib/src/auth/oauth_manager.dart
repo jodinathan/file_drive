@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import 'package:http/http.dart' as http;
 import 'oauth_config.dart';
+import '../utils/app_logger.dart';
 
 /// Manages OAuth2 authentication flow
 class OAuthManager {
@@ -172,10 +173,10 @@ class OAuthManager {
       }
       
       // LOG DETALHADO: Request details
-      print('🔍 DEBUG: OAuth Refresh Token Request:');
-      print('   URL: $refreshUrl');
-      print('   Body: ${body.toString()}');
-      print('   Refresh Token (last 10 chars): ${refreshToken.substring(refreshToken.length - 10)}');
+      AppLogger.debug('OAuth Refresh Token Request', component: 'OAuth');
+      AppLogger.debug('URL: $refreshUrl', component: 'OAuth');
+      AppLogger.debug('Body: ${body.toString()}', component: 'OAuth');
+      AppLogger.debug('Refresh Token (last 10 chars): ${refreshToken.substring(refreshToken.length - 10)}', component: 'OAuth');
       
       final response = await http.post(
         Uri.parse(refreshUrl),
@@ -187,14 +188,14 @@ class OAuthManager {
       );
       
       // LOG DETALHADO: Response details
-      print('🔍 DEBUG: OAuth Refresh Token Response:');
-      print('   Status Code: ${response.statusCode}');
-      print('   Reason Phrase: ${response.reasonPhrase}');
-      print('   Headers: ${response.headers}');
-      print('   Body: ${response.body}');
+      AppLogger.debug('OAuth Refresh Token Response', component: 'OAuth');
+      AppLogger.debug('Status Code: ${response.statusCode}', component: 'OAuth');
+      AppLogger.debug('Reason Phrase: ${response.reasonPhrase}', component: 'OAuth');
+      AppLogger.debug('Headers: ${response.headers}', component: 'OAuth');
+      AppLogger.debug('Body: ${response.body}', component: 'OAuth');
       
       if (response.statusCode != 200) {
-        print('🔍 DEBUG: Refresh failed with non-200 status code');
+        AppLogger.warning('Refresh failed with non-200 status code', component: 'OAuth');
         return OAuthResult.error(
           'Token refresh failed: ${response.statusCode} ${response.reasonPhrase}',
         );
@@ -203,21 +204,21 @@ class OAuthManager {
       final Map<String, dynamic> data;
       try {
         data = json.decode(response.body) as Map<String, dynamic>;
-        print('🔍 DEBUG: Parsed response data: $data');
+        AppLogger.debug('Parsed response data: $data', component: 'OAuth');
       } catch (e) {
-        print('🔍 DEBUG: Failed to parse response as JSON: $e');
+        AppLogger.error('Failed to parse response as JSON', component: 'OAuth', error: e);
         return OAuthResult.error('Invalid response format from refresh endpoint');
       }
       
       if (data.containsKey('error')) {
         final error = data['error'] as String? ?? 'Unknown error';
-        print('🔍 DEBUG: Response contains error: $error');
+        AppLogger.error('Response contains error: $error', component: 'OAuth');
         return OAuthResult.error(error);
       }
       
       final accessToken = data['access_token'] as String?;
       if (accessToken == null || accessToken.isEmpty) {
-        print('🔍 DEBUG: No access token in response');
+        AppLogger.warning('No access token in response', component: 'OAuth');
         return OAuthResult.error('No access token received from refresh');
       }
       
@@ -232,11 +233,11 @@ class OAuthManager {
         }
       }
       
-      print('🔍 DEBUG: Successfully parsed refresh response:');
-      print('   New Access Token (last 10 chars): ${accessToken.substring(accessToken.length - 10)}');
-      print('   New Refresh Token (last 10 chars): ${newRefreshToken.substring(newRefreshToken.length - 10)}');
-      print('   Expires In: $expiresIn seconds');
-      print('   Expires At: $expiresAt');
+      AppLogger.success('Successfully parsed refresh response', component: 'OAuth');
+      AppLogger.debug('New Access Token (last 10 chars): ${accessToken.substring(accessToken.length - 10)}', component: 'OAuth');
+      AppLogger.debug('New Refresh Token (last 10 chars): ${newRefreshToken.substring(newRefreshToken.length - 10)}', component: 'OAuth');
+      AppLogger.debug('Expires In: $expiresIn seconds', component: 'OAuth');
+      AppLogger.debug('Expires At: $expiresAt', component: 'OAuth');
       
       return OAuthResult.success(
         accessToken: accessToken,
@@ -245,7 +246,7 @@ class OAuthManager {
       );
       
     } catch (e) {
-      print('🔍 DEBUG: Exception during refresh token: $e');
+      AppLogger.error('Exception during refresh token', component: 'OAuth', error: e);
       return OAuthResult.error('Token refresh failed: ${e.toString()}');
     }
   }

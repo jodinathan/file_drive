@@ -6,6 +6,7 @@ import '../models/image_file_entry.dart';
 import '../models/crop_config.dart';
 import '../utils/image_utils.dart';
 import '../utils/image_dimension_detector.dart';
+import '../utils/app_logger.dart';
 
 /// Widget for the dedicated crop panel with two-column layout
 class CropPanelWidget extends StatefulWidget {
@@ -62,30 +63,30 @@ class _CropPanelWidgetState extends State<CropPanelWidget> {
 
   /// Detects dimensions for images that don't have them
   Future<void> _detectMissingDimensions() async {
-    print('🔍 Starting dimension detection for images without dimensions...');
+    AppLogger.debug('Starting dimension detection for images without dimensions', component: 'CropPanel');
     
     for (int i = 0; i < _croppedFiles.length; i++) {
       final file = _croppedFiles[i];
       
       // Skip if we already have dimensions
       if (file.width != null && file.height != null && file.width! > 0 && file.height! > 0) {
-        print('✅ Image ${file.name} already has dimensions: ${file.width}x${file.height}');
+        AppLogger.debug('Image ${file.name} already has dimensions: ${file.width}x${file.height}', component: 'CropPanel');
         continue;
       }
       
       // Skip if no download URL
       if (file.downloadUrl == null) {
-        print('⚠️ Image ${file.name} has no download URL, skipping dimension detection');
+        AppLogger.warning('Image ${file.name} has no download URL, skipping dimension detection', component: 'CropPanel');
         continue;
       }
       
       try {
-        print('🔍 Detecting dimensions for ${file.name}...');
+        AppLogger.debug('Detecting dimensions for ${file.name}...', component: 'CropPanel');
         final imageUrl = ImageDimensionDetector.buildCompleteUrl(file.downloadUrl!);
         final dimensions = await ImageDimensionDetector.detectNetworkImageDimensions(imageUrl);
         
         if (dimensions != null) {
-          print('✅ Detected dimensions for ${file.name}: ${dimensions.width.toInt()}x${dimensions.height.toInt()}');
+          AppLogger.success('Detected dimensions for ${file.name}: ${dimensions.width.toInt()}x${dimensions.height.toInt()}', component: 'CropPanel');
           
           // Cache the dimensions
           _detectedDimensions[file.id] = dimensions;
@@ -100,14 +101,14 @@ class _CropPanelWidgetState extends State<CropPanelWidget> {
             _croppedFiles[i] = updatedFile;
           });
         } else {
-          print('❌ Failed to detect dimensions for ${file.name}');
+          AppLogger.error('Failed to detect dimensions for ${file.name}', component: 'CropPanel');
         }
       } catch (e) {
-        print('❌ Error detecting dimensions for ${file.name}: $e');
+        AppLogger.error('Error detecting dimensions for ${file.name}: $e', component: 'CropPanel');
       }
     }
     
-    print('✅ Dimension detection completed');
+    AppLogger.success('Dimension detection completed', component: 'CropPanel');
   }
 
   Future<void> _initializeCropController() async {
@@ -644,7 +645,7 @@ class _CropPanelWidgetState extends State<CropPanelWidget> {
     // Build complete URL if needed
     String imageUrl = _buildCompleteUrl(currentFile.downloadUrl!);
 
-    print('🔍 DEBUG: Loading image for crop with URL: $imageUrl');
+    AppLogger.debug('Loading image for crop with URL: $imageUrl', component: 'CropPanel');
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -692,10 +693,10 @@ class _CropPanelWidgetState extends State<CropPanelWidget> {
           // Use the larger constraint to ensure both minimums are satisfied, rounded up
           minimumImageSize = max(minDisplayWidth, minDisplayHeight).ceilToDouble();
           
-          print('🔍 DEBUG: Image: ${imageWidth}x${imageHeight}, Display: ${displayWidth}x${displayHeight}');
-          print('🔍 DEBUG: Scale factors: ${scaleFactorWidth}x${scaleFactorHeight}');
-          print('🔍 DEBUG: Min requirements: ${widget.cropConfig!.minWidth}x${widget.cropConfig!.minHeight}');
-          print('🔍 DEBUG: Calculated minimumImageSize: $minimumImageSize');
+          AppLogger.debug('Image: ${imageWidth}x${imageHeight}, Display: ${displayWidth}x${displayHeight}', component: 'CropPanel');
+          AppLogger.debug('Scale factors: ${scaleFactorWidth}x${scaleFactorHeight}', component: 'CropPanel');
+          AppLogger.debug('Min requirements: ${widget.cropConfig!.minWidth}x${widget.cropConfig!.minHeight}', component: 'CropPanel');
+          AppLogger.debug('Calculated minimumImageSize: $minimumImageSize', component: 'CropPanel');
         }
 
         return CropImage(
@@ -704,8 +705,8 @@ class _CropPanelWidgetState extends State<CropPanelWidget> {
             imageUrl,
             fit: BoxFit.contain,
             errorBuilder: (context, error, stackTrace) {
-              print('❌ Error loading image from URL: $imageUrl');
-              print('❌ Error: $error');
+              AppLogger.error('Error loading image from URL: $imageUrl', component: 'CropPanel');
+              AppLogger.debug('Error: $error', component: 'CropPanel');
               return const Center(
                 child: Text('Error loading image'),
               );

@@ -2,8 +2,11 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:http/http.dart' as http;
 import '../models/file_entry.dart';
+import '../enums/cloud_provider_type.dart';
+import '../enums/oauth_scope.dart';
 import '../models/provider_capabilities.dart';
 import 'base_cloud_provider.dart';
+import '../utils/app_logger.dart';
 
 /// Provider que conecta ao servidor local para testes (sem autenticação)
 class LocalServerProvider extends BaseCloudProvider {
@@ -19,10 +22,13 @@ class LocalServerProvider extends BaseCloudProvider {
   });
   
   @override
-  String get providerType => providerId;
+  CloudProviderType get providerType => CloudProviderType.localServer;
   
   @override
   String get displayName => providerName;
+  
+  @override
+  Set<OAuthScope> get requiredScopes => {}; // Local server doesn't require OAuth scopes
   
   @override
   String? get logoAssetPath => null; // Uses icon fallback
@@ -136,19 +142,19 @@ class LocalServerProvider extends BaseCloudProvider {
   Stream<List<int>> downloadFile({
     required String fileId,
   }) async* {
-    print('📥 LocalServerProvider.downloadFile called with fileId: "$fileId"');
-    print('📥 FileId type: ${fileId.runtimeType}');
-    print('📥 FileId length: ${fileId.length}');
-    print('📥 FileId bytes: ${fileId.codeUnits}');
+    AppLogger.debug('LocalServerProvider.downloadFile called with fileId: "$fileId"', component: 'LocalServer');
+    AppLogger.debug('FileId type: ${fileId.runtimeType}', component: 'LocalServer');
+    AppLogger.debug('FileId length: ${fileId.length}', component: 'LocalServer');
+    AppLogger.debug('FileId bytes: ${fileId.codeUnits}', component: 'LocalServer');
     
     final response = await _makeRequest('GET', '/api/download/$fileId');
     
     if (response.statusCode == 200) {
-      print('✅ Download successful for fileId: "$fileId"');
+      AppLogger.success('Download successful for fileId: "$fileId"', component: 'LocalServer');
       yield response.bodyBytes;
     } else {
-      print('❌ Download failed for fileId: "$fileId" - Status: ${response.statusCode}');
-      print('❌ Response body: ${response.body}');
+      AppLogger.error('Download failed for fileId: "$fileId" - Status: ${response.statusCode}', component: 'LocalServer');
+      AppLogger.debug('Response body: ${response.body}', component: 'LocalServer');
       throw CloudProviderException(
         'Failed to download file: ${response.statusCode}',
         statusCode: response.statusCode,
@@ -244,13 +250,13 @@ class LocalServerProvider extends BaseCloudProvider {
     String? body,
     Map<String, String>? headers,
   }) async {
-    print('🌐 Making $method request to path: "$path"');
-    print('🌐 Path bytes: ${path.codeUnits}');
+    AppLogger.debug('Making $method request to path: "$path"', component: 'LocalServer');
+    AppLogger.debug('Path bytes: ${path.codeUnits}', component: 'LocalServer');
     
     final uri = Uri.parse('$serverUrl$path');
-    print('🌐 Final URI: "$uri"');
-    print('🌐 URI path: "${uri.path}"');
-    print('🌐 URI path bytes: ${uri.path.codeUnits}');
+    AppLogger.debug('Final URI: "$uri"', component: 'LocalServer');
+    AppLogger.debug('URI path: "${uri.path}"', component: 'LocalServer');
+    AppLogger.debug('URI path bytes: ${uri.path.codeUnits}', component: 'LocalServer');
     
     final requestHeaders = {
       'Authorization': 'Bearer $testToken', // Uses test token directly

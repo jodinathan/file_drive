@@ -3,11 +3,18 @@ library;
 
 // Export public models
 export 'src/models/file_entry.dart';
+export 'src/models/image_file_entry.dart';
 export 'src/models/cloud_account.dart';
 export 'src/models/account_status.dart';
 export 'src/models/provider_capabilities.dart';
 export 'src/models/selection_config.dart';
 export 'src/models/crop_config.dart';
+export 'src/models/oni_cloud_provider_config.dart';
+
+// Export enums
+export 'src/enums/cloud_provider_type.dart';
+export 'src/enums/oauth_scope.dart';
+export 'src/enums/provider_scope_mapper.dart';
 
 // Export storage interfaces
 export 'src/storage/account_storage.dart';
@@ -25,7 +32,11 @@ export 'src/auth/oauth_manager.dart';
 export 'src/theme/app_theme.dart';
 export 'src/theme/app_constants.dart';
 
+// Export utilities
+export 'src/utils/app_logger.dart';
+
 // Export main widget
 export 'src/widgets/file_cloud_widget.dart';
 export 'src/widgets/file_item_card.dart';
 export 'src/widgets/thumbnail_image.dart';
+export 'src/widgets/cloud_provider_config_widget.dart';

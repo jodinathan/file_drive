@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:http/http.dart' as http;
+import '../enums/cloud_provider_type.dart';
+import '../enums/oauth_scope.dart';
 import '../providers/account_based_provider.dart';
 import '../models/file_entry.dart';
 import '../models/provider_capabilities.dart';
 import '../models/cloud_account.dart';
 import '../models/account_status.dart';
+import '../utils/app_logger.dart';
 
 /// Authenticated HTTP client for Google APIs
 class AuthenticatedClient extends http.BaseClient {
@@ -32,13 +35,23 @@ class GoogleDriveProvider extends AccountBasedProvider {
   AuthenticatedClient? _httpClient;
   
   @override
-  String get providerType => 'google_drive';
+  CloudProviderType get providerType => CloudProviderType.googleDrive;
   
   @override
   String get displayName => 'Google Drive';
   
   @override
   String get logoAssetPath => 'assets/logos/google_drive.png';
+  
+  @override
+  Set<OAuthScope> get requiredScopes => {
+    OAuthScope.readFiles,
+    OAuthScope.writeFiles,
+    OAuthScope.createFolders,
+    OAuthScope.deleteFiles,
+    OAuthScope.readProfile,
+    OAuthScope.readMetadata,
+  };
   
   @override
   void initialize(CloudAccount account) {
@@ -86,7 +99,7 @@ class GoogleDriveProvider extends AccountBasedProvider {
       }
     } catch (e) {
       // Log error but don't fail the entire conversion
-      print('Warning: Error processing thumbnail data for file ${driveFile.id}: $e');
+      AppLogger.warning('Error processing thumbnail data for file ${driveFile.id}', component: 'GoogleDrive');
       thumbnailUrl = null;
       hasThumbnail = false;
       thumbnailVersion = null;
@@ -122,18 +135,18 @@ class GoogleDriveProvider extends AccountBasedProvider {
   /// Handles API errors and updates account status if needed
   void _handleApiError(Exception e) {
     // LOG DETALHADO: Print da resposta completa para debug
-    print('🔍 DEBUG: GoogleDrive API Error - Exception completa:');
-    print('   Type: ${e.runtimeType}');
-    print('   Message: ${e.toString()}');
-    print('   Current Account: ${currentAccount?.email}');
-    print('   Access Token (last 10 chars): ${currentAccount?.accessToken.substring(currentAccount!.accessToken.length - 10)}');
-    print('   Refresh Token exists: ${currentAccount?.refreshToken != null}');
-    print('   Account Status: ${currentAccount?.status}');
-    print('   Token expires at: ${currentAccount?.expiresAt}');
-    print('   Current time: ${DateTime.now().toIso8601String()}');
+    AppLogger.error('GoogleDrive API Error - Exception completa', component: 'GoogleDrive', error: e);
+    AppLogger.debug('Type: ${e.runtimeType}', component: 'GoogleDrive');
+    AppLogger.debug('Message: ${e.toString()}', component: 'GoogleDrive');
+    AppLogger.debug('Current Account: ${currentAccount?.email}', component: 'GoogleDrive');
+    AppLogger.debug('Access Token (last 10 chars): ${currentAccount?.accessToken.substring(currentAccount!.accessToken.length - 10)}', component: 'GoogleDrive');
+    AppLogger.debug('Refresh Token exists: ${currentAccount?.refreshToken != null}', component: 'GoogleDrive');
+    AppLogger.debug('Account Status: ${currentAccount?.status}', component: 'GoogleDrive');
+    AppLogger.debug('Token expires at: ${currentAccount?.expiresAt}', component: 'GoogleDrive');
+    AppLogger.debug('Current time: ${DateTime.now().toIso8601String()}', component: 'GoogleDrive');
     
     if (e.toString().contains('401')) {
-      print('🔍 DEBUG: 401 Unauthorized detected - marking account as revoked');
+      AppLogger.warning('401 Unauthorized detected - marking account as revoked', component: 'GoogleDrive');
       _updateAccountStatus(AccountStatus.revoked);
       throw CloudProviderException(
         'Authentication failed. Please reauthorize your account.',
@@ -141,10 +154,10 @@ class GoogleDriveProvider extends AccountBasedProvider {
         statusCode: 401,
       );
     } else if (e.toString().contains('403')) {
-      print('🔍 DEBUG: 403 Forbidden detected');
+      AppLogger.warning('403 Forbidden detected', component: 'GoogleDrive');
       if (e.toString().contains('insufficientPermissions') || 
           e.toString().contains('forbidden')) {
-        print('🔍 DEBUG: Insufficient permissions detected - marking account as missing scopes');
+        AppLogger.warning('Insufficient permissions detected - marking account as missing scopes', component: 'GoogleDrive');
         _updateAccountStatus(AccountStatus.missingScopes);
         throw CloudProviderException(
           'Insufficient permissions. Please reauthorize with required scopes.',
@@ -154,7 +167,7 @@ class GoogleDriveProvider extends AccountBasedProvider {
       }
     }
     
-    print('🔍 DEBUG: Generic API error - rethrowing as CloudProviderException');
+    AppLogger.error('Generic API error - rethrowing as CloudProviderException', component: 'GoogleDrive');
     throw CloudProviderException('API request failed: ${e.toString()}');
   }
 
@@ -217,7 +230,7 @@ class GoogleDriveProvider extends AccountBasedProvider {
     // Implementation depends on how upload tracking is implemented
     // For now, this is a placeholder as the current upload implementation
     // doesn't support cancellation tracking
-    print('Upload cancellation requested: $uploadId');
+    AppLogger.info('Upload cancellation requested: $uploadId', component: 'GoogleDrive');
     
     // In a full implementation, this would:
     // 1. Track active uploads by ID
@@ -409,8 +422,8 @@ class GoogleDriveProvider extends AccountBasedProvider {
     // 🚨 SECURITY: Client credentials should NEVER be hardcoded!
     // They should come from secure configuration or environment variables
     // This implementation requires external OAuth server to provide these values
-    print('🔍 DEBUG: Refresh token requires proper OAuth configuration');
-    print('   Account: ${account.email}');
+    AppLogger.warning('Refresh token requires proper OAuth configuration', component: 'GoogleDrive');
+    AppLogger.debug('Account: ${account.email}', component: 'GoogleDrive');
     
     // Throw exception to indicate refresh is not available without proper OAuth setup
     throw CloudProviderException(

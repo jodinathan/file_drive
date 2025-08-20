@@ -3,9 +3,12 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
+import '../enums/cloud_provider_type.dart';
+import '../enums/oauth_scope.dart';
 import '../models/file_entry.dart';
 import '../models/provider_capabilities.dart';
 import 'base_cloud_provider.dart';
+import '../utils/app_logger.dart';
 
 /// Configuration for the custom provider
 class CustomProviderConfig {
@@ -39,13 +42,16 @@ class CustomProvider extends BaseCloudProvider {
   late http.Client _httpClient;
 
   @override
-  String get providerType => config.providerType;
+  CloudProviderType get providerType => CloudProviderType.custom;
 
   @override
   String get displayName => config.displayName;
 
   @override
   String get logoAssetPath => ''; // Not used since we have logoWidget
+
+  @override
+  Set<OAuthScope> get requiredScopes => {}; // Custom provider doesn't use OAuth scopes
 
   /// Widget to display as logo/icon
   Widget get logoWidget => config.logoWidget;
@@ -164,7 +170,7 @@ class CustomProvider extends BaseCloudProvider {
   }) async {
     // If no account management, just pretend deletion worked
     if (!config.showAccountManagement) {
-      print('🗑️ Mock deletion of entry: $entryId');
+      AppLogger.debug('Mock deletion of entry: $entryId', component: 'CustomProvider');
       return;
     }
     
@@ -232,7 +238,7 @@ class CustomProvider extends BaseCloudProvider {
         speed: chunk.length / 0.05, // Simulate speed based on chunk size
       );
       
-      print('DEBUG CustomProvider: Emitindo progresso ${progressObj.uploaded}/${progressObj.total} para $fileName');
+      AppLogger.debug('Emitindo progresso ${progressObj.uploaded}/${progressObj.total} para $fileName', component: 'CustomProvider');
       yield progressObj;
       
       // Update estimated total to match current progress for smoother progress bar

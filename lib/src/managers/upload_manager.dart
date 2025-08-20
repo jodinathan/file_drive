@@ -64,7 +64,7 @@ class UploadManager extends ChangeNotifier {
     final uploadState = UploadState.fromFile(
       fileName: fileName,
       fileSize: fileSize,
-      providerType: provider.providerType,
+      providerType: provider.providerType.name,
       accountId: provider is AccountBasedProvider ? provider.currentAccount?.id ?? 'unknown' : 'local',
       parentFolderId: parentFolderId,
       mimeType: mimeType,
