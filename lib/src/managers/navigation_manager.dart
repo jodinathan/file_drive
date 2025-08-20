@@ -138,12 +138,9 @@ class NavigationManager extends ChangeNotifier {
     Map<String, dynamic>? metadata,
   }) {
     AppLogger.info('Going to home/root - clearing history first', component: 'NavigationManager');
-    AppLogger.debug('NavigationManager.goHome() called', component: 'Navigation');
-    AppLogger.debug('History before clear: ${_history.entries.length} entries', component: 'Navigation');
     
     // Clear history first to reset breadcrumb
     clearHistory();
-    AppLogger.debug('History after clear: ${_history.entries.length} entries', component: 'Navigation');
     
     navigateToFolder(
       folderId: null,
@@ -152,7 +149,6 @@ class NavigationManager extends ChangeNotifier {
       accountId: accountId,
       metadata: metadata,
     );
-    AppLogger.debug('NavigationManager.goHome() completed', component: 'Navigation');
   }
 
   /// Navigates to a specific entry in the history (for breadcrumb navigation)
@@ -175,7 +171,6 @@ class NavigationManager extends ChangeNotifier {
     final current = _history.current;
     if (current == null) return;
 
-    AppLogger.debug('Updating current navigation entry', component: 'NavigationManager');
 
     final updatedEntry = current.copyWith(
       folderName: folderName ?? current.folderName,
@@ -189,12 +184,8 @@ class NavigationManager extends ChangeNotifier {
   /// Clears the navigation history
   void clearHistory() {
     AppLogger.info('Clearing navigation history', component: 'NavigationManager');
-    AppLogger.debug('NavigationManager.clearHistory() called', component: 'Navigation');
-    AppLogger.debug('History entries before clear: ${_history.entries.length}', component: 'Navigation');
     
     _history.clear();
-    AppLogger.debug('History entries after clear: ${_history.entries.length}', component: 'Navigation');
-    AppLogger.debug('Current entry after clear: ${_history.current}', component: 'Navigation');
     
     notifyListeners();
     onNavigationChanged?.call(null);

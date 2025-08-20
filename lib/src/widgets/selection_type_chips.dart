@@ -21,7 +21,7 @@ class SelectionTypeChips extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant.withAlpha(128),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha(128),
         border: Border(
           bottom: BorderSide(
             color: Theme.of(context).colorScheme.outline.withAlpha(51),

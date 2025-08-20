@@ -143,10 +143,6 @@ class LocalServerProvider extends BaseCloudProvider {
   Stream<List<int>> downloadFile({
     required String fileId,
   }) async* {
-    AppLogger.debug('LocalServerProvider.downloadFile called with fileId: "$fileId"', component: 'LocalServer');
-    AppLogger.debug('FileId type: ${fileId.runtimeType}', component: 'LocalServer');
-    AppLogger.debug('FileId length: ${fileId.length}', component: 'LocalServer');
-    AppLogger.debug('FileId bytes: ${fileId.codeUnits}', component: 'LocalServer');
     
     final response = await _makeRequest('GET', '/api/download/$fileId');
     
@@ -155,7 +151,6 @@ class LocalServerProvider extends BaseCloudProvider {
       yield response.bodyBytes;
     } else {
       AppLogger.error('Download failed for fileId: "$fileId" - Status: ${response.statusCode}', component: 'LocalServer');
-      AppLogger.debug('Response body: ${response.body}', component: 'LocalServer');
       throw CloudProviderException(
         'Failed to download file: ${response.statusCode}',
         statusCode: response.statusCode,
@@ -251,13 +246,7 @@ class LocalServerProvider extends BaseCloudProvider {
     String? body,
     Map<String, String>? headers,
   }) async {
-    AppLogger.debug('Making $method request to path: "$path"', component: 'LocalServer');
-    AppLogger.debug('Path bytes: ${path.codeUnits}', component: 'LocalServer');
-    
     final uri = Uri.parse('$serverUrl$path');
-    AppLogger.debug('Final URI: "$uri"', component: 'LocalServer');
-    AppLogger.debug('URI path: "${uri.path}"', component: 'LocalServer');
-    AppLogger.debug('URI path bytes: ${uri.path.codeUnits}', component: 'LocalServer');
     
     final requestHeaders = {
       'Authorization': 'Bearer $testToken', // Uses test token directly

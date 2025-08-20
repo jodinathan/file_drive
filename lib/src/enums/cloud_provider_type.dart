@@ -24,8 +24,4 @@ enum CloudProviderType {
   /// Human-readable display name for this provider
   final String displayName;
   
-  /// Returns the provider identifier string for backwards compatibility
-  /// This should be phased out in favor of direct enum usage
-  @Deprecated('Use enum directly instead of string identifier')
-  String get identifier => name;
 }

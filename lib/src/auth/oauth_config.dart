@@ -60,9 +60,6 @@ class OAuthConfig {
     return ProviderScopeMapper.mapScopesToProvider(requiredScopes, providerType);
   }
 
-  /// Gets the provider type identifier string (deprecated)
-  @Deprecated('Use providerType enum directly instead of string identifier')
-  String get providerTypeString => providerType.name;
 
   /// Creates a copy of this configuration with updated values
   OAuthConfig copyWith({

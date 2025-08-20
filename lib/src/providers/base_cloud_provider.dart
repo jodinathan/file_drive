@@ -299,13 +299,9 @@ class CloudProviderException implements Exception {
   String toString() => 'CloudProviderException: $message';
 }
 
-// TODO: Import ProviderConfiguration when Phase 1.1 is complete
-// import '../models/provider_configuration.dart';
 
 /// Abstract base class for cloud storage providers
 abstract class BaseCloudProvider {
-  /// Current provider configuration
-  dynamic _configuration; // Will be ProviderConfiguration when Phase 1.1 is complete
   
   /// Current account being used by this provider
   CloudAccount? _currentAccount;
@@ -328,9 +324,6 @@ abstract class BaseCloudProvider {
   /// Gets the OAuth scopes required by this provider
   Set<OAuthScope> get requiredScopes;
   
-  /// Unique identifier for this provider type (deprecated)
-  @Deprecated('Use providerType enum directly instead of string identifier')
-  String get providerTypeString => providerType.name;
   
   /// Gets the current account being used by this provider
   CloudAccount? get currentAccount => _currentAccount;
@@ -406,7 +399,6 @@ abstract class BaseCloudProvider {
     required dynamic configuration, // Will be ProviderConfiguration when Phase 1.1 is complete
     CloudAccount? account,
   }) {
-    _configuration = configuration;
     _currentAccount = account;
   }
   

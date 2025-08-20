@@ -172,11 +172,6 @@ class OAuthManager {
         body['client_id'] = clientId;
       }
       
-      // LOG DETALHADO: Request details
-      AppLogger.debug('OAuth Refresh Token Request', component: 'OAuth');
-      AppLogger.debug('URL: $refreshUrl', component: 'OAuth');
-      AppLogger.debug('Body: ${body.toString()}', component: 'OAuth');
-      AppLogger.debug('Refresh Token (last 10 chars): ${refreshToken.substring(refreshToken.length - 10)}', component: 'OAuth');
       
       final response = await http.post(
         Uri.parse(refreshUrl),
@@ -187,12 +182,6 @@ class OAuthManager {
         body: body,
       );
       
-      // LOG DETALHADO: Response details
-      AppLogger.debug('OAuth Refresh Token Response', component: 'OAuth');
-      AppLogger.debug('Status Code: ${response.statusCode}', component: 'OAuth');
-      AppLogger.debug('Reason Phrase: ${response.reasonPhrase}', component: 'OAuth');
-      AppLogger.debug('Headers: ${response.headers}', component: 'OAuth');
-      AppLogger.debug('Body: ${response.body}', component: 'OAuth');
       
       if (response.statusCode != 200) {
         AppLogger.warning('Refresh failed with non-200 status code', component: 'OAuth');
@@ -204,7 +193,6 @@ class OAuthManager {
       final Map<String, dynamic> data;
       try {
         data = json.decode(response.body) as Map<String, dynamic>;
-        AppLogger.debug('Parsed response data: $data', component: 'OAuth');
       } catch (e) {
         AppLogger.error('Failed to parse response as JSON', component: 'OAuth', error: e);
         return OAuthResult.error('Invalid response format from refresh endpoint');
@@ -234,10 +222,6 @@ class OAuthManager {
       }
       
       AppLogger.success('Successfully parsed refresh response', component: 'OAuth');
-      AppLogger.debug('New Access Token (last 10 chars): ${accessToken.substring(accessToken.length - 10)}', component: 'OAuth');
-      AppLogger.debug('New Refresh Token (last 10 chars): ${newRefreshToken.substring(newRefreshToken.length - 10)}', component: 'OAuth');
-      AppLogger.debug('Expires In: $expiresIn seconds', component: 'OAuth');
-      AppLogger.debug('Expires At: $expiresAt', component: 'OAuth');
       
       return OAuthResult.success(
         accessToken: accessToken,

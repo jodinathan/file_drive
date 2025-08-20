@@ -488,7 +488,7 @@ class _CropPanelWidgetState extends State<CropPanelWidget> {
                                       ),
                                       const SizedBox(width: 4),
                                       Text(
-                                        'Crop: ${_currentCropWidth}×${_currentCropHeight}',
+                                        'Crop: $_currentCropWidth×$_currentCropHeight',
                                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                           fontSize: 10,
                                           fontWeight: FontWeight.w500,
@@ -693,8 +693,8 @@ class _CropPanelWidgetState extends State<CropPanelWidget> {
           // Use the larger constraint to ensure both minimums are satisfied, rounded up
           minimumImageSize = max(minDisplayWidth, minDisplayHeight).ceilToDouble();
           
-          AppLogger.debug('Image: ${imageWidth}x${imageHeight}, Display: ${displayWidth}x${displayHeight}', component: 'CropPanel');
-          AppLogger.debug('Scale factors: ${scaleFactorWidth}x${scaleFactorHeight}', component: 'CropPanel');
+          AppLogger.debug('Image: ${imageWidth}x$imageHeight, Display: ${displayWidth}x$displayHeight', component: 'CropPanel');
+          AppLogger.debug('Scale factors: ${scaleFactorWidth}x$scaleFactorHeight', component: 'CropPanel');
           AppLogger.debug('Min requirements: ${widget.cropConfig!.minWidth}x${widget.cropConfig!.minHeight}', component: 'CropPanel');
           AppLogger.debug('Calculated minimumImageSize: $minimumImageSize', component: 'CropPanel');
         }

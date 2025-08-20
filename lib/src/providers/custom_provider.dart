@@ -9,7 +9,6 @@ import '../models/file_entry.dart';
 import '../models/provider_capabilities.dart';
 import '../models/cloud_account.dart';
 import 'base_cloud_provider.dart';
-import '../utils/app_logger.dart';
 
 /// Configuration for the custom provider
 class CustomProviderConfig {
@@ -171,7 +170,6 @@ class CustomProvider extends BaseCloudProvider {
   }) async {
     // If no account management, just pretend deletion worked
     if (!config.showAccountManagement) {
-      AppLogger.debug('Mock deletion of entry: $entryId', component: 'CustomProvider');
       return;
     }
     
@@ -239,7 +237,6 @@ class CustomProvider extends BaseCloudProvider {
         speed: chunk.length / 0.05, // Simulate speed based on chunk size
       );
       
-      AppLogger.debug('Emitindo progresso ${progressObj.uploaded}/${progressObj.total} para $fileName', component: 'CustomProvider');
       yield progressObj;
       
       // Update estimated total to match current progress for smoother progress bar

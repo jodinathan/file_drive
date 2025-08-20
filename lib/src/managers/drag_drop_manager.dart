@@ -83,7 +83,6 @@ class DragDropManager extends ChangeNotifier {
   }) {
     if (!_state.isDragging) return;
 
-    AppLogger.debug('Drag enter detected', component: 'DragDropManager');
 
     final validation = _validateFiles(
       _state.fileNames,
@@ -105,7 +104,6 @@ class DragDropManager extends ChangeNotifier {
   void dragLeave({Offset? cursorPosition}) {
     if (!_state.isDragging) return;
 
-    AppLogger.debug('Drag leave detected', component: 'DragDropManager');
 
     _state = _state.dragLeave(cursorPosition: cursorPosition);
     notifyListeners();

@@ -57,15 +57,6 @@ class GoogleDriveProvider extends BaseCloudProvider {
   };
   
   /// Initializes the provider with an account
-  /// This method should be called before using other methods
-  /// 
-  /// DEPRECATED: Use BaseCloudProvider.initialize() instead
-  @Deprecated('Use BaseCloudProvider.initialize() instead')
-  void initializeWithAccount(CloudAccount account) {
-    super.initialize(configuration: null, account: account);
-    _httpClient = AuthenticatedClient(account.accessToken);
-    _driveApi = drive.DriveApi(_httpClient!);
-  }
   
   @override
   void initialize({

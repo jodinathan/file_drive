@@ -1,10 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
 
-import '../../lib/src/models/provider_configuration.dart';
-import '../../lib/src/enums/cloud_provider_type.dart';
-import '../../lib/src/enums/oauth_scope.dart';
-import '../../lib/src/models/provider_capabilities.dart';
+import 'package:file_cloud/src/models/provider_configuration.dart';
+import 'package:file_cloud/src/enums/cloud_provider_type.dart';
+import 'package:file_cloud/src/enums/oauth_scope.dart';
+import 'package:file_cloud/src/models/provider_capabilities.dart';
 
 void main() {
   group('ProviderConfiguration', () {

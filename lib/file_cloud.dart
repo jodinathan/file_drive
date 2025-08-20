@@ -37,7 +37,11 @@ export 'src/theme/app_constants.dart';
 // Export utilities
 export 'src/utils/app_logger.dart';
 
-// Export main widget
+// Export main widgets
 export 'src/widgets/file_cloud_widget.dart';
 export 'src/widgets/file_item_card.dart';
 export 'src/widgets/thumbnail_image.dart';
+export 'src/widgets/search_bar_widget.dart';
+export 'src/widgets/crop_panel_widget.dart';
+export 'src/widgets/upload_progress_widget.dart';
+export 'src/widgets/upload_list_widget.dart';

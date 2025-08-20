@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 import 'file_entry.dart';
-import '../utils/app_logger.dart';
 
 /// Specialized FileEntry for image files with crop functionality
 class ImageFileEntry extends FileEntry {
@@ -100,15 +99,10 @@ class ImageFileEntry extends FileEntry {
 
   /// Checks if a MIME type represents a supported image
   static bool _isImageMimeType(String? mimeType) {
-    AppLogger.debug('Checking MIME type: $mimeType', component: 'ImageFileEntry');
     if (mimeType == null) {
-      AppLogger.debug('MIME type is null, returning false', component: 'ImageFileEntry');
       return false;
     }
-    final result = supportedImageTypes.contains(mimeType.toLowerCase());
-    AppLogger.debug('Supported types: $supportedImageTypes', component: 'ImageFileEntry');
-    AppLogger.debug('Is supported: $result', component: 'ImageFileEntry');
-    return result;
+    return supportedImageTypes.contains(mimeType.toLowerCase());
   }
 
   /// Factory method to create ImageFileEntry from regular FileEntry

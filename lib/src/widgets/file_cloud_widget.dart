@@ -41,9 +41,6 @@ class FileCloudWidget extends StatefulWidget {
   /// File selection configuration (optional)
   final SelectionConfig? selectionConfig;
 
-  /// Callback when selection is confirmed (DEPRECATED: use SelectionConfig.onSelectionConfirm instead)
-  @Deprecated('Use SelectionConfig.onSelectionConfirm instead')
-  final Function(List<FileEntry>)? onSelectionConfirm;
 
   /// Callback when files are selected (backward compatibility)
   final Function(List<FileEntry>)? onFilesSelected;
@@ -62,7 +59,6 @@ class FileCloudWidget extends StatefulWidget {
     required this.accountStorage,
     required this.providers,
     this.selectionConfig,
-    this.onSelectionConfirm,
     this.onFilesSelected,
     this.initialProvider,
     this.cropConfig,
@@ -91,7 +87,6 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
   // Search state
   String _searchQuery = '';
   bool _isSearching = false;
-  bool _isSearchMode = false;
 
   // Pagination state for infinite scroll
   String? _currentPageToken;
@@ -149,22 +144,12 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
   }
 
   // New managers for upload, navigation, and drag & drop
-  // late UploadManager _uploadManager; // Comentado até implementação completa
   late NavigationManager _navigationManager;
-  // late DragDropManager _dragDropManager; // Comentado até implementação completa
 
   // Scroll controller for infinite scroll
   late ScrollController _scrollController;
 
   /// Helper method to check if the current provider requires account management
-  bool _requiresAccountManagement() {
-    if (_selectedProvider == null) return false;
-    final providerConfig = widget.providers.firstWhere(
-      (config) => config.type == _selectedProvider,
-      orElse: () => widget.providers.first,
-    );
-    return providerConfig.requiresAccountManagement;
-  }
 
   // Scroll listener for infinite scroll
   void _onScroll() {
@@ -183,7 +168,6 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       setState(() {
         _searchQuery = query.trim();
         _isSearching = query.trim().isNotEmpty;
-        _isSearchMode = query.trim().isNotEmpty;
       });
 
       if (query.trim().isEmpty) {
@@ -200,7 +184,6 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     setState(() {
       _searchQuery = '';
       _isSearching = false;
-      _isSearchMode = false;
     });
     await _clearSearch();
   }
@@ -311,52 +294,6 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
   }
 
   /// Check if capabilities info should be shown (when some features are disabled)
-  bool _shouldShowCapabilitiesInfo() {
-    return !_canUpload() || !_canCreateFolders() || !_canDelete() || !_canSearch() || !_hasThumbnails();
-  }
-
-  /// Build capabilities info widget
-  Widget _buildCapabilitiesInfo() {
-    final disabledFeatures = <String>[];
-    
-    if (!_canUpload()) disabledFeatures.add('Upload');
-    if (!_canCreateFolders()) disabledFeatures.add('Criar pastas');
-    if (!_canDelete()) disabledFeatures.add('Excluir arquivos');
-    if (!_canSearch()) disabledFeatures.add('Buscar arquivos');
-    if (!_hasThumbnails()) disabledFeatures.add('Visualizar miniaturas');
-    
-    if (disabledFeatures.isEmpty) return const SizedBox.shrink();
-    
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.info_outline,
-            size: 20,
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              '${_getProviderName()} não suporta: ${disabledFeatures.join(', ')}',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   @override
   void initState() {
@@ -364,9 +301,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     AppLogger.systemInit('FileCloudWidget iniciado');
 
     // Initialize managers
-    // _uploadManager = UploadManager(); // Comentado até implementação completa
     _navigationManager = NavigationManager();
-    // _dragDropManager = DragDropManager(); // Comentado até implementação completa
 
     // Initialize scroll controller for infinite scroll
     _scrollController = ScrollController();
@@ -1687,10 +1622,6 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       widget.selectionConfig!.onSelectionConfirm(_selectedFiles);
     }
     
-    // Also call the deprecated onSelectionConfirm callback for backward compatibility
-    if (widget.onSelectionConfirm != null && _selectedFiles.isNotEmpty) {
-      widget.onSelectionConfirm!(_selectedFiles);
-    }
   }
 
   void _handleCropCompleted(List<ImageFileEntry> croppedFiles) {
@@ -1738,10 +1669,6 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       widget.selectionConfig!.onSelectionConfirm(_selectedFiles);
     }
     
-    // Also call the deprecated onSelectionConfirm callback for backward compatibility
-    if (widget.onSelectionConfirm != null && _selectedFiles.isNotEmpty) {
-      widget.onSelectionConfirm!(_selectedFiles);
-    }
   }
 
   void _handleCropCancelled() {
@@ -1759,8 +1686,6 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       );
       return;
     }
-
-    final provider = _providers[_selectedProvider!]!;
 
     // Get provider configuration
     final providerConfig = widget.providers.firstWhere(
@@ -2263,7 +2188,6 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
             ? IconButton(
                 icon: const Icon(Icons.cancel),
                 onPressed: () {
-                  // TODO: Implementar cancelamento de upload
                 },
               )
             : null,
@@ -2412,7 +2336,6 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
         ),
 
         // Drag & Drop Overlay (simplified)
-        // TODO: Implement proper drag & drop detection
         const SizedBox.shrink(),
       ],
     );
@@ -2681,7 +2604,6 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
                       _loadFiles();
                     },
                     onMenuAction: (action) {
-                      // TODO: Implementar ações do menu
                       if (action == 'remove') {
                         // Remover conta
                       } else if (action == 'reauth') {
