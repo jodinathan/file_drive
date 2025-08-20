@@ -15,6 +15,9 @@ class ImageFileItemCard extends StatelessWidget {
   /// Whether to show selection checkbox
   final bool showCheckbox;
   
+  /// Whether the provider supports thumbnails
+  final bool providerSupportsThumbnails;
+  
   /// Callback when the item is tapped
   final VoidCallback? onTap;
   
@@ -26,6 +29,7 @@ class ImageFileItemCard extends StatelessWidget {
     required this.imageEntry,
     this.isSelected = false,
     this.showCheckbox = false,
+    this.providerSupportsThumbnails = true,
     this.onTap,
     this.onCheckboxChanged,
   });
@@ -38,6 +42,7 @@ class ImageFileItemCard extends StatelessWidget {
         file: imageEntry,
         isSelected: isSelected,
         showCheckbox: showCheckbox,
+        providerSupportsThumbnails: providerSupportsThumbnails,
         onTap: onTap,
         onCheckboxChanged: onCheckboxChanged,
       );
@@ -222,7 +227,7 @@ class ImageFileItemCard extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(7),
-        child: imageEntry.thumbnailUrl != null
+        child: (imageEntry.thumbnailUrl != null && providerSupportsThumbnails)
             ? Image.network(
                 _buildCompleteUrl(imageEntry.thumbnailUrl!),
                 fit: BoxFit.cover,

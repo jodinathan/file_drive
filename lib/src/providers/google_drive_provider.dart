@@ -3,7 +3,7 @@ import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:http/http.dart' as http;
 import '../enums/cloud_provider_type.dart';
 import '../enums/oauth_scope.dart';
-import '../providers/account_based_provider.dart';
+import 'base_cloud_provider.dart';
 import '../models/file_entry.dart';
 import '../models/provider_capabilities.dart';
 import '../models/cloud_account.dart';
@@ -30,7 +30,7 @@ class AuthenticatedClient extends http.BaseClient {
 }
 
 /// Google Drive provider implementation using official googleapis SDK
-class GoogleDriveProvider extends AccountBasedProvider {
+class GoogleDriveProvider extends BaseCloudProvider {
   drive.DriveApi? _driveApi;
   AuthenticatedClient? _httpClient;
   
@@ -44,6 +44,9 @@ class GoogleDriveProvider extends AccountBasedProvider {
   String get logoAssetPath => 'assets/logos/google_drive.png';
   
   @override
+  bool get requiresAccountManagement => true;
+  
+  @override
   Set<OAuthScope> get requiredScopes => {
     OAuthScope.readFiles,
     OAuthScope.writeFiles,
@@ -53,11 +56,27 @@ class GoogleDriveProvider extends AccountBasedProvider {
     OAuthScope.readMetadata,
   };
   
-  @override
-  void initialize(CloudAccount account) {
-    super.initialize(account); // Call parent initialize
+  /// Initializes the provider with an account
+  /// This method should be called before using other methods
+  /// 
+  /// DEPRECATED: Use BaseCloudProvider.initialize() instead
+  @Deprecated('Use BaseCloudProvider.initialize() instead')
+  void initializeWithAccount(CloudAccount account) {
+    super.initialize(configuration: null, account: account);
     _httpClient = AuthenticatedClient(account.accessToken);
     _driveApi = drive.DriveApi(_httpClient!);
+  }
+  
+  @override
+  void initialize({
+    required dynamic configuration,
+    CloudAccount? account,
+  }) {
+    super.initialize(configuration: configuration, account: account);
+    if (account != null) {
+      _httpClient = AuthenticatedClient(account.accessToken);
+      _driveApi = drive.DriveApi(_httpClient!);
+    }
   }
   
   @override

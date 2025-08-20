@@ -9,7 +9,7 @@ export 'src/models/account_status.dart';
 export 'src/models/provider_capabilities.dart';
 export 'src/models/selection_config.dart';
 export 'src/models/crop_config.dart';
-export 'src/models/oni_cloud_provider_config.dart';
+export 'src/models/provider_configuration.dart';
 
 // Export enums
 export 'src/enums/cloud_provider_type.dart';
@@ -23,6 +23,8 @@ export 'src/storage/shared_preferences_account_storage.dart';
 // Export provider interfaces
 export 'src/providers/base_cloud_provider.dart';
 export 'src/providers/google_drive_provider.dart';
+export 'src/providers/custom_provider.dart';
+export 'src/providers/local_server_provider.dart';
 
 // Export authentication
 export 'src/auth/oauth_config.dart';
@@ -39,4 +41,3 @@ export 'src/utils/app_logger.dart';
 export 'src/widgets/file_cloud_widget.dart';
 export 'src/widgets/file_item_card.dart';
 export 'src/widgets/thumbnail_image.dart';
-export 'src/widgets/cloud_provider_config_widget.dart';

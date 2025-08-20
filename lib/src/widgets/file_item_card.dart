@@ -13,6 +13,9 @@ class FileItemCard extends StatefulWidget {
   /// Whether to show a checkbox for selection
   final bool showCheckbox;
   
+  /// Whether the provider supports thumbnails
+  final bool providerSupportsThumbnails;
+  
   /// Callback when the file is tapped
   final VoidCallback? onTap;
   
@@ -24,6 +27,7 @@ class FileItemCard extends StatefulWidget {
     required this.file,
     this.isSelected = false,
     this.showCheckbox = false,
+    this.providerSupportsThumbnails = true,
     this.onTap,
     this.onCheckboxChanged,
   });
@@ -90,10 +94,10 @@ class _FileItemCardState extends State<FileItemCard> {
   }
 
   Widget _buildFileIcon(ThemeData theme) {
-    // Use thumbnail if available, otherwise fall back to icon
+    // Use thumbnail if available and provider supports thumbnails, otherwise fall back to icon
     return FileThumbnail(
       thumbnailUrl: widget.file.thumbnailUrl,
-      hasThumbnail: widget.file.hasThumbnail,
+      hasThumbnail: widget.file.hasThumbnail && widget.providerSupportsThumbnails,
       mimeType: widget.file.mimeType,
       isFolder: widget.file.isFolder,
     );

@@ -3,7 +3,6 @@ import 'dart:collection';
 import 'package:flutter/foundation.dart';
 import '../models/upload_state.dart';
 import '../providers/base_cloud_provider.dart';
-import '../providers/account_based_provider.dart';
 import '../utils/app_logger.dart';
 
 /// Central manager for handling file uploads with queue management and retry logic
@@ -65,7 +64,7 @@ class UploadManager extends ChangeNotifier {
       fileName: fileName,
       fileSize: fileSize,
       providerType: provider.providerType.name,
-      accountId: provider is AccountBasedProvider ? provider.currentAccount?.id ?? 'unknown' : 'local',
+      accountId: provider.requiresAccountManagement ? provider.currentAccount?.id ?? 'unknown' : 'local',
       parentFolderId: parentFolderId,
       mimeType: mimeType,
       metadata: metadata,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/navigation_history.dart';
 import '../theme/app_constants.dart';
 import '../l10n/generated/app_localizations.dart';
+import 'search_bar_widget.dart';
 
 /// Widget for navigation bar with home, back, forward buttons and breadcrumb
 class NavigationBarWidget extends StatelessWidget {
@@ -44,6 +45,30 @@ class NavigationBarWidget extends StatelessWidget {
   /// Maximum breadcrumb items to show before truncating
   final int maxBreadcrumbItems;
 
+  /// Whether to show the search bar
+  final bool showSearchBar;
+
+  /// Callback when search query changes
+  final Function(String query)? onSearch;
+
+  /// Callback when search is cleared
+  final VoidCallback? onSearchClear;
+
+  /// Whether search is currently loading
+  final bool isSearchLoading;
+
+  /// Current search query
+  final String? searchQuery;
+
+  /// Message to show when upload is not available
+  final String? uploadDisabledMessage;
+
+  /// Message to show when create folder is not available
+  final String? createFolderDisabledMessage;
+
+  /// Message to show when search is not available
+  final String? searchDisabledMessage;
+
   const NavigationBarWidget({
     super.key,
     required this.navigationHistory,
@@ -59,6 +84,14 @@ class NavigationBarWidget extends StatelessWidget {
     this.showUploadButton = true,
     this.showCreateFolderButton = true,
     this.maxBreadcrumbItems = 5,
+    this.showSearchBar = false,
+    this.onSearch,
+    this.onSearchClear,
+    this.isSearchLoading = false,
+    this.searchQuery,
+    this.uploadDisabledMessage,
+    this.createFolderDisabledMessage,
+    this.searchDisabledMessage,
   });
 
   @override
@@ -82,9 +115,50 @@ class NavigationBarWidget extends StatelessWidget {
               const SizedBox(width: AppConstants.spacingM),
               Expanded(child: _buildBreadcrumb(context)),
               const SizedBox(width: AppConstants.spacingM),
+              
+              // Search bar (if enabled and enough space)
+              if ((showSearchBar || searchDisabledMessage != null) && !_shouldShowSeparateBreadcrumb(context)) ...[
+                Tooltip(
+                  message: onSearch != null
+                      ? 'Pesquisar arquivos'
+                      : searchDisabledMessage ?? 'Busca não disponível para este provedor',
+                  child: SearchBarWidget(
+                    onSearch: onSearch,
+                    onClear: onSearchClear,
+                    isLoading: isSearchLoading,
+                    initialQuery: searchQuery,
+                    enabled: onSearch != null,
+                    placeholder: onSearch != null
+                        ? null
+                        : 'Busca não disponível',
+                  ),
+                ),
+                const SizedBox(width: AppConstants.spacingM),
+              ],
+              
               _buildActionButtons(context),
             ],
           ),
+
+          // Search bar row (mobile-friendly)
+          if ((showSearchBar || searchDisabledMessage != null) && _shouldShowSeparateBreadcrumb(context)) ...[
+            const SizedBox(height: AppConstants.spacingS),
+            Tooltip(
+              message: onSearch != null
+                  ? 'Pesquisar arquivos'
+                  : searchDisabledMessage ?? 'Busca não disponível para este provedor',
+              child: SearchBarWidget(
+                onSearch: onSearch,
+                onClear: onSearchClear,
+                isLoading: isSearchLoading,
+                initialQuery: searchQuery,
+                enabled: onSearch != null,
+                placeholder: onSearch != null
+                    ? null
+                    : 'Busca não disponível',
+              ),
+            ),
+          ],
 
           // Breadcrumb row (mobile-friendly)
           if (_shouldShowSeparateBreadcrumb(context)) ...[
@@ -314,27 +388,43 @@ class NavigationBarWidget extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Create folder button
-        if (showCreateFolderButton)
+        // Create folder button - show disabled if no callback but provide helpful message
+        if (showCreateFolderButton || createFolderDisabledMessage != null) ...[
           IconButton(
             onPressed: onCreateFolder,
             icon: const Icon(Icons.create_new_folder),
-            tooltip: 'Nova pasta',
+            tooltip: onCreateFolder != null
+                ? 'Nova pasta'
+                : createFolderDisabledMessage ?? 'Criação de pastas não disponível',
             style: IconButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: onCreateFolder != null
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.onSurface.withOpacity(0.38),
             ),
           ),
+        ],
 
-        // Upload button
-        if (showUploadButton) ...[
-          FilledButton.icon(
-            onPressed: onUpload,
-            icon: const Icon(Icons.upload, size: 18),
-            label: Text(_getUploadText(context)),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppConstants.paddingM,
-                vertical: AppConstants.paddingS,
+        // Upload button - show disabled if no callback but provide helpful message
+        if (showUploadButton || uploadDisabledMessage != null) ...[
+          Tooltip(
+            message: onUpload != null
+                ? _getUploadText(context)
+                : uploadDisabledMessage ?? 'Upload não disponível para este provedor',
+            child: FilledButton.icon(
+              onPressed: onUpload,
+              icon: const Icon(Icons.upload, size: 18),
+              label: Text(_getUploadText(context)),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppConstants.paddingM,
+                  vertical: AppConstants.paddingS,
+                ),
+                backgroundColor: onUpload != null
+                    ? null
+                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.12),
+                foregroundColor: onUpload != null
+                    ? null
+                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.38),
               ),
             ),
           ),

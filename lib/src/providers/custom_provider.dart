@@ -7,6 +7,7 @@ import '../enums/cloud_provider_type.dart';
 import '../enums/oauth_scope.dart';
 import '../models/file_entry.dart';
 import '../models/provider_capabilities.dart';
+import '../models/cloud_account.dart';
 import 'base_cloud_provider.dart';
 import '../utils/app_logger.dart';
 
@@ -356,6 +357,78 @@ class CustomProvider extends BaseCloudProvider {
     );
   }
 
+  @override
+  Future<UserProfile> getUserProfile() async {
+    // Custom provider may not have user profiles if it doesn't require account management
+    if (!config.showAccountManagement) {
+      // Return a mock profile for demo purposes
+      return const UserProfile(
+        id: 'mock_user',
+        name: 'Demo User',
+        email: 'demo@example.com',
+        photoUrl: null,
+      );
+    }
+    
+    // For account-based custom providers, fetch from server
+    final headers = _getAuthHeaders();
+    final uri = Uri.parse('${config.baseUrl}/api/profile');
+    
+    final response = await _httpClient.get(uri, headers: headers);
+    
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return UserProfile(
+        id: data['id'],
+        name: data['name'],
+        email: data['email'],
+        photoUrl: data['photo_url'],
+        metadata: data['metadata'] ?? {},
+      );
+    }
+    
+    throw CloudProviderException(
+      'Failed to get user profile: ${response.statusCode}',
+      statusCode: response.statusCode,
+    );
+  }
+  
+  @override
+  Future<CloudAccount> refreshAuth(CloudAccount account) async {
+    // Custom provider may not need token refresh if it doesn't require account management
+    if (!config.showAccountManagement) {
+      // Return the same account for non-account-based custom providers
+      return account;
+    }
+    
+    // For account-based custom providers, implement token refresh logic
+    if (account.refreshToken == null) {
+      throw CloudProviderException('No refresh token available');
+    }
+    
+    final headers = {'Content-Type': 'application/json'};
+    final body = json.encode({
+      'refresh_token': account.refreshToken,
+    });
+    
+    final uri = Uri.parse('${config.baseUrl}/api/auth/refresh');
+    final response = await _httpClient.post(uri, headers: headers, body: body);
+    
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return account.copyWith(
+        accessToken: data['access_token'],
+        refreshToken: data['refresh_token'],
+        expiresAt: data['expires_at'] != null ? 
+            DateTime.parse(data['expires_at']) : null,
+      );
+    }
+    
+    throw CloudProviderException(
+      'Failed to refresh token: ${response.statusCode}',
+      statusCode: response.statusCode,
+    );
+  }
 
   @override
   void dispose() {

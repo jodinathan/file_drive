@@ -46,7 +46,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   late final AccountStorage _accountStorage;
-  late final OAuthConfig _oauthConfig;
+  late final List<ProviderConfiguration> _providers;
   bool _isLoading = true;
   String? _error;
   bool _showInstructions = false;
@@ -61,7 +61,7 @@ class _HomePageState extends State<HomePage> {
     try {
       _accountStorage = SharedPreferencesAccountStorage();
       
-      // Configure OAuth with proper server URLs
+      // Configure providers with proper server URLs
       try {
         // Get configuration from config.dart if available, otherwise use localhost
         String serverBaseUrl = 'http://localhost:8080';
@@ -75,13 +75,22 @@ class _HomePageState extends State<HomePage> {
           // Use defaults if config not available
         }
         
-        _oauthConfig = OAuthConfig(
-          generateAuthUrl: (state) => '$serverBaseUrl/auth/google?state=$state',
-          generateTokenUrl: (state) => '$serverBaseUrl/auth/tokens/$state',
-          redirectScheme: redirectScheme,
-          providerType: CloudProviderType.googleDrive,
-          requiredScopes: {OAuthScope.readFiles, OAuthScope.writeFiles},
-        );
+        // Create provider configurations using the new API
+        _providers = [
+          ProviderConfigurationFactories.googleDrive(
+            generateAuthUrl: (state) => '$serverBaseUrl/auth/google?state=$state',
+            generateTokenUrl: (state) => '$serverBaseUrl/auth/tokens/$state',
+            redirectScheme: redirectScheme,
+            requiredScopes: {OAuthScope.readFiles, OAuthScope.writeFiles, OAuthScope.createFolders},
+          ),
+          // Add more providers if needed
+          ProviderConfigurationFactories.localServer(
+            generateAuthUrl: (state) => '$serverBaseUrl/auth/local?state=$state',
+            generateTokenUrl: (state) => '$serverBaseUrl/auth/tokens/$state',
+            redirectScheme: redirectScheme,
+            displayName: 'Local Development Server',
+          ),
+        ];
         
         // Test server connectivity
         await _testServerConnection();
@@ -311,18 +320,20 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildFileCloudWidget() {
     return FileCloudWidget(
+      providers: _providers,
+      accountStorage: _accountStorage,
       cropConfig: CropConfig.custom(
         aspectRatio: 9.0 / 6.0,
         minWidth: 500,
         minHeight: 300,
         enforceAspectRatio: true,
       ),
-      accountStorage: _accountStorage,
-      oauthConfig: _oauthConfig,
       selectionConfig: SelectionConfig(
         minSelection: 1,
         maxSelection: 5,
         allowFolders: false,
+        allowedMimeTypes: ['image/*', 'application/pdf', 'text/*'],
+        mimeTypeHint: 'You can select images, PDF documents, and text files',
         onSelectionConfirm: (files) {
           // Show selected files in a dialog
           showDialog(

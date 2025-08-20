@@ -11,9 +11,9 @@ import '../models/crop_config.dart';
 import '../providers/base_cloud_provider.dart';
 import '../providers/google_drive_provider.dart';
 import '../providers/local_server_provider.dart';
-import '../providers/account_based_provider.dart';
 import '../storage/account_storage.dart';
 import '../auth/oauth_config.dart';
+import '../models/provider_configuration.dart';
 import '../auth/oauth_manager.dart';
 import '../theme/app_constants.dart';
 import '../l10n/generated/app_localizations.dart';
@@ -27,6 +27,7 @@ import 'file_item_card.dart';
 import 'image_file_item_card.dart';
 import 'crop_panel_widget.dart';
 import 'navigation_bar_widget.dart';
+import 'selection_type_chips.dart';
 import 'create_folder_dialog.dart';
 
 /// Main File Cloud widget that provides cloud storage integration
@@ -34,16 +35,20 @@ class FileCloudWidget extends StatefulWidget {
   /// Storage for managing user accounts
   final AccountStorage accountStorage;
 
-  /// OAuth configuration for authentication
-  final OAuthConfig oauthConfig;
+  /// List of provider configurations (replaces single oauthConfig)
+  final List<ProviderConfiguration> providers;
 
   /// File selection configuration (optional)
   final SelectionConfig? selectionConfig;
 
-  /// Callback when files are selected (required if selectionConfig is provided)
+  /// Callback when selection is confirmed (DEPRECATED: use SelectionConfig.onSelectionConfirm instead)
+  @Deprecated('Use SelectionConfig.onSelectionConfirm instead')
+  final Function(List<FileEntry>)? onSelectionConfirm;
+
+  /// Callback when files are selected (backward compatibility)
   final Function(List<FileEntry>)? onFilesSelected;
 
-  /// Initial provider type to show ('google_drive', 'dropbox', 'onedrive')
+  /// Initial provider type to show (optional)
   final CloudProviderType? initialProvider;
 
   /// Crop configuration for image editing (if provided, enables crop functionality)
@@ -55,8 +60,9 @@ class FileCloudWidget extends StatefulWidget {
   const FileCloudWidget({
     super.key,
     required this.accountStorage,
-    required this.oauthConfig,
+    required this.providers,
     this.selectionConfig,
+    this.onSelectionConfirm,
     this.onFilesSelected,
     this.initialProvider,
     this.cropConfig,
@@ -81,6 +87,17 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
   bool _isAddingAccount = false;
   bool _showCropPanel = false;
   List<ImageFileEntry> _croppableImageFiles = [];
+
+  // Search state
+  String _searchQuery = '';
+  bool _isSearching = false;
+  bool _isSearchMode = false;
+
+  // Pagination state for infinite scroll
+  String? _currentPageToken;
+  bool _hasMoreItems = false;
+  bool _isLoadingMore = false;
+  static const int _itemsPerPage = 50; // As specified in RULES.md line 11
 
   // Upload management
   final Map<String, UploadProgress> _activeUploads = {};
@@ -136,6 +153,211 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
   late NavigationManager _navigationManager;
   // late DragDropManager _dragDropManager; // Comentado até implementação completa
 
+  // Scroll controller for infinite scroll
+  late ScrollController _scrollController;
+
+  /// Helper method to check if the current provider requires account management
+  bool _requiresAccountManagement() {
+    if (_selectedProvider == null) return false;
+    final providerConfig = widget.providers.firstWhere(
+      (config) => config.type == _selectedProvider,
+      orElse: () => widget.providers.first,
+    );
+    return providerConfig.requiresAccountManagement;
+  }
+
+  // Scroll listener for infinite scroll
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      // Load more items when user is near the bottom (200px threshold)
+      if (_hasMoreItems && !_isLoadingMore && !_isLoading) {
+        _loadMoreFiles();
+      }
+    }
+  }
+
+  // Search functionality methods
+  void _onSearchQueryChanged(String query) async {
+    if (query.trim() != _searchQuery) {
+      setState(() {
+        _searchQuery = query.trim();
+        _isSearching = query.trim().isNotEmpty;
+        _isSearchMode = query.trim().isNotEmpty;
+      });
+
+      if (query.trim().isEmpty) {
+        // Clear search - reload current folder
+        await _clearSearch();
+      } else {
+        // Perform search
+        await _performSearch(query.trim());
+      }
+    }
+  }
+
+  void _onSearchCleared() async {
+    setState(() {
+      _searchQuery = '';
+      _isSearching = false;
+      _isSearchMode = false;
+    });
+    await _clearSearch();
+  }
+
+  Future<void> _performSearch(String query) async {
+    if (_selectedProvider == null) return;
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final provider = _providers[_selectedProvider!]!;
+      
+      // For now, skip complex initialization and just call the search method
+      // This will be properly handled when Phase 1 refactoring is complete
+      final searchResults = await provider.searchByName(
+        query: query,
+        pageSize: _itemsPerPage,
+      );
+      
+      setState(() {
+        _currentFiles = searchResults.entries;
+        _isLoading = false;
+        // Reset pagination state for search results
+        _currentPageToken = searchResults.nextPageToken;
+        _hasMoreItems = searchResults.hasMore;
+        _isLoadingMore = false;
+      });
+
+      AppLogger.success(
+        'Busca por "$query" retornou ${searchResults.entries.length} resultados',
+        component: 'Search',
+      );
+    } catch (e) {
+      AppLogger.error(
+        'Erro ao buscar por "$query": $e',
+        component: 'Search',
+      );
+      setState(() {
+        _error = 'Erro ao buscar arquivos: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _clearSearch() async {
+    // Reload current folder content
+    if (_selectedProvider != null) {
+      final currentFolder = _navigationManager.current?.folderId;
+      await _loadFiles(folderId: currentFolder, skipNavigation: true);
+    }
+  }
+
+  bool _canSearch() {
+    if (_selectedProvider == null) return false;
+    final provider = _providers[_selectedProvider!];
+    if (provider == null) return false;
+    return provider.getCapabilities().canSearch;
+  }
+
+  /// Capability helper methods for UI components
+  bool _canUpload() {
+    if (_selectedProvider == null) return false;
+    final provider = _providers[_selectedProvider!];
+    if (provider == null) return false;
+    return provider.getCapabilities().canUpload;
+  }
+
+  bool _canCreateFolders() {
+    if (_selectedProvider == null) return false;
+    final provider = _providers[_selectedProvider!];
+    if (provider == null) return false;
+    return provider.getCapabilities().canCreateFolders;
+  }
+
+  bool _canDelete() {
+    if (_selectedProvider == null) return false;
+    final provider = _providers[_selectedProvider!];
+    if (provider == null) return false;
+    return provider.getCapabilities().canDelete;
+  }
+
+  bool _hasThumbnails() {
+    if (_selectedProvider == null) return false;
+    final provider = _providers[_selectedProvider!];
+    if (provider == null) return false;
+    return provider.getCapabilities().hasThumbnails;
+  }
+
+  /// Get user-friendly provider name for messages
+  String _getProviderName() {
+    if (_selectedProvider == null) return 'este provedor';
+    
+    switch (_selectedProvider!) {
+      case CloudProviderType.googleDrive:
+        return 'Google Drive';
+      case CloudProviderType.dropbox:
+        return 'Dropbox';
+      case CloudProviderType.oneDrive:
+        return 'OneDrive';
+      case CloudProviderType.custom:
+        return 'provedor personalizado';
+      case CloudProviderType.localServer:
+        return 'servidor local';
+    }
+  }
+
+  /// Check if capabilities info should be shown (when some features are disabled)
+  bool _shouldShowCapabilitiesInfo() {
+    return !_canUpload() || !_canCreateFolders() || !_canDelete() || !_canSearch() || !_hasThumbnails();
+  }
+
+  /// Build capabilities info widget
+  Widget _buildCapabilitiesInfo() {
+    final disabledFeatures = <String>[];
+    
+    if (!_canUpload()) disabledFeatures.add('Upload');
+    if (!_canCreateFolders()) disabledFeatures.add('Criar pastas');
+    if (!_canDelete()) disabledFeatures.add('Excluir arquivos');
+    if (!_canSearch()) disabledFeatures.add('Buscar arquivos');
+    if (!_hasThumbnails()) disabledFeatures.add('Visualizar miniaturas');
+    
+    if (disabledFeatures.isEmpty) return const SizedBox.shrink();
+    
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.info_outline,
+            size: 20,
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '${_getProviderName()} não suporta: ${disabledFeatures.join(', ')}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -146,59 +368,78 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     _navigationManager = NavigationManager();
     // _dragDropManager = DragDropManager(); // Comentado até implementação completa
 
-    _initializeProviders();
+    // Initialize scroll controller for infinite scroll
+    _scrollController = ScrollController();
+    _scrollController.addListener(_onScroll);
+
+    _initializeProvidersFromConfiguration();
     _loadAccounts();
   }
 
-  void _initializeProviders() {
-    AppLogger.info('Inicializando provedores de nuvem', component: 'Init');
+  void _initializeProvidersFromConfiguration() {
+    AppLogger.info('Inicializando provedores de nuvem a partir da configuração', component: 'Init');
 
-    // Only initialize enabled/implemented providers
-    final enabledProviders = ProviderHelper.getEnabledProviders();
-    AppLogger.info(
-      'Provedores habilitados: $enabledProviders',
-      component: 'Init',
-    );
+    if (widget.providers.isEmpty) {
+      AppLogger.warning('Nenhuma configuração de provedor fornecida', component: 'Init');
+      return;
+    }
 
-    for (final providerType in enabledProviders) {
-      switch (providerType) {
-        case CloudProviderType.googleDrive:
-          _providers[providerType] = GoogleDriveProvider();
-          AppLogger.success(
-            'GoogleDriveProvider inicializado',
-            component: 'Init',
-          );
-          break;
-        case CloudProviderType.localServer:
-          _providers[providerType] = LocalServerProvider(
-            serverUrl: 'http://localhost:8080',
-          );
-          AppLogger.success(
-            'LocalServerProvider inicializado',
-            component: 'Init',
-          );
-          break;
-        case CloudProviderType.dropbox:
-        case CloudProviderType.oneDrive:
-        case CloudProviderType.custom:
-          AppLogger.warning(
-            'Provedor não implementado: ${providerType.displayName}',
-            component: 'Init',
-          );
-          break;
+    for (final config in widget.providers) {
+      AppLogger.info(
+        'Inicializando provedor: ${config.displayName} (${config.type})',
+        component: 'Init',
+      );
+
+      final provider = _createProviderInstance(config);
+      if (provider != null) {
+        // Initialize provider with configuration
+        provider.initialize(configuration: config);
+        _providers[config.type] = provider;
+        AppLogger.success(
+          'Provedor ${config.displayName} inicializado com sucesso',
+          component: 'Init',
+        );
+      } else {
+        AppLogger.warning(
+          'Não foi possível criar instância para provedor: ${config.displayName}',
+          component: 'Init',
+        );
       }
     }
 
-    // Set providers map in ProviderHelper for custom logo access
-    // TODO: Update ProviderHelper to work with CloudProviderType keys
-    // ProviderHelper.setProvidersMap(_providers);
+    // Set initial provider to user preference or first available
+    if (widget.providers.isNotEmpty) {
+      _selectedProvider = widget.initialProvider ?? widget.providers.first.type;
+      AppLogger.info(
+        'Provedor inicial selecionado: $_selectedProvider',
+        component: 'Init',
+      );
+    }
+  }
 
-    // Set initial provider to first enabled provider
-    _selectedProvider = widget.initialProvider ?? enabledProviders.first;
-    AppLogger.info(
-      'Provedor inicial selecionado: $_selectedProvider',
-      component: 'Init',
-    );
+  BaseCloudProvider? _createProviderInstance(ProviderConfiguration config) {
+    // Use custom provider factory if provided
+    if (config.createProvider != null) {
+      return config.createProvider!();
+    }
+
+    // Default provider creation based on type
+    switch (config.type) {
+      case CloudProviderType.googleDrive:
+        return GoogleDriveProvider();
+      case CloudProviderType.localServer:
+        return LocalServerProvider(
+          serverUrl: config.generateAuthUrl('dummy').split('/auth/')[0],
+        );
+      case CloudProviderType.dropbox:
+      case CloudProviderType.oneDrive:
+      case CloudProviderType.custom:
+        AppLogger.warning(
+          'Provedor ${config.type} não implementado ainda',
+          component: 'Init',
+        );
+        return null;
+    }
   }
 
   Future<void> _loadAccounts() async {
@@ -211,9 +452,11 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
 
     try {
       // Check if current provider needs account management
-      final showAccountManagement = ProviderHelper.getShowAccountManagement(
-        _selectedProvider ?? CloudProviderType.googleDrive,
+      final providerConfig = widget.providers.firstWhere(
+        (config) => config.type == _selectedProvider,
+        orElse: () => widget.providers.first,
       );
+      final showAccountManagement = providerConfig.requiresAccountManagement;
 
       if (!showAccountManagement && _selectedProvider != null) {
         // For providers without account management, no account needed
@@ -325,7 +568,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
 
       // Only try to refresh token for account-based providers
       final provider = _providers[_selectedProvider!]!;
-      if (provider is AccountBasedProvider &&
+      if (provider.requiresAccountManagement &&
           _selectedAccount != null &&
           _selectedAccount!.refreshToken != null &&
           _selectedAccount!.refreshToken!.isNotEmpty) {
@@ -340,7 +583,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
           );
 
           final provider = _providers[_selectedProvider!]!;
-          if (provider is AccountBasedProvider) {
+          if (provider.requiresAccountManagement) {
             final refreshedAccount = await provider.refreshAuth(
               _selectedAccount!,
             );
@@ -353,8 +596,13 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
               component: component,
             );
 
+            // Get provider configuration for reinitializing
+            final providerConfig = widget.providers.firstWhere(
+              (config) => config.type == _selectedProvider,
+              orElse: () => throw Exception('Provider configuration not found'),
+            );
             // Reinitialize provider with new token
-            provider.initialize(refreshedAccount);
+            provider.initialize(configuration: providerConfig, account: refreshedAccount);
 
             // Reload accounts to reflect the updated token in UI
             await _reloadAccountsOnly();
@@ -377,8 +625,12 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
 
             // Reinitialize provider with new token (only for account-based providers)
             final provider = _providers[_selectedProvider!]!;
-            if (provider is AccountBasedProvider) {
-              provider.initialize(refreshedAccount);
+            final providerConfig = widget.providers.firstWhere(
+              (config) => config.type == _selectedProvider,
+              orElse: () => throw Exception('Provider configuration not found'),
+            );
+            if (providerConfig.requiresAccountManagement) {
+              provider.initialize(configuration: providerConfig, account: refreshedAccount);
             }
 
             // Reload accounts to reflect the updated token in UI
@@ -393,7 +645,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
           );
         }
       } else {
-        if (provider is AccountBasedProvider) {
+        if (provider.requiresAccountManagement) {
           AppLogger.warning(
             'Refresh token não disponível para a conta: ${_selectedAccount?.email}',
             component: component,
@@ -413,7 +665,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       }
 
       // If refresh failed or no refresh token available, mark as revoked (only for account-based providers)
-      if (provider is AccountBasedProvider) {
+      if (provider.requiresAccountManagement) {
         AppLogger.warning(
           'Marcando conta como revogada devido à falha de autenticação',
           component: component,
@@ -471,22 +723,17 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       AppLogger.info('   Current time: ${DateTime.now().toIso8601String()}');
       AppLogger.info('   Account Status: ${account.status}');
 
-      // Get OAuth configuration for the provider
-      final oauthConfig = widget.oauthConfig;
-      if (oauthConfig.providerType.name != account.providerType) {
-        AppLogger.error(
-          'OAuth config não corresponde ao tipo do provedor: ${oauthConfig.providerType} != ${account.providerType}',
-          component: 'Auth',
-        );
-        return null;
-      }
+      // Get provider configuration for the account
+      final providerConfig = widget.providers.firstWhere(
+        (config) => config.type.name == account.providerType,
+        orElse: () => throw Exception('Provider configuration not found for ${account.providerType}'),
+      );
 
       // Create OAuth manager instance
       final oauthManager = OAuthManager();
 
-      // Build refresh URL from the auth URL pattern
-      // Extract base URL from generateAuthUrl and create refresh endpoint
-      final authUrl = oauthConfig.generateAuthUrl('dummy');
+      // Build refresh URL from the provider configuration
+      final authUrl = providerConfig.generateAuthUrl('dummy');
       final baseUrl = authUrl.split('/auth/')[0]; // Get base URL
       final refreshUrl = '$baseUrl/auth/refresh';
 
@@ -688,6 +935,90 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     }
   }
 
+  /// Loads more files for infinite scroll pagination
+  Future<void> _loadMoreFiles() async {
+    if (_isLoadingMore || !_hasMoreItems || _currentPageToken == null) {
+      return;
+    }
+
+    AppLogger.info(
+      'Loading more files - pageToken: $_currentPageToken',
+      component: 'Pagination',
+    );
+
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    try {
+      if (_selectedProvider == null) {
+        AppLogger.warning(
+          'Cannot load more files: no provider selected',
+          component: 'Pagination',
+        );
+        return;
+      }
+
+      final provider = _providers[_selectedProvider!]!;
+      final providerConfig = widget.providers.firstWhere(
+        (config) => config.type == _selectedProvider,
+        orElse: () => throw Exception('Provider configuration not found'),
+      );
+
+      // Check if provider requires account
+      final requiresAccount = provider.requiresAccountManagement;
+      if (requiresAccount && _selectedAccount == null) {
+        AppLogger.warning(
+          'Cannot load more files: no account selected for provider requiring account',
+          component: 'Pagination',
+        );
+        return;
+      }
+
+      // Initialize provider if needed
+      if (requiresAccount && _selectedAccount != null) {
+        provider.initialize(configuration: providerConfig, account: _selectedAccount!);
+      } else {
+        provider.initialize(configuration: providerConfig);
+      }
+
+      // Get current folder ID for pagination
+      final currentFolderId = _navigationManager.currentFolderId;
+
+      // Load next page
+      final filesPage = await provider.listFolder(
+        folderId: currentFolderId,
+        pageToken: _currentPageToken,
+        pageSize: _itemsPerPage,
+      );
+
+      AppLogger.success(
+        'Loaded ${filesPage.entries.length} more files',
+        component: 'Pagination',
+      );
+
+      setState(() {
+        // Append new files to existing list
+        _currentFiles.addAll(filesPage.entries);
+        _currentPageToken = filesPage.nextPageToken;
+        _hasMoreItems = filesPage.hasMore;
+      });
+    } catch (e) {
+      AppLogger.error(
+        'Error loading more files',
+        component: 'Pagination',
+        error: e,
+      );
+
+      // Handle authentication errors
+      await _handleAuthenticationError(e, 'Pagination');
+    } finally {
+      setState(() {
+        _isLoadingMore = false;
+      });
+    }
+  }
+
   Future<void> _loadFiles({
     String? folderId,
     String? folderName,
@@ -707,7 +1038,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
 
     // Check if this provider requires account management
     final provider = _providers[_selectedProvider!]!;
-    final requiresAccount = provider is AccountBasedProvider;
+    final requiresAccount = provider.requiresAccountManagement;
 
     if (requiresAccount && _selectedAccount == null) {
       AppLogger.warning(
@@ -744,20 +1075,29 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       }
 
       final provider = _providers[_selectedProvider!]!;
-      if (provider is AccountBasedProvider && _selectedAccount != null) {
-        provider.initialize(_selectedAccount!);
+      final providerConfig = widget.providers.firstWhere(
+        (config) => config.type == _selectedProvider,
+        orElse: () => throw Exception('Provider configuration not found'),
+      );
+      
+      if (providerConfig.requiresAccountManagement && _selectedAccount != null) {
+        provider.initialize(configuration: providerConfig, account: _selectedAccount!);
         AppLogger.debug(
           'Provider inicializado para ${_selectedAccount!.name}',
           component: 'Files',
         );
       } else {
+        provider.initialize(configuration: providerConfig);
         AppLogger.debug(
           'Provider serverless inicializado sem conta',
           component: 'Files',
         );
       }
 
-      final filesPage = await provider.listFolder(folderId: folderId);
+      final filesPage = await provider.listFolder(
+        folderId: folderId,
+        pageSize: _itemsPerPage,
+      );
 
       AppLogger.success(
         '${filesPage.entries.length} arquivos carregados',
@@ -766,6 +1106,10 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
 
       setState(() {
         _currentFiles = filesPage.entries;
+        // Reset pagination state for initial load
+        _currentPageToken = filesPage.nextPageToken;
+        _hasMoreItems = filesPage.hasMore;
+        _isLoadingMore = false;
 
         // Only update navigation if not skipping (avoid double navigation)
         if (!skipNavigation) {
@@ -847,7 +1191,22 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       );
 
       final oauthManager = OAuthManager();
-      final result = await oauthManager.authenticate(widget.oauthConfig);
+      // Get provider configuration for the selected provider
+      final providerConfig = widget.providers.firstWhere(
+        (config) => config.type == _selectedProvider,
+        orElse: () => throw Exception('Provider configuration not found for $_selectedProvider'),
+      );
+
+      // Create OAuthConfig from provider configuration for authentication
+      final oauthConfig = OAuthConfig(
+        providerType: providerConfig.type,
+        requiredScopes: providerConfig.requiredScopes,
+        generateAuthUrl: providerConfig.generateAuthUrl,
+        generateTokenUrl: providerConfig.generateTokenUrl,
+        redirectScheme: providerConfig.redirectScheme,
+      );
+
+      final result = await oauthManager.authenticate(oauthConfig);
 
       AppLogger.info(
         'Resultado OAuth - Sucesso: ${result.isSuccess}',
@@ -909,8 +1268,8 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
           updatedAt: DateTime.now(),
         );
 
-        if (provider is AccountBasedProvider) {
-          provider.initialize(tempAccount);
+        if (providerConfig.requiresAccountManagement) {
+          provider.initialize(configuration: providerConfig, account: tempAccount);
           final profile = await provider.getUserProfile();
 
           final account = CloudAccount(
@@ -970,12 +1329,26 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       if (_selectedFiles.contains(file)) {
         _selectedFiles.remove(file);
       } else {
+        // First check if the file type is allowed
+        if (!widget.selectionConfig!.canSelect(file)) {
+          final typeDescription = widget.selectionConfig!.getTypeDescription();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'File type not allowed. Only $typeDescription files can be selected.',
+              ),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+          return;
+        }
+
         // Check selection limits
         if (_selectedFiles.length >= widget.selectionConfig!.maxSelection) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Máximo de ${widget.selectionConfig!.maxSelection} arquivos',
+                'Maximum of ${widget.selectionConfig!.maxSelection} files allowed',
               ),
             ),
           );
@@ -1043,6 +1416,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
                         file: file,
                         isSelected: false,
                         showCheckbox: false,
+                        providerSupportsThumbnails: _hasThumbnails(),
                       );
                     },
                   ),
@@ -1062,6 +1436,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
                             file: file,
                             isSelected: false,
                             showCheckbox: false,
+                            providerSupportsThumbnails: _hasThumbnails(),
                           );
                         },
                       ),
@@ -1170,13 +1545,17 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
         final provider = _providers[_selectedProvider!]!;
 
         // Only check for account if provider requires it
-        if (provider is AccountBasedProvider) {
+        if (provider.requiresAccountManagement) {
           if (_selectedAccount == null) {
             throw Exception(
               'Nenhuma conta selecionada para provedor que requer conta',
             );
           }
-          provider.initialize(_selectedAccount!);
+          final providerConfig = widget.providers.firstWhere(
+            (config) => config.type == _selectedProvider,
+            orElse: () => throw Exception('Provider configuration not found'),
+          );
+          provider.initialize(configuration: providerConfig, account: _selectedAccount!);
         }
 
         // Excluir cada arquivo selecionado
@@ -1303,10 +1682,14 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       widget.onFilesSelected!(_selectedFiles);
     }
 
-    // Also call the selection config callback if it exists
-    if (widget.selectionConfig?.onSelectionConfirm != null &&
-        _selectedFiles.isNotEmpty) {
-      widget.selectionConfig?.onSelectionConfirm!(_selectedFiles);
+    // Call the selection config callback (preferred)
+    if (widget.selectionConfig != null && _selectedFiles.isNotEmpty) {
+      widget.selectionConfig!.onSelectionConfirm(_selectedFiles);
+    }
+    
+    // Also call the deprecated onSelectionConfirm callback for backward compatibility
+    if (widget.onSelectionConfirm != null && _selectedFiles.isNotEmpty) {
+      widget.onSelectionConfirm!(_selectedFiles);
     }
   }
 
@@ -1350,9 +1733,14 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       widget.onFilesSelected!(_selectedFiles);
     }
 
-    if (widget.selectionConfig?.onSelectionConfirm != null &&
-        _selectedFiles.isNotEmpty) {
-      widget.selectionConfig?.onSelectionConfirm!(_selectedFiles);
+    // Call the selection config callback (preferred)
+    if (widget.selectionConfig != null && _selectedFiles.isNotEmpty) {
+      widget.selectionConfig!.onSelectionConfirm(_selectedFiles);
+    }
+    
+    // Also call the deprecated onSelectionConfirm callback for backward compatibility
+    if (widget.onSelectionConfirm != null && _selectedFiles.isNotEmpty) {
+      widget.onSelectionConfirm!(_selectedFiles);
     }
   }
 
@@ -1374,8 +1762,14 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
 
     final provider = _providers[_selectedProvider!]!;
 
+    // Get provider configuration
+    final providerConfig = widget.providers.firstWhere(
+      (config) => config.type == _selectedProvider,
+      orElse: () => throw Exception('Provider configuration not found'),
+    );
+    
     // Only check for account if provider requires it
-    if (provider is AccountBasedProvider && _selectedAccount == null) {
+    if (providerConfig.requiresAccountManagement && _selectedAccount == null) {
       AppLogger.warning(
         'Tentativa de criar pasta sem conta selecionada para provedor que requer conta',
         component: 'Folder',
@@ -1391,8 +1785,12 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     if (result != null && result.isNotEmpty) {
       try {
         final provider = _providers[_selectedProvider!]!;
-        if (provider is AccountBasedProvider) {
-          provider.initialize(_selectedAccount!);
+        if (provider.requiresAccountManagement) {
+          final providerConfig = widget.providers.firstWhere(
+            (config) => config.type == _selectedProvider,
+            orElse: () => throw Exception('Provider configuration not found'),
+          );
+          provider.initialize(configuration: providerConfig, account: _selectedAccount!);
         }
 
         final currentFolderId = _navigationManager.currentFolderId;
@@ -1489,7 +1887,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     final provider = _providers[_selectedProvider!]!;
 
     // Only check for account if provider requires it
-    if (provider is AccountBasedProvider && _selectedAccount == null) {
+    if (provider.requiresAccountManagement && _selectedAccount == null) {
       AppLogger.warning(
         'Upload cancelado: conta não selecionada para provedor que requer conta',
         component: 'Upload',
@@ -1956,6 +2354,8 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -2041,28 +2441,29 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
           Expanded(
             child: ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              itemCount: ProviderHelper.getEnabledProviders().length,
+              itemCount: widget.providers.length,
               separatorBuilder: (context, index) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
-                final providerType =
-                    ProviderHelper.getEnabledProviders()[index];
-                final accounts = _accountsByProvider[providerType] ?? [];
+                final providerConfig = widget.providers[index];
+                final accounts = _accountsByProvider[providerConfig.type] ?? [];
                 return ProviderCard(
-                  providerType: providerType,
-                  isSelected: _selectedProvider == providerType,
+                  providerType: providerConfig.type,
+                  isSelected: _selectedProvider == providerConfig.type,
                   accounts: accounts,
-                  customLogoWidget: ProviderHelper.getCustomLogoWidget(
-                    providerType,
+                  customLogoWidget: providerConfig.logoWidget ?? ProviderHelper.getCustomLogoWidget(
+                    providerConfig.type,
                   ),
-                  showAccountCount: ProviderHelper.getShowAccountManagement(
-                    providerType,
-                  ),
+                  showAccountCount: providerConfig.requiresAccountManagement,
                   onTap: () {
                     setState(() {
-                      _selectedProvider = providerType;
+                      _selectedProvider = providerConfig.type;
                       _selectedAccount = null;
                       _currentFiles.clear();
                       _pathStack.clear();
+                      // Reset pagination state when changing provider
+                      _currentPageToken = null;
+                      _hasMoreItems = false;
+                      _isLoadingMore = false;
                     });
                     // Reset navigation history when changing provider
                     _navigationManager.clearHistory();
@@ -2079,9 +2480,11 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
 
   /// Segunda coluna: Conteúdo principal com layout melhorado
   Widget _buildMainContent() {
-    final showAccountManagement = ProviderHelper.getShowAccountManagement(
-      _selectedProvider ?? CloudProviderType.googleDrive,
+    final providerConfig = widget.providers.firstWhere(
+      (config) => config.type == _selectedProvider,
+      orElse: () => widget.providers.first,
     );
+    final showAccountManagement = providerConfig.requiresAccountManagement;
 
     return Column(
       children: [
@@ -2098,7 +2501,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
         // Navigation bar (nova adição)
         if (_selectedProvider != null &&
             (_selectedAccount != null ||
-                (_providers[_selectedProvider]! is! AccountBasedProvider)))
+                !_providers[_selectedProvider]!.requiresAccountManagement))
           NavigationBarWidget(
             navigationHistory: _navigationManager.history,
             onGoHome: () {
@@ -2132,12 +2535,32 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
                 }
               }
             },
-            onCreateFolder: _createFolder,
-            onUpload: _uploadFiles,
+            onCreateFolder: _canCreateFolders() ? _createFolder : null,
+            onUpload: _canUpload() ? _uploadFiles : null,
             onViewUploads: _showUploadList,
             activeUploadsCount: _activeUploadsCount,
             uploadProgress: _averageUploadProgress,
+            
+            // Capability-based UI controls
+            showUploadButton: _canUpload(),
+            showCreateFolderButton: _canCreateFolders(),
+            
+            // Search functionality
+            showSearchBar: _canSearch(),
+            onSearch: _onSearchQueryChanged,
+            onSearchClear: _onSearchCleared,
+            isSearchLoading: _isSearching && _isLoading,
+            searchQuery: _searchQuery.isNotEmpty ? _searchQuery : null,
+            
+            // Capability messages for disabled features
+            uploadDisabledMessage: _canUpload() ? null : '${_getProviderName()} não suporta upload de arquivos',
+            createFolderDisabledMessage: _canCreateFolders() ? null : '${_getProviderName()} não suporta criação de pastas',
+            searchDisabledMessage: _canSearch() ? null : '${_getProviderName()} não suporta busca de arquivos',
           ),
+
+        // Show allowed file types when in selection mode
+        if (widget.selectionConfig != null)
+          SelectionTypeChips(selectionConfig: widget.selectionConfig!),
 
         // Navegação de arquivos
         Expanded(child: _buildFileNavigation()),
@@ -2248,6 +2671,10 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
                         _selectedAccount = account;
                         _currentFiles.clear();
                         _pathStack.clear();
+                        // Reset pagination state when changing account
+                        _currentPageToken = null;
+                        _hasMoreItems = false;
+                        _isLoadingMore = false;
                       });
                       // Reset navigation history when changing account
                       _navigationManager.clearHistory();
@@ -2346,7 +2773,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
   Widget _buildFileNavigation() {
     // Check if provider requires account
     final provider = _providers[_selectedProvider]!;
-    final requiresAccount = provider is AccountBasedProvider;
+    final requiresAccount = provider.requiresAccountManagement;
 
     if (requiresAccount && _selectedAccount == null) {
       return const Center(
@@ -2421,14 +2848,49 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
           child: _currentFiles.isEmpty
               ? const Center(child: Text('Nenhum arquivo encontrado'))
               : ListView.builder(
-                  itemCount: _currentFiles.length,
+                  controller: _scrollController,
+                  itemCount: _currentFiles.length + (_hasMoreItems ? 1 : 0),
                   itemBuilder: (context, index) {
+                    // Show loading indicator at the end if there are more items
+                    if (index == _currentFiles.length) {
+                      return _buildLoadingIndicator();
+                    }
+                    
                     final file = _currentFiles[index];
                     return _buildFileItem(file);
                   },
                 ),
         ),
       ],
+    );
+  }
+
+  /// Builds the loading indicator shown at the end of the list during pagination
+  Widget _buildLoadingIndicator() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            'Carregando mais arquivos...',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2451,6 +2913,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
           imageEntry: imageEntry,
           isSelected: isSelected,
           showCheckbox: widget.selectionConfig != null,
+          providerSupportsThumbnails: _hasThumbnails(),
           onTap: () {
             if (widget.selectionConfig != null) {
               _toggleFileSelection(file);
@@ -2469,6 +2932,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       file: file,
       isSelected: isSelected,
       showCheckbox: widget.selectionConfig != null,
+      providerSupportsThumbnails: _hasThumbnails(),
       onTap: () {
         if (file.isFolder) {
           // Always navigate into folders when clicked
@@ -2522,13 +2986,26 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       child: Row(
         children: [
           // Botão Excluir no início (mais longe dos outros)
-          TextButton(
-            onPressed: _selectedFiles.isNotEmpty ? _deleteSelectedFiles : null,
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
+          if (_canDelete()) ...[
+            TextButton(
+              onPressed: _selectedFiles.isNotEmpty ? _deleteSelectedFiles : null,
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.error,
+              ),
+              child: const Text('Excluir'),
             ),
-            child: const Text('Excluir'),
-          ),
+          ] else ...[
+            Tooltip(
+              message: '${_getProviderName()} não suporta exclusão de arquivos',
+              child: TextButton(
+                onPressed: null,
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.38),
+                ),
+                child: const Text('Excluir'),
+              ),
+            ),
+          ],
           const Spacer(), // Espaça o botão excluir dos demais
           Text(
             '${_selectedFiles.length} arquivo(s) selecionado(s)',

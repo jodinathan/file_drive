@@ -2,6 +2,7 @@ import '../models/file_entry.dart';
 import '../enums/cloud_provider_type.dart';
 import '../enums/oauth_scope.dart';
 import '../models/provider_capabilities.dart';
+import '../models/cloud_account.dart';
 
 /// Progress information for upload operations
 class UploadProgress {
@@ -298,8 +299,17 @@ class CloudProviderException implements Exception {
   String toString() => 'CloudProviderException: $message';
 }
 
+// TODO: Import ProviderConfiguration when Phase 1.1 is complete
+// import '../models/provider_configuration.dart';
+
 /// Abstract base class for cloud storage providers
 abstract class BaseCloudProvider {
+  /// Current provider configuration
+  dynamic _configuration; // Will be ProviderConfiguration when Phase 1.1 is complete
+  
+  /// Current account being used by this provider
+  CloudAccount? _currentAccount;
+  
   /// Cloud provider type for this provider
   CloudProviderType get providerType;
   
@@ -321,6 +331,9 @@ abstract class BaseCloudProvider {
   /// Unique identifier for this provider type (deprecated)
   @Deprecated('Use providerType enum directly instead of string identifier')
   String get providerTypeString => providerType.name;
+  
+  /// Gets the current account being used by this provider
+  CloudAccount? get currentAccount => _currentAccount;
   
   /// Lists files and folders in the specified folder
   /// 
@@ -383,6 +396,37 @@ abstract class BaseCloudProvider {
     String? pageToken,
     int pageSize = 50,
   });
+  
+  /// Initializes the provider with configuration and optional account
+  /// This method should be called before using other provider methods
+  /// 
+  /// [configuration] - Provider configuration (will be ProviderConfiguration when Phase 1.1 is complete)
+  /// [account] - Optional cloud account for authenticated operations
+  void initialize({
+    required dynamic configuration, // Will be ProviderConfiguration when Phase 1.1 is complete
+    CloudAccount? account,
+  }) {
+    _configuration = configuration;
+    _currentAccount = account;
+  }
+  
+  /// Gets the user profile information
+  /// This method requires authentication
+  Future<UserProfile> getUserProfile();
+  
+  /// Refreshes the authentication token
+  /// 
+  /// [account] - The account to refresh
+  /// Returns updated account with new tokens
+  Future<CloudAccount> refreshAuth(CloudAccount account);
+  
+  /// Ensures the provider is authenticated
+  /// Throws CloudProviderException if not authenticated
+  void ensureAuthenticated() {
+    if (_currentAccount?.accessToken == null) {
+      throw CloudProviderException('Provider not authenticated');
+    }
+  }
   
   /// Disposes of resources used by this provider
   /// Should be called when the provider is no longer needed

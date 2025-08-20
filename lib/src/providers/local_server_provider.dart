@@ -5,6 +5,7 @@ import '../models/file_entry.dart';
 import '../enums/cloud_provider_type.dart';
 import '../enums/oauth_scope.dart';
 import '../models/provider_capabilities.dart';
+import '../models/cloud_account.dart';
 import 'base_cloud_provider.dart';
 import '../utils/app_logger.dart';
 
@@ -275,5 +276,22 @@ class LocalServerProvider extends BaseCloudProvider {
       default:
         throw CloudProviderException('Unsupported HTTP method: $method');
     }
+  }
+
+  @override
+  Future<UserProfile> getUserProfile() async {
+    // Local server provider doesn't require authentication, return mock profile
+    return const UserProfile(
+      id: 'local_user',
+      name: 'Local Server User',
+      email: 'local@server.dev',
+      photoUrl: null,
+    );
+  }
+  
+  @override
+  Future<CloudAccount> refreshAuth(CloudAccount account) async {
+    // Local server provider doesn't require token refresh, return the same account
+    return account;
   }
 }
