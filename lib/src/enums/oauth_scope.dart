@@ -5,34 +5,34 @@
 enum OAuthScope {
   /// Read access to user's files
   readFiles,
-  
+
   /// Write access to user's files (create, modify, delete)
   writeFiles,
-  
+
   /// Permission to create folders/directories
   createFolders,
-  
+
   /// Permission to delete files and folders
   deleteFiles,
-  
+
   /// Permission to share files and folders with others
   shareFiles,
-  
+
   /// Read access to user's profile information
   readProfile,
-  
+
   /// Access to file metadata (without content)
   readMetadata,
-  
+
   /// Permission to move files between folders
   moveFiles,
-  
+
   /// Permission to copy files
   copyFiles,
-  
+
   /// Permission to rename files and folders
   renameFiles;
-  
+
   /// Returns a human-readable description of this scope
   String get description {
     switch (this) {
@@ -58,4 +58,11 @@ enum OAuthScope {
         return 'Rename files and folders';
     }
   }
+
+  static const required = {
+    OAuthScope.readFiles,
+    OAuthScope.writeFiles,
+    OAuthScope.createFolders,
+    OAuthScope.readProfile,
+  };
 }

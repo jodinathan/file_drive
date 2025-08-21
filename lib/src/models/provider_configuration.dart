@@ -282,12 +282,7 @@ extension ProviderConfigurationFactories on ProviderConfiguration {
     required String Function(String state) generateAuthUrl,
     required String Function(String state) generateTokenUrl,
     required String redirectScheme,
-    Set<OAuthScope> requiredScopes = const {
-      OAuthScope.readFiles,
-      OAuthScope.writeFiles,
-      OAuthScope.createFolders,
-      OAuthScope.readProfile,
-    },
+    Set<OAuthScope> requiredScopes = OAuthScope.required,
     String displayName = 'Google Drive',
     String? logoAssetPath = 'assets/logos/googleDrive.svg',
     Map<String, dynamic> additionalConfig = const {},
