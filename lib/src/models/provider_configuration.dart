@@ -13,50 +13,50 @@ import '../providers/base_cloud_provider.dart';
 class ProviderConfiguration {
   /// The cloud provider type this configuration is for
   final CloudProviderType type;
-  
+
   /// Human-readable display name for this provider
   final String displayName;
-  
+
   /// Custom widget for displaying the provider logo
   final Widget? logoWidget;
-  
+
   /// Path to the provider's logo asset (alternative to logoWidget)
   final String? logoAssetPath;
-  
+
   /// Function to generate OAuth authorization URL
   /// This function receives the OAuth state parameter and should return
   /// a complete authorization URL (typically from a server endpoint)
   final String Function(String state) generateAuthUrl;
-  
+
   /// Function to generate OAuth token exchange URL
   /// This function receives the OAuth state parameter and should return
   /// a complete token URL (typically from a server endpoint)
   final String Function(String state) generateTokenUrl;
-  
+
   /// OAuth redirect scheme used for handling auth callbacks
   /// Should match the scheme configured in your app's URL handling
   final String redirectScheme;
-  
+
   /// Set of OAuth scopes required by this provider configuration
   final Set<OAuthScope> requiredScopes;
-  
+
   /// Capabilities supported by this provider
   final ProviderCapabilities capabilities;
-  
+
   /// Whether this provider requires account management
   /// If true, the provider will support multiple accounts and account switching
   final bool requiresAccountManagement;
-  
+
   /// Optional factory function to create custom provider instances
   /// If not provided, the default provider for the type will be used
   final BaseCloudProvider Function()? createProvider;
-  
+
   /// Additional provider-specific configuration
   final Map<String, dynamic> additionalConfig;
-  
+
   /// Whether this provider configuration is enabled
   final bool enabled;
-  
+
   /// Unique identifier for this configuration (useful for multi-tenant scenarios)
   final String? configurationId;
 
@@ -76,13 +76,12 @@ class ProviderConfiguration {
     this.enabled = true,
     this.configurationId,
   }) : assert(
-         logoWidget != null || logoAssetPath != null || type == CloudProviderType.custom,
+         logoWidget != null ||
+             logoAssetPath != null ||
+             type == CloudProviderType.custom,
          'Either logoWidget or logoAssetPath must be provided (or use custom type)',
        ),
-       assert(
-         redirectScheme.isNotEmpty,
-         'redirectScheme cannot be empty',
-       ),
+       assert(redirectScheme.isNotEmpty, 'redirectScheme cannot be empty'),
        assert(
          requiredScopes.isNotEmpty,
          'At least one OAuth scope must be specified',
@@ -115,7 +114,8 @@ class ProviderConfiguration {
       redirectScheme: redirectScheme ?? this.redirectScheme,
       requiredScopes: requiredScopes ?? this.requiredScopes,
       capabilities: capabilities ?? this.capabilities,
-      requiresAccountManagement: requiresAccountManagement ?? this.requiresAccountManagement,
+      requiresAccountManagement:
+          requiresAccountManagement ?? this.requiresAccountManagement,
       createProvider: createProvider ?? this.createProvider,
       additionalConfig: additionalConfig ?? this.additionalConfig,
       enabled: enabled ?? this.enabled,
@@ -130,34 +130,38 @@ class ProviderConfiguration {
     if (displayName.isEmpty) {
       throw ArgumentError('Display name cannot be empty');
     }
-    
+
     if (requiredScopes.isEmpty) {
       throw ArgumentError('At least one OAuth scope must be specified');
     }
-    
+
     if (redirectScheme.isEmpty) {
       throw ArgumentError('Redirect scheme cannot be empty');
     }
-    
+
     if (!redirectScheme.contains('://')) {
       throw ArgumentError('Invalid redirect scheme format: $redirectScheme');
     }
-    
+
     // Validate logo requirements
-    if (logoWidget == null && logoAssetPath == null && type != CloudProviderType.custom) {
-      throw ArgumentError('Either logoWidget or logoAssetPath must be provided (or use custom type)');
+    if (logoWidget == null &&
+        logoAssetPath == null &&
+        type != CloudProviderType.custom) {
+      throw ArgumentError(
+        'Either logoWidget or logoAssetPath must be provided (or use custom type)',
+      );
     }
-    
+
     // Test URL generation functions with a sample state
     try {
       final sampleState = 'test_state_123';
       final authUrl = generateAuthUrl(sampleState);
       final tokenUrl = generateTokenUrl(sampleState);
-      
+
       if (Uri.tryParse(authUrl) == null) {
         throw ArgumentError('generateAuthUrl must return a valid URL');
       }
-      
+
       if (Uri.tryParse(tokenUrl) == null) {
         throw ArgumentError('generateTokenUrl must return a valid URL');
       }
@@ -197,7 +201,7 @@ class ProviderConfiguration {
       (t) => t.name == typeString,
       orElse: () => throw ArgumentError('Invalid provider type: $typeString'),
     );
-    
+
     final scopeStrings = List<String>.from(json['requiredScopes'] as List);
     final scopes = scopeStrings.map((scopeString) {
       return OAuthScope.values.firstWhere(
@@ -218,7 +222,8 @@ class ProviderConfiguration {
       capabilities: ProviderCapabilities.fromJson(
         json['capabilities'] as Map<String, dynamic>,
       ),
-      requiresAccountManagement: json['requiresAccountManagement'] as bool? ?? true,
+      requiresAccountManagement:
+          json['requiresAccountManagement'] as bool? ?? true,
       additionalConfig: Map<String, dynamic>.from(
         json['additionalConfig'] as Map? ?? {},
       ),
@@ -230,7 +235,7 @@ class ProviderConfiguration {
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    
+
     return other is ProviderConfiguration &&
         other.type == type &&
         other.displayName == displayName &&
@@ -242,9 +247,9 @@ class ProviderConfiguration {
         other.requiresAccountManagement == requiresAccountManagement &&
         other.enabled == enabled &&
         other.configurationId == configurationId;
-        // Note: Functions (generateAuthUrl, generateTokenUrl, createProvider) and 
-        // Widgets (logoWidget) are not included in equality comparison
-        // as they cannot be reliably compared for equality
+    // Note: Functions (generateAuthUrl, generateTokenUrl, createProvider) and
+    // Widgets (logoWidget) are not included in equality comparison
+    // as they cannot be reliably compared for equality
   }
 
   @override
@@ -352,16 +357,8 @@ extension ProviderConfigurationFactories on ProviderConfiguration {
 
   /// Creates a local server provider configuration (for development/testing)
   static ProviderConfiguration localServer({
-    required String Function(String state) generateAuthUrl,
-    required String Function(String state) generateTokenUrl,
-    required String redirectScheme,
     String displayName = 'Local Development Server',
     Widget? logoWidget,
-    Set<OAuthScope> requiredScopes = const {
-      OAuthScope.readFiles,
-      OAuthScope.writeFiles,
-      OAuthScope.createFolders,
-    },
     Map<String, dynamic> additionalConfig = const {},
     bool enabled = true,
     String? configurationId,
@@ -369,11 +366,15 @@ extension ProviderConfigurationFactories on ProviderConfiguration {
     return ProviderConfiguration(
       type: CloudProviderType.localServer,
       displayName: displayName,
-      logoWidget: logoWidget ?? const Icon(Icons.storage), // Default icon for local server
-      generateAuthUrl: generateAuthUrl,
-      generateTokenUrl: generateTokenUrl,
-      redirectScheme: redirectScheme,
-      requiredScopes: requiredScopes,
+      logoWidget:
+          logoWidget ??
+          const Icon(Icons.storage), // Default icon for local server
+      generateAuthUrl: (s) =>
+          throw 'Unexpected generateAuthUrl call for local server',
+      generateTokenUrl: (s) =>
+          throw 'Unexpected generateTokenUrl call for local server',
+      redirectScheme: 'UNKNOWN',
+      requiredScopes: {},
       capabilities: const ProviderCapabilities(
         canUpload: true,
         canCreateFolders: true,
@@ -386,7 +387,8 @@ extension ProviderConfigurationFactories on ProviderConfiguration {
         canRename: true,
         maxPageSize: 50,
       ),
-      requiresAccountManagement: false, // Local server doesn't need multiple accounts
+      requiresAccountManagement:
+          false, // Local server doesn't need multiple accounts
       additionalConfig: additionalConfig,
       enabled: enabled,
       configurationId: configurationId,
