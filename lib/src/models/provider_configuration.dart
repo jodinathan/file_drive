@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../enums/cloud_provider_type.dart';
 import '../enums/oauth_scope.dart';
 import '../models/provider_capabilities.dart';
+import '../models/base_provider_configuration.dart';
 import '../providers/base_cloud_provider.dart';
 
 /// Unified configuration for cloud storage providers
@@ -10,15 +11,26 @@ import '../providers/base_cloud_provider.dart';
 /// This class replaces the fragmented configuration approach with a single,
 /// flexible configuration structure that supports multiple providers without
 /// client secrets in the app code.
-class ProviderConfiguration {
-  /// The cloud provider type this configuration is for
-  final CloudProviderType type;
-
-  /// Human-readable display name for this provider
-  final String displayName;
-
-  /// Custom widget for displaying the provider logo
-  final Widget? logoWidget;
+class ProviderConfiguration extends BaseProviderConfiguration {
+  
+  /// Converts ProviderCapabilities to Set<ProviderCapability>
+  static Set<ProviderCapability> _convertCapabilities(ProviderCapabilities capabilities) {
+    final result = <ProviderCapability>{};
+    
+    if (capabilities.canUpload) result.add(ProviderCapability.upload);
+    if (capabilities.canCreateFolders) result.add(ProviderCapability.createFolders);
+    if (capabilities.canDelete) result.add(ProviderCapability.delete);
+    if (capabilities.canPermanentDelete) result.add(ProviderCapability.permanentDelete);
+    if (capabilities.canSearch) result.add(ProviderCapability.search);
+    if (capabilities.canChunkedUpload) result.add(ProviderCapability.chunkedUpload);
+    if (capabilities.hasThumbnails) result.add(ProviderCapability.thumbnails);
+    if (capabilities.canShare) result.add(ProviderCapability.share);
+    if (capabilities.canMove) result.add(ProviderCapability.move);
+    if (capabilities.canCopy) result.add(ProviderCapability.copy);
+    if (capabilities.canRename) result.add(ProviderCapability.rename);
+    
+    return result;
+  }
 
   /// Path to the provider's logo asset (alternative to logoWidget)
   final String? logoAssetPath;
@@ -40,8 +52,8 @@ class ProviderConfiguration {
   /// Set of OAuth scopes required by this provider configuration
   final Set<OAuthScope> requiredScopes;
 
-  /// Capabilities supported by this provider
-  final ProviderCapabilities capabilities;
+  /// Original capabilities supported by this provider
+  final ProviderCapabilities providerCapabilities;
 
   /// Whether this provider requires account management
   /// If true, the provider will support multiple accounts and account switching
@@ -54,27 +66,21 @@ class ProviderConfiguration {
   /// Additional provider-specific configuration
   final Map<String, dynamic> additionalConfig;
 
-  /// Whether this provider configuration is enabled
-  final bool enabled;
-
-  /// Unique identifier for this configuration (useful for multi-tenant scenarios)
-  final String? configurationId;
-
   ProviderConfiguration({
-    required this.type,
-    required this.displayName,
-    this.logoWidget,
+    required CloudProviderType type,
+    required String displayName,
+    Widget? logoWidget,
     this.logoAssetPath,
     required this.generateAuthUrl,
     required this.generateTokenUrl,
     required this.redirectScheme,
     required this.requiredScopes,
-    required this.capabilities,
+    required this.providerCapabilities,
     this.requiresAccountManagement = true,
     this.createProvider,
     this.additionalConfig = const {},
-    this.enabled = true,
-    this.configurationId,
+    bool enabled = true,
+    String? configurationId,
   }) : assert(
          logoWidget != null ||
              logoAssetPath != null ||
@@ -83,41 +89,60 @@ class ProviderConfiguration {
        ),
        assert(redirectScheme.isNotEmpty, 'redirectScheme cannot be empty'),
        assert(
-         requiredScopes.isNotEmpty,
-         'At least one OAuth scope must be specified',
+         requiredScopes.isNotEmpty || type == CloudProviderType.localServer,
+         'At least one OAuth scope must be specified (except for local server)',
+       ),
+       super(
+         type: type,
+         displayName: displayName,
+         logoWidget: logoWidget,
+         capabilities: _convertCapabilities(providerCapabilities),
+         enabled: enabled,
+         configurationId: configurationId,
        );
 
   /// Creates a copy of this configuration with updated values
-  ProviderConfiguration copyWith({
+  @override
+  BaseProviderConfiguration copyWith({
     CloudProviderType? type,
     String? displayName,
     Widget? logoWidget,
-    String? logoAssetPath,
-    String Function(String state)? generateAuthUrl,
-    String Function(String state)? generateTokenUrl,
-    String? redirectScheme,
-    Set<OAuthScope>? requiredScopes,
-    ProviderCapabilities? capabilities,
-    bool? requiresAccountManagement,
-    BaseCloudProvider Function()? createProvider,
-    Map<String, dynamic>? additionalConfig,
+    Set<ProviderCapability>? capabilities,
     bool? enabled,
     String? configurationId,
   }) {
+    // For ProviderConfiguration, we need to convert the capabilities back
+    ProviderCapabilities? newProviderCapabilities;
+    if (capabilities != null) {
+      // Convert Set<ProviderCapability> back to ProviderCapabilities
+      newProviderCapabilities = ProviderCapabilities(
+        canUpload: capabilities.contains(ProviderCapability.upload),
+        canCreateFolders: capabilities.contains(ProviderCapability.createFolders),
+        canDelete: capabilities.contains(ProviderCapability.delete),
+        canPermanentDelete: capabilities.contains(ProviderCapability.permanentDelete),
+        canSearch: capabilities.contains(ProviderCapability.search),
+        canChunkedUpload: capabilities.contains(ProviderCapability.chunkedUpload),
+        hasThumbnails: capabilities.contains(ProviderCapability.thumbnails),
+        canShare: capabilities.contains(ProviderCapability.share),
+        canMove: capabilities.contains(ProviderCapability.move),
+        canCopy: capabilities.contains(ProviderCapability.copy),
+        canRename: capabilities.contains(ProviderCapability.rename),
+      );
+    }
+    
     return ProviderConfiguration(
       type: type ?? this.type,
       displayName: displayName ?? this.displayName,
       logoWidget: logoWidget ?? this.logoWidget,
-      logoAssetPath: logoAssetPath ?? this.logoAssetPath,
-      generateAuthUrl: generateAuthUrl ?? this.generateAuthUrl,
-      generateTokenUrl: generateTokenUrl ?? this.generateTokenUrl,
-      redirectScheme: redirectScheme ?? this.redirectScheme,
-      requiredScopes: requiredScopes ?? this.requiredScopes,
-      capabilities: capabilities ?? this.capabilities,
-      requiresAccountManagement:
-          requiresAccountManagement ?? this.requiresAccountManagement,
-      createProvider: createProvider ?? this.createProvider,
-      additionalConfig: additionalConfig ?? this.additionalConfig,
+      logoAssetPath: logoAssetPath,
+      generateAuthUrl: generateAuthUrl,
+      generateTokenUrl: generateTokenUrl,
+      redirectScheme: redirectScheme,
+      requiredScopes: requiredScopes,
+      providerCapabilities: newProviderCapabilities ?? providerCapabilities,
+      requiresAccountManagement: requiresAccountManagement,
+      createProvider: createProvider,
+      additionalConfig: additionalConfig,
       enabled: enabled ?? this.enabled,
       configurationId: configurationId ?? this.configurationId,
     );
@@ -126,13 +151,14 @@ class ProviderConfiguration {
   /// Validates this configuration
   ///
   /// Throws [ArgumentError] if the configuration is invalid.
+  @override
   void validate() {
     if (displayName.isEmpty) {
       throw ArgumentError('Display name cannot be empty');
     }
 
-    if (requiredScopes.isEmpty) {
-      throw ArgumentError('At least one OAuth scope must be specified');
+    if (requiredScopes.isEmpty && type != CloudProviderType.localServer) {
+      throw ArgumentError('At least one OAuth scope must be specified (except for local server)');
     }
 
     if (redirectScheme.isEmpty) {
@@ -172,6 +198,7 @@ class ProviderConfiguration {
 
   /// Converts this configuration to a JSON map
   /// Note: Widget and function properties are not serialized
+  @override
   Map<String, dynamic> toJson() {
     return {
       'type': type.name,
@@ -179,7 +206,7 @@ class ProviderConfiguration {
       'logoAssetPath': logoAssetPath,
       'redirectScheme': redirectScheme,
       'requiredScopes': requiredScopes.map((s) => s.name).toList(),
-      'capabilities': capabilities.toJson(),
+      'capabilities': providerCapabilities.toJson(),
       'requiresAccountManagement': requiresAccountManagement,
       'additionalConfig': additionalConfig,
       'enabled': enabled,
@@ -219,7 +246,7 @@ class ProviderConfiguration {
       generateTokenUrl: generateTokenUrl,
       redirectScheme: json['redirectScheme'] as String,
       requiredScopes: scopes,
-      capabilities: ProviderCapabilities.fromJson(
+      providerCapabilities: ProviderCapabilities.fromJson(
         json['capabilities'] as Map<String, dynamic>,
       ),
       requiresAccountManagement:
@@ -302,7 +329,7 @@ extension ProviderConfigurationFactories on ProviderConfiguration {
       generateTokenUrl: generateTokenUrl,
       redirectScheme: redirectScheme,
       requiredScopes: requiredScopes,
-      capabilities: const ProviderCapabilities(
+      providerCapabilities: const ProviderCapabilities(
         canUpload: true,
         canCreateFolders: true,
         canDelete: true,
@@ -346,7 +373,7 @@ extension ProviderConfigurationFactories on ProviderConfiguration {
       generateTokenUrl: generateTokenUrl,
       redirectScheme: redirectScheme,
       requiredScopes: requiredScopes,
-      capabilities: capabilities,
+      providerCapabilities: capabilities,
       requiresAccountManagement: requiresAccountManagement,
       createProvider: createProvider,
       additionalConfig: additionalConfig,
@@ -375,7 +402,7 @@ extension ProviderConfigurationFactories on ProviderConfiguration {
           throw 'Unexpected generateTokenUrl call for local server',
       redirectScheme: 'UNKNOWN',
       requiredScopes: {},
-      capabilities: const ProviderCapabilities(
+      providerCapabilities: const ProviderCapabilities(
         canUpload: true,
         canCreateFolders: true,
         canDelete: true,

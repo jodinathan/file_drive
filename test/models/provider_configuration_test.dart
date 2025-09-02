@@ -5,6 +5,7 @@ import 'package:file_cloud/src/models/provider_configuration.dart';
 import 'package:file_cloud/src/enums/cloud_provider_type.dart';
 import 'package:file_cloud/src/enums/oauth_scope.dart';
 import 'package:file_cloud/src/models/provider_capabilities.dart';
+import 'package:file_cloud/src/models/base_provider_configuration.dart';
 
 void main() {
   group('ProviderConfiguration', () {
@@ -19,8 +20,8 @@ void main() {
       expect(config.displayName, 'Google Drive');
       expect(config.redirectScheme, 'myapp://oauth');
       expect(config.requiredScopes.contains(OAuthScope.readFiles), true);
-      expect(config.capabilities.canUpload, true);
-      expect(config.capabilities.canSearch, true);
+      expect(config.capabilities.contains(ProviderCapability.upload), true);
+      expect(config.capabilities.contains(ProviderCapability.search), true);
       expect(config.requiresAccountManagement, true);
     });
 
@@ -44,21 +45,19 @@ void main() {
       expect(config.type, CloudProviderType.custom);
       expect(config.displayName, 'My Custom Provider');
       expect(config.logoWidget, isA<Icon>());
-      expect(config.capabilities.canCreateFolders, false);
-      expect(config.capabilities.canSearch, true);
+      expect(config.capabilities.contains(ProviderCapability.createFolders), false);
+      expect(config.capabilities.contains(ProviderCapability.search), true);
     });
 
     test('should create local server configuration', () {
       final config = ProviderConfigurationFactories.localServer(
-        generateAuthUrl: (state) => 'http://localhost:8080/auth?state=$state',
-        generateTokenUrl: (state) => 'http://localhost:8080/token?state=$state',
-        redirectScheme: 'localapp://oauth',
+        displayName: 'Test Local Server',
       );
 
       expect(config.type, CloudProviderType.localServer);
-      expect(config.displayName, 'Local Development Server');
+      expect(config.displayName, 'Test Local Server');
       expect(config.requiresAccountManagement, false);
-      expect(config.capabilities.canSearch, false); // Default for local server
+      expect(config.capabilities.contains(ProviderCapability.search), false); // Default for local server
     });
 
     test('should validate configuration correctly', () {
@@ -70,7 +69,7 @@ void main() {
         generateTokenUrl: (state) => 'https://example.com/token?state=$state',
         redirectScheme: 'test://oauth',
         requiredScopes: {OAuthScope.readFiles},
-        capabilities: const ProviderCapabilities(),
+        providerCapabilities: const ProviderCapabilities(),
       );
 
       expect(() => config.validate(), returnsNormally);
@@ -85,7 +84,7 @@ void main() {
         generateTokenUrl: (state) => 'https://example.com/token?state=$state',
         redirectScheme: 'invalid-scheme', // Missing ://
         requiredScopes: {OAuthScope.readFiles},
-        capabilities: const ProviderCapabilities(),
+        providerCapabilities: const ProviderCapabilities(),
       );
 
       expect(() => config.validate(), throwsArgumentError);
@@ -100,7 +99,7 @@ void main() {
         generateTokenUrl: (state) => 'https://example.com/token?state=$state',
         redirectScheme: 'test://oauth',
         requiredScopes: {OAuthScope.readFiles},
-        capabilities: const ProviderCapabilities(),
+        providerCapabilities: const ProviderCapabilities(),
       );
 
       expect(() => config.validate(), throwsArgumentError);
@@ -115,7 +114,7 @@ void main() {
         generateTokenUrl: (state) => 'https://example.com/token?state=$state',
         redirectScheme: 'test://oauth',
         requiredScopes: {OAuthScope.readFiles, OAuthScope.writeFiles},
-        capabilities: const ProviderCapabilities(canUpload: true),
+        providerCapabilities: const ProviderCapabilities(canUpload: true),
         configurationId: 'test-config-1',
       );
 
@@ -163,8 +162,8 @@ void main() {
       expect(config.requiredScopes.contains(OAuthScope.readFiles), true);
       expect(config.requiredScopes.contains(OAuthScope.writeFiles), true);
       expect(config.configurationId, 'test-config-1');
-      expect(config.capabilities.canUpload, true);
-      expect(config.capabilities.canDelete, false);
+      expect(config.capabilities.contains(ProviderCapability.upload), true);
+      expect(config.capabilities.contains(ProviderCapability.delete), false);
     });
 
     test('should create copy with updated values', () {
@@ -176,7 +175,7 @@ void main() {
         generateTokenUrl: (state) => 'https://example.com/token?state=$state',
         redirectScheme: 'original://oauth',
         requiredScopes: {OAuthScope.readFiles},
-        capabilities: const ProviderCapabilities(),
+        providerCapabilities: const ProviderCapabilities(),
         enabled: true,
       );
 
@@ -188,7 +187,7 @@ void main() {
       expect(updated.displayName, 'Updated Provider');
       expect(updated.enabled, false);
       expect(updated.type, original.type); // Should remain unchanged
-      expect(updated.logoAssetPath, original.logoAssetPath); // Should remain unchanged
+      expect((updated as ProviderConfiguration).logoAssetPath, (original as ProviderConfiguration).logoAssetPath); // Should remain unchanged
     });
 
     test('should handle equality comparison correctly', () {
@@ -204,7 +203,7 @@ void main() {
         generateTokenUrl: tokenUrlGenerator,
         redirectScheme: 'test://oauth',
         requiredScopes: {OAuthScope.readFiles},
-        capabilities: const ProviderCapabilities(),
+        providerCapabilities: const ProviderCapabilities(),
       );
 
       final config2 = ProviderConfiguration(
@@ -215,7 +214,7 @@ void main() {
         generateTokenUrl: tokenUrlGenerator, // Same function reference
         redirectScheme: 'test://oauth',
         requiredScopes: {OAuthScope.readFiles},
-        capabilities: const ProviderCapabilities(),
+        providerCapabilities: const ProviderCapabilities(),
       );
 
       final config3 = config1.copyWith(displayName: 'Different Provider');

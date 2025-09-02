@@ -124,7 +124,7 @@ class ProviderHelper {
   static bool getShowAccountManagement(CloudProviderType providerType) {
     if (_providersMap == null) return true; // Default to true for standard providers
     
-    final provider = _providersMap![providerType];
+    final provider = _providersMap![providerType.name];
     if (provider is CustomProvider) {
       return provider.config.showAccountManagement;
     }

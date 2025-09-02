@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter run:*)",
+      "mcp__dart__connect_dart_tooling_daemon",
+      "mcp__dart__add_roots",
+      "mcp__dart__analyze_files"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "dart"
+  ]
+}

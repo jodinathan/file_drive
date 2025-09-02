@@ -1,32 +1,90 @@
 import 'dart:convert';
 import 'dart:async';
+import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 import '../models/file_entry.dart';
 import '../enums/cloud_provider_type.dart';
 import '../enums/oauth_scope.dart';
 import '../models/provider_capabilities.dart';
 import '../models/cloud_account.dart';
+import '../models/base_provider_configuration.dart';
 import 'base_cloud_provider.dart';
 import '../utils/app_logger.dart';
+
+/// Configuration for the local server provider
+class LocalServerProviderConfig extends BaseProviderConfiguration {
+  /// Server URL for local testing
+  final String serverUrl;
+  
+  /// Test token for authentication
+  final String testToken;
+
+  const LocalServerProviderConfig({
+    String displayName = 'Local Server',
+    this.serverUrl = 'http://localhost:8080',
+    this.testToken = 'test_token_dev',
+    Set<ProviderCapability> capabilities = const {
+      ProviderCapability.upload,
+      ProviderCapability.createFolders,
+      ProviderCapability.delete,
+      ProviderCapability.search,
+    },
+    bool enabled = true,
+    String? configurationId,
+  }) : super(
+    type: CloudProviderType.localServer,
+    displayName: displayName,
+    capabilities: capabilities,
+    enabled: enabled,
+    configurationId: configurationId,
+  );
+
+  @override
+  LocalServerProviderConfig copyWith({
+    CloudProviderType? type,
+    String? displayName,
+    Widget? logoWidget,
+    Set<ProviderCapability>? capabilities,
+    bool? enabled,
+    String? configurationId,
+    String? serverUrl,
+    String? testToken,
+  }) {
+    return LocalServerProviderConfig(
+      displayName: displayName ?? this.displayName,
+      serverUrl: serverUrl ?? this.serverUrl,
+      testToken: testToken ?? this.testToken,
+      capabilities: capabilities ?? this.capabilities,
+      enabled: enabled ?? this.enabled,
+      configurationId: configurationId ?? this.configurationId,
+    );
+  }
+}
 
 /// Provider que conecta ao servidor local para testes (sem autenticação)
 class LocalServerProvider extends BaseCloudProvider {
   static const String providerId = 'local_server';
   static const String providerName = 'Local Server';
   
-  final String serverUrl;
-  final String testToken;
+  /// Gets the local server provider configuration
+  LocalServerProviderConfig get config => configuration as LocalServerProviderConfig;
+  
+  /// Server URL for local testing
+  String get serverUrl => config.serverUrl;
+  
+  /// Test token for authentication
+  String get testToken => config.testToken;
   
   LocalServerProvider({
-    this.serverUrl = 'http://localhost:8080',
-    this.testToken = 'test_token_dev',
-  });
+    required LocalServerProviderConfig configuration,
+    CloudAccount? account,
+  }) : super(configuration: configuration, account: account);
   
   @override
   CloudProviderType get providerType => CloudProviderType.localServer;
   
   @override
-  String get displayName => providerName;
+  String get displayName => configuration.displayName;
   
   @override
   Set<OAuthScope> get requiredScopes => {}; // Local server doesn't require OAuth scopes

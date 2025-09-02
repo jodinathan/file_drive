@@ -85,9 +85,9 @@ class _FileItemCardState extends State<FileItemCard> {
 
   Color _getBackgroundColor(ThemeData theme) {
     if (widget.isSelected) {
-      return theme.colorScheme.primaryContainer.withOpacity(0.3);
+      return theme.colorScheme.primaryContainer.withValues(alpha: 0.3);
     } else if (_isHovered) {
-      return theme.colorScheme.surfaceContainerHighest.withOpacity(0.5);
+      return theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5);
     } else {
       return Colors.transparent;
     }

@@ -46,13 +46,13 @@ class ProviderCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppConstants.radiusL),
         border: Border.all(
           color: isSelected 
-              ? Theme.of(context).colorScheme.primary.withOpacity(0.3)
-              : Theme.of(context).colorScheme.outline.withOpacity(0.2),
+              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)
+              : Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
           width: isSelected ? 2 : 1,
         ),
         boxShadow: isSelected ? [
           BoxShadow(
-            color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -101,7 +101,7 @@ class ProviderCard extends StatelessWidget {
                     vertical: AppConstants.paddingXS,
                   ),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.secondaryContainer.withOpacity(0.5),
+                    color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(AppConstants.radiusS + 2), // 6px
                   ),
                   child: Text(

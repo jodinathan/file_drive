@@ -10,6 +10,10 @@ export 'src/models/provider_capabilities.dart';
 export 'src/models/selection_config.dart';
 export 'src/models/crop_config.dart';
 export 'src/models/provider_configuration.dart';
+export 'src/models/base_provider_configuration.dart';
+export 'src/models/oauth_provider_configuration.dart';
+export 'src/models/local_provider_configuration.dart';
+export 'src/models/ready_provider_configuration.dart';
 
 // Export enums
 export 'src/enums/cloud_provider_type.dart';
@@ -22,9 +26,14 @@ export 'src/storage/shared_preferences_account_storage.dart';
 
 // Export provider interfaces
 export 'src/providers/base_cloud_provider.dart';
+export 'src/providers/oauth_cloud_provider.dart';
 export 'src/providers/google_drive_provider.dart';
+export 'src/providers/dropbox_provider.dart';
 export 'src/providers/custom_provider.dart';
 export 'src/providers/local_server_provider.dart';
+
+// Export factory
+export 'src/factory/cloud_provider_factory.dart';
 
 // Export authentication
 export 'src/auth/oauth_config.dart';

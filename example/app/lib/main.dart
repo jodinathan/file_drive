@@ -46,7 +46,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   late final AccountStorage _accountStorage;
-  late final List<ProviderConfiguration> _providers;
+  late final List<BaseProviderConfiguration> _providers;
   bool _isLoading = true;
   String? _error;
   bool _showInstructions = false;
@@ -62,43 +62,33 @@ class _HomePageState extends State<HomePage> {
       _accountStorage = SharedPreferencesAccountStorage();
       
       // Configure providers with proper server URLs
+      String serverBaseUrl = 'http://localhost:8080';
+      String redirectScheme = 'my-custom-app';
+      
       try {
-        // Get configuration from config.dart if available, otherwise use localhost
-        String serverBaseUrl = 'http://localhost:8080';
-        String redirectScheme = 'my-custom-app';
-        
-        try {
-          // Try to use config if available
-          serverBaseUrl = config.AppConfig.serverBaseUrl;
-          redirectScheme = config.AppConfig.customScheme;
-        } catch (e) {
-          // Use defaults if config not available
-        }
-        
-        // Create provider configurations using the new API
-        _providers = [
-          ProviderConfigurationFactories.googleDrive(
-            generateAuthUrl: (state) => '$serverBaseUrl/auth/google?state=$state',
-            generateTokenUrl: (state) => '$serverBaseUrl/auth/tokens/$state',
-            redirectScheme: redirectScheme,
-            requiredScopes: {OAuthScope.readFiles, OAuthScope.writeFiles, OAuthScope.createFolders},
-          ),
-          // Add more providers if needed
-          ProviderConfigurationFactories.localServer(
-            generateAuthUrl: (state) => '$serverBaseUrl/auth/local?state=$state',
-            generateTokenUrl: (state) => '$serverBaseUrl/auth/tokens/$state',
-            redirectScheme: redirectScheme,
-            displayName: 'Local Development Server',
-          ),
-        ];
-        
-        // Test server connectivity
-        await _testServerConnection();
-        
+        // Try to use config if available
+        serverBaseUrl = config.AppConfig.serverBaseUrl;
+        redirectScheme = config.AppConfig.customScheme;
       } catch (e) {
-        // If config is missing, show instructions but don't set the flag
-        // _showInstructions = true; // Commented out to always show widget
+        // Use defaults if config not available
       }
+      
+      // Create provider configurations using the new API
+      _providers = <BaseProviderConfiguration>[
+        ProviderConfigurationFactories.googleDrive(
+          generateAuthUrl: (state) => '$serverBaseUrl/auth/google?state=$state',
+          generateTokenUrl: (state) => '$serverBaseUrl/auth/tokens/$state',
+          redirectScheme: redirectScheme,
+          requiredScopes: {OAuthScope.readFiles, OAuthScope.writeFiles, OAuthScope.createFolders},
+        ),
+        // Add more providers if needed
+        ProviderConfigurationFactories.localServer(
+          displayName: 'Local Development Server',
+        ),
+      ];
+      
+      // Test server connectivity
+      await _testServerConnection();
       
       if (mounted) {
         setState(() {
@@ -106,6 +96,9 @@ class _HomePageState extends State<HomePage> {
         });
       }
     } catch (e) {
+      // Initialize providers with empty list on error to prevent LateInitializationError
+      _providers = <BaseProviderConfiguration>[];
+      print('❌ Erro ao inicializar: $e');
       if (mounted) {
         setState(() {
           _error = 'Erro ao inicializar: $e';

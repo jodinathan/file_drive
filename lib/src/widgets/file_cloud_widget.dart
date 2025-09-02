@@ -9,11 +9,12 @@ import '../models/image_file_entry.dart';
 import '../models/selection_config.dart';
 import '../models/crop_config.dart';
 import '../providers/base_cloud_provider.dart';
-import '../providers/google_drive_provider.dart';
-import '../providers/local_server_provider.dart';
+import '../models/base_provider_configuration.dart';
+import '../models/oauth_provider_configuration.dart';
 import '../storage/account_storage.dart';
 import '../auth/oauth_config.dart';
-import '../models/provider_configuration.dart';
+import '../factory/cloud_provider_factory.dart';
+import '../enums/oauth_scope.dart';
 import '../auth/oauth_manager.dart';
 import '../theme/app_constants.dart';
 import '../l10n/generated/app_localizations.dart';
@@ -36,7 +37,7 @@ class FileCloudWidget extends StatefulWidget {
   final AccountStorage accountStorage;
 
   /// List of provider configurations (replaces single oauthConfig)
-  final List<ProviderConfiguration> providers;
+  final List<BaseProviderConfiguration> providers;
 
   /// File selection configuration (optional)
   final SelectionConfig? selectionConfig;
@@ -327,8 +328,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
 
       final provider = _createProviderInstance(config);
       if (provider != null) {
-        // Initialize provider with configuration
-        provider.initialize(configuration: config);
+        // Provider is already configured via constructor
         _providers[config.type] = provider;
         AppLogger.success(
           'Provedor ${config.displayName} inicializado com sucesso',
@@ -352,30 +352,76 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     }
   }
 
-  BaseCloudProvider? _createProviderInstance(ProviderConfiguration config) {
-    // Use custom provider factory if provided
-    if (config.createProvider != null) {
-      return config.createProvider!();
-    }
-
-    // Default provider creation based on type
-    switch (config.type) {
-      case CloudProviderType.googleDrive:
-        return GoogleDriveProvider();
-      case CloudProviderType.localServer:
-        return LocalServerProvider(
-          serverUrl: config.generateAuthUrl('dummy').split('/auth/')[0],
-        );
-      case CloudProviderType.dropbox:
-      case CloudProviderType.oneDrive:
-      case CloudProviderType.custom:
-        AppLogger.warning(
-          'Provedor ${config.type} não implementado ainda',
-          component: 'Init',
-        );
-        return null;
+  BaseCloudProvider? _createProviderInstance(BaseProviderConfiguration config) {
+    try {
+      // Use the factory to create provider from configuration
+      return CloudProviderFactory.createFromConfiguration(config);
+    } catch (e) {
+      AppLogger.error(
+        'Erro ao criar provedor ${config.displayName}: $e',
+        component: 'Init',
+      );
+      return null;
     }
   }
+
+  /// Helper method to safely check if a provider configuration requires account management
+  bool _requiresAccountManagement(BaseProviderConfiguration config) {
+    if (config is OAuthProviderConfiguration) {
+      return config.requiresAccountManagement;
+    }
+    // Most providers require account management by default, except local/custom providers
+    switch (config.type) {
+      case CloudProviderType.localServer:
+      case CloudProviderType.custom:
+        return false;
+      default:
+        return true;
+    }
+  }
+
+  /// Helper method to safely get OAuth properties from configurations
+  String? _getAuthUrl(BaseProviderConfiguration config, String state) {
+    if (config is OAuthProviderConfiguration) {
+      try {
+        return config.authUrlGenerator(state).toString();
+      } catch (e) {
+        AppLogger.warning('Failed to generate auth URL: $e', component: 'OAuth');
+        return null;
+      }
+    }
+    return null;
+  }
+
+  /// Helper method to safely get token URL from configurations  
+  String? _getTokenUrl(BaseProviderConfiguration config, String state) {
+    if (config is OAuthProviderConfiguration) {
+      try {
+        return config.tokenUrlGenerator(state).toString();
+      } catch (e) {
+        AppLogger.warning('Failed to generate token URL: $e', component: 'OAuth');
+        return null;
+      }
+    }
+    return null;
+  }
+
+  /// Helper method to safely get redirect scheme from configurations
+  String? _getRedirectScheme(BaseProviderConfiguration config) {
+    if (config is OAuthProviderConfiguration) {
+      return config.redirectScheme;
+    }
+    return null;
+  }
+
+  /// Helper method to safely get OAuth scopes from configurations
+  List<String> _getScopes(BaseProviderConfiguration config) {
+    if (config is OAuthProviderConfiguration) {
+      return config.scopes;
+    }
+    return [];
+  }
+
 
   Future<void> _loadAccounts() async {
     AppLogger.info('Carregando contas do storage', component: 'Accounts');
@@ -391,7 +437,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
         (config) => config.type == _selectedProvider,
         orElse: () => widget.providers.first,
       );
-      final showAccountManagement = providerConfig.requiresAccountManagement;
+      final showAccountManagement = _requiresAccountManagement(providerConfig);
 
       if (!showAccountManagement && _selectedProvider != null) {
         // For providers without account management, no account needed
@@ -531,13 +577,8 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
               component: component,
             );
 
-            // Get provider configuration for reinitializing
-            final providerConfig = widget.providers.firstWhere(
-              (config) => config.type == _selectedProvider,
-              orElse: () => throw Exception('Provider configuration not found'),
-            );
-            // Reinitialize provider with new token
-            provider.initialize(configuration: providerConfig, account: refreshedAccount);
+            // Update provider with new account
+            provider.setCurrentAccount(refreshedAccount);
 
             // Reload accounts to reflect the updated token in UI
             await _reloadAccountsOnly();
@@ -564,8 +605,8 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
               (config) => config.type == _selectedProvider,
               orElse: () => throw Exception('Provider configuration not found'),
             );
-            if (providerConfig.requiresAccountManagement) {
-              provider.initialize(configuration: providerConfig, account: refreshedAccount);
+            if (_requiresAccountManagement(providerConfig)) {
+              provider.setCurrentAccount(refreshedAccount);
             }
 
             // Reload accounts to reflect the updated token in UI
@@ -668,7 +709,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       final oauthManager = OAuthManager();
 
       // Build refresh URL from the provider configuration
-      final authUrl = providerConfig.generateAuthUrl('dummy');
+      final authUrl = _getAuthUrl(providerConfig, 'dummy') ?? '';
       final baseUrl = authUrl.split('/auth/')[0]; // Get base URL
       final refreshUrl = '$baseUrl/auth/refresh';
 
@@ -895,10 +936,6 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       }
 
       final provider = _providers[_selectedProvider!]!;
-      final providerConfig = widget.providers.firstWhere(
-        (config) => config.type == _selectedProvider,
-        orElse: () => throw Exception('Provider configuration not found'),
-      );
 
       // Check if provider requires account
       final requiresAccount = provider.requiresAccountManagement;
@@ -910,11 +947,9 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
         return;
       }
 
-      // Initialize provider if needed
+      // Set account if needed
       if (requiresAccount && _selectedAccount != null) {
-        provider.initialize(configuration: providerConfig, account: _selectedAccount!);
-      } else {
-        provider.initialize(configuration: providerConfig);
+        provider.setCurrentAccount(_selectedAccount!);
       }
 
       // Get current folder ID for pagination
@@ -1015,16 +1050,15 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
         orElse: () => throw Exception('Provider configuration not found'),
       );
       
-      if (providerConfig.requiresAccountManagement && _selectedAccount != null) {
-        provider.initialize(configuration: providerConfig, account: _selectedAccount!);
+      if (_requiresAccountManagement(providerConfig) && _selectedAccount != null) {
+        provider.setCurrentAccount(_selectedAccount!);
         AppLogger.debug(
-          'Provider inicializado para ${_selectedAccount!.name}',
+          'Provider configurado para ${_selectedAccount!.name}',
           component: 'Files',
         );
       } else {
-        provider.initialize(configuration: providerConfig);
         AppLogger.debug(
-          'Provider serverless inicializado sem conta',
+          'Provider serverless já configurado via construtor',
           component: 'Files',
         );
       }
@@ -1135,10 +1169,10 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       // Create OAuthConfig from provider configuration for authentication
       final oauthConfig = OAuthConfig(
         providerType: providerConfig.type,
-        requiredScopes: providerConfig.requiredScopes,
-        generateAuthUrl: providerConfig.generateAuthUrl,
-        generateTokenUrl: providerConfig.generateTokenUrl,
-        redirectScheme: providerConfig.redirectScheme,
+        requiredScopes: _getScopes(providerConfig).map((scope) => OAuthScope.values.firstWhere((s) => s.name == scope, orElse: () => OAuthScope.readFiles)).toSet(),
+        generateAuthUrl: (state) => _getAuthUrl(providerConfig, state) ?? '',
+        generateTokenUrl: (state) => _getTokenUrl(providerConfig, state) ?? '',
+        redirectScheme: _getRedirectScheme(providerConfig) ?? '',
       );
 
       final result = await oauthManager.authenticate(oauthConfig);
@@ -1203,8 +1237,8 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
           updatedAt: DateTime.now(),
         );
 
-        if (providerConfig.requiresAccountManagement) {
-          provider.initialize(configuration: providerConfig, account: tempAccount);
+        if (_requiresAccountManagement(providerConfig)) {
+          provider.setCurrentAccount(tempAccount);
           final profile = await provider.getUserProfile();
 
           final account = CloudAccount(
@@ -1486,11 +1520,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
               'Nenhuma conta selecionada para provedor que requer conta',
             );
           }
-          final providerConfig = widget.providers.firstWhere(
-            (config) => config.type == _selectedProvider,
-            orElse: () => throw Exception('Provider configuration not found'),
-          );
-          provider.initialize(configuration: providerConfig, account: _selectedAccount!);
+          provider.setCurrentAccount(_selectedAccount!);
         }
 
         // Excluir cada arquivo selecionado
@@ -1694,7 +1724,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     );
     
     // Only check for account if provider requires it
-    if (providerConfig.requiresAccountManagement && _selectedAccount == null) {
+    if (_requiresAccountManagement(providerConfig) && _selectedAccount == null) {
       AppLogger.warning(
         'Tentativa de criar pasta sem conta selecionada para provedor que requer conta',
         component: 'Folder',
@@ -1711,11 +1741,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       try {
         final provider = _providers[_selectedProvider!]!;
         if (provider.requiresAccountManagement) {
-          final providerConfig = widget.providers.firstWhere(
-            (config) => config.type == _selectedProvider,
-            orElse: () => throw Exception('Provider configuration not found'),
-          );
-          provider.initialize(configuration: providerConfig, account: _selectedAccount!);
+          provider.setCurrentAccount(_selectedAccount!);
         }
 
         final currentFolderId = _navigationManager.currentFolderId;
@@ -2376,7 +2402,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
                   customLogoWidget: providerConfig.logoWidget ?? ProviderHelper.getCustomLogoWidget(
                     providerConfig.type,
                   ),
-                  showAccountCount: providerConfig.requiresAccountManagement,
+                  showAccountCount: _requiresAccountManagement(providerConfig),
                   onTap: () {
                     setState(() {
                       _selectedProvider = providerConfig.type;
@@ -2407,7 +2433,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       (config) => config.type == _selectedProvider,
       orElse: () => widget.providers.first,
     );
-    final showAccountManagement = providerConfig.requiresAccountManagement;
+    final showAccountManagement = _requiresAccountManagement(providerConfig);
 
     return Column(
       children: [
@@ -2423,6 +2449,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
 
         // Navigation bar (nova adição)
         if (_selectedProvider != null &&
+            _providers[_selectedProvider] != null &&
             (_selectedAccount != null ||
                 !_providers[_selectedProvider]!.requiresAccountManagement))
           NavigationBarWidget(
@@ -2694,6 +2721,19 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
   /// Navegação de arquivos (parte inferior)
   Widget _buildFileNavigation() {
     // Check if provider requires account
+    if (_selectedProvider == null || _providers[_selectedProvider] == null) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
+            Text('Provider not available'),
+          ],
+        ),
+      );
+    }
+    
     final provider = _providers[_selectedProvider]!;
     final requiresAccount = provider.requiresAccountManagement;
 
@@ -2922,7 +2962,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
               child: TextButton(
                 onPressed: null,
                 style: TextButton.styleFrom(
-                  foregroundColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.38),
+                  foregroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.38),
                 ),
                 child: const Text('Excluir'),
               ),

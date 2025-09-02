@@ -75,7 +75,7 @@ class _UploadListWidgetState extends State<UploadListWidget> {
           : null,
       decoration: BoxDecoration(
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
         ),
         borderRadius: BorderRadius.circular(AppConstants.radiusM),
       ),
@@ -94,7 +94,7 @@ class _UploadListWidgetState extends State<UploadListWidget> {
       padding: const EdgeInsets.all(AppConstants.paddingL),
       decoration: BoxDecoration(
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
         ),
         borderRadius: BorderRadius.circular(AppConstants.radiusM),
       ),
@@ -134,7 +134,7 @@ class _UploadListWidgetState extends State<UploadListWidget> {
     return Container(
       padding: const EdgeInsets.all(AppConstants.paddingM),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(AppConstants.radiusM),
           topRight: Radius.circular(AppConstants.radiusM),
@@ -226,9 +226,9 @@ class _UploadListWidgetState extends State<UploadListWidget> {
           vertical: 4,
         ),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.2) : Colors.transparent,
+          color: isSelected ? color.withValues(alpha: 0.2) : Colors.transparent,
           border: Border.all(
-            color: isSelected ? color : color.withOpacity(0.5),
+            color: isSelected ? color : color.withValues(alpha: 0.5),
           ),
           borderRadius: BorderRadius.circular(AppConstants.radiusS),
         ),

@@ -109,7 +109,7 @@ class AppTheme {
       // Input Decoration Theme
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: baseColorScheme.surfaceContainerHighest.withOpacity(0.5),
+        fillColor: baseColorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppConstants.radiusM),
           borderSide: BorderSide.none,
@@ -117,7 +117,7 @@ class AppTheme {
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppConstants.radiusM),
           borderSide: BorderSide(
-            color: baseColorScheme.outline.withOpacity(0.5),
+            color: baseColorScheme.outline.withValues(alpha: 0.5),
           ),
         ),
         focusedBorder: OutlineInputBorder(
@@ -171,7 +171,7 @@ class AppTheme {
       
       // Divider Theme
       dividerTheme: DividerThemeData(
-        color: baseColorScheme.outline.withOpacity(0.2),
+        color: baseColorScheme.outline.withValues(alpha: 0.2),
         thickness: 1,
         space: 1,
       ),

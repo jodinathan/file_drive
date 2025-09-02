@@ -102,7 +102,7 @@ class NavigationBarWidget extends StatelessWidget {
         color: Theme.of(context).colorScheme.surface,
         border: Border(
           bottom: BorderSide(
-            color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
           ),
         ),
       ),
@@ -192,7 +192,7 @@ class NavigationBarWidget extends StatelessWidget {
           style: IconButton.styleFrom(
             foregroundColor: navigationHistory.canGoBack
                 ? Theme.of(context).colorScheme.primary
-                : Theme.of(context).colorScheme.onSurface.withOpacity(0.38),
+                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.38),
           ),
         ),
 
@@ -204,7 +204,7 @@ class NavigationBarWidget extends StatelessWidget {
           style: IconButton.styleFrom(
             foregroundColor: navigationHistory.canGoForward
                 ? Theme.of(context).colorScheme.primary
-                : Theme.of(context).colorScheme.onSurface.withOpacity(0.38),
+                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.38),
           ),
         ),
       ],
@@ -225,7 +225,7 @@ class NavigationBarWidget extends StatelessWidget {
         decoration: BoxDecoration(
           color: Theme.of(
             context,
-          ).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+          ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
           borderRadius: BorderRadius.circular(AppConstants.radiusS),
         ),
         child: Text(
@@ -280,7 +280,7 @@ class NavigationBarWidget extends StatelessWidget {
       decoration: BoxDecoration(
         color: Theme.of(
           context,
-        ).colorScheme.surfaceContainerHighest.withOpacity(0.3),
+        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(AppConstants.radiusS),
       ),
       child: Row(
@@ -314,7 +314,7 @@ class NavigationBarWidget extends StatelessWidget {
       decoration: BoxDecoration(
         color: Theme.of(
           context,
-        ).colorScheme.surfaceContainerHighest.withOpacity(0.3),
+        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(AppConstants.radiusS),
       ),
       child: SingleChildScrollView(
@@ -399,7 +399,7 @@ class NavigationBarWidget extends StatelessWidget {
             style: IconButton.styleFrom(
               foregroundColor: onCreateFolder != null
                   ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context).colorScheme.onSurface.withOpacity(0.38),
+                  : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.38),
             ),
           ),
         ],
@@ -421,10 +421,10 @@ class NavigationBarWidget extends StatelessWidget {
                 ),
                 backgroundColor: onUpload != null
                     ? null
-                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.12),
+                    : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12),
                 foregroundColor: onUpload != null
                     ? null
-                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.38),
+                    : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.38),
               ),
             ),
           ),
@@ -435,7 +435,7 @@ class NavigationBarWidget extends StatelessWidget {
             height: 24,
             width: 1,
             color: activeUploadsCount > 0
-                ? Theme.of(context).colorScheme.outline.withOpacity(0.3)
+                ? Theme.of(context).colorScheme.outline.withValues(alpha: 0.3)
                 : Colors.transparent,
           ),
           const SizedBox(width: AppConstants.spacingS),
@@ -466,7 +466,7 @@ class NavigationBarWidget extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: Theme.of(
                       context,
-                    ).colorScheme.outline.withOpacity(0.5),
+                    ).colorScheme.outline.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(1.5),
                   ),
                   child: FractionallySizedBox(

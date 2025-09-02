@@ -106,12 +106,12 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
         maxWidth: 400,
       ),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.7),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(AppConstants.radiusM),
         border: Border.all(
           color: _focusNode.hasFocus
-              ? Theme.of(context).colorScheme.primary.withOpacity(0.5)
-              : Theme.of(context).colorScheme.outline.withOpacity(0.3),
+              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.5)
+              : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -141,7 +141,7 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
                   vertical: AppConstants.paddingS,
                 ),
                 hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.7),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                 ),
               ),
               style: Theme.of(context).textTheme.bodyMedium,

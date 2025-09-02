@@ -181,8 +181,6 @@ flutter gen-l10n
 - [ ] **Testes E2E**: Testes de integração completos
 - [ ] **CI/CD**: Pipeline automatizado
 
-Histórico completo: [`REFACTORING_PLAN.md`](REFACTORING_PLAN.md)
-
 ## 🤝 Contribuindo
 
 1. Fork o projeto

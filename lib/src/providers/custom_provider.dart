@@ -8,18 +8,13 @@ import '../enums/oauth_scope.dart';
 import '../models/file_entry.dart';
 import '../models/provider_capabilities.dart';
 import '../models/cloud_account.dart';
+import '../models/base_provider_configuration.dart';
 import 'base_cloud_provider.dart';
 
 /// Configuration for the custom provider
-class CustomProviderConfig {
-  /// Display name of the provider (e.g., "Minha Galeria")
-  final String displayName;
-  
+class CustomProviderConfig extends BaseProviderConfiguration {
   /// Base URL of the server
   final String baseUrl;
-  
-  /// Widget to display as logo/icon
-  final Widget logoWidget;
   
   /// Whether to show account management features
   final bool showAccountManagement;
@@ -28,24 +23,65 @@ class CustomProviderConfig {
   final String providerType;
 
   const CustomProviderConfig({
-    required this.displayName,
+    required String displayName,
     required this.baseUrl,
-    required this.logoWidget,
+    required Widget logoWidget,
     this.showAccountManagement = true,
     this.providerType = 'custom',
-  });
+    Set<ProviderCapability> capabilities = const {
+      ProviderCapability.upload,
+      ProviderCapability.createFolders,
+      ProviderCapability.delete,
+      ProviderCapability.search,
+    },
+    bool enabled = true,
+    String? configurationId,
+  }) : super(
+    type: CloudProviderType.custom,
+    displayName: displayName,
+    logoWidget: logoWidget,
+    capabilities: capabilities,
+    enabled: enabled,
+    configurationId: configurationId,
+  );
+
+  @override
+  CustomProviderConfig copyWith({
+    CloudProviderType? type,
+    String? displayName,
+    Widget? logoWidget,
+    Set<ProviderCapability>? capabilities,
+    bool? enabled,
+    String? configurationId,
+    String? baseUrl,
+    bool? showAccountManagement,
+    String? providerType,
+  }) {
+    return CustomProviderConfig(
+      displayName: displayName ?? this.displayName,
+      baseUrl: baseUrl ?? this.baseUrl,
+      logoWidget: logoWidget ?? this.logoWidget!,
+      showAccountManagement: showAccountManagement ?? this.showAccountManagement,
+      providerType: providerType ?? this.providerType,
+      capabilities: capabilities ?? this.capabilities,
+      enabled: enabled ?? this.enabled,
+      configurationId: configurationId ?? this.configurationId,
+    );
+  }
 }
 
 /// Custom provider implementation that connects to a configurable server
 class CustomProvider extends BaseCloudProvider {
-  final CustomProviderConfig config;
   late http.Client _httpClient;
+
+  /// Gets the custom provider configuration
+  CustomProviderConfig get config => configuration as CustomProviderConfig;
 
   @override
   CloudProviderType get providerType => CloudProviderType.custom;
 
   @override
-  String get displayName => config.displayName;
+  String get displayName => configuration.displayName;
 
   @override
   String get logoAssetPath => ''; // Not used since we have logoWidget
@@ -54,12 +90,15 @@ class CustomProvider extends BaseCloudProvider {
   Set<OAuthScope> get requiredScopes => {}; // Custom provider doesn't use OAuth scopes
 
   /// Widget to display as logo/icon
-  Widget get logoWidget => config.logoWidget;
+  Widget get logoWidget => configuration.logoWidget!;
 
   /// Whether to show account management features
   bool get showAccountManagement => config.showAccountManagement;
 
-  CustomProvider({required this.config}) {
+  CustomProvider({
+    required CustomProviderConfig configuration,
+    CloudAccount? account,
+  }) : super(configuration: configuration, account: account) {
     _httpClient = http.Client();
   }
 

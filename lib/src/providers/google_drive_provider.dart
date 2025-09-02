@@ -4,23 +4,31 @@ import 'package:http/http.dart' as http;
 import '../enums/cloud_provider_type.dart';
 import '../enums/oauth_scope.dart';
 import 'base_cloud_provider.dart';
+import 'oauth_cloud_provider.dart';
 import '../models/file_entry.dart';
 import '../models/provider_capabilities.dart';
 import '../models/cloud_account.dart';
 import '../models/account_status.dart';
 import '../utils/app_logger.dart';
 
-/// Authenticated HTTP client for Google APIs
-class AuthenticatedClient extends http.BaseClient {
+/// HTTP client that uses OAuthCloudProvider's authentication
+class OAuthAuthenticatedClient extends http.BaseClient {
+  final OAuthCloudProvider _oauthProvider;
   final http.Client _client;
-  final String _accessToken;
 
-  AuthenticatedClient(this._accessToken) : _client = http.Client();
+  OAuthAuthenticatedClient(this._oauthProvider) : _client = http.Client();
 
   @override
-  Future<http.StreamedResponse> send(http.BaseRequest request) {
-    request.headers['Authorization'] = 'Bearer $_accessToken';
-    return _client.send(request);
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    try {
+      // Get authenticated headers from parent OAuth provider
+      final headers = await _oauthProvider.getAuthenticatedHeaders();
+      request.headers.addAll(headers);
+      return _client.send(request);
+    } catch (e) {
+      // If authentication fails, let the parent handle it
+      rethrow;
+    }
   }
 
   @override
@@ -30,9 +38,9 @@ class AuthenticatedClient extends http.BaseClient {
 }
 
 /// Google Drive provider implementation using official googleapis SDK
-class GoogleDriveProvider extends BaseCloudProvider {
+class GoogleDriveProvider extends OAuthCloudProvider {
   drive.DriveApi? _driveApi;
-  AuthenticatedClient? _httpClient;
+  OAuthAuthenticatedClient? _httpClient;
   
   @override
   CloudProviderType get providerType => CloudProviderType.googleDrive;
@@ -56,16 +64,13 @@ class GoogleDriveProvider extends BaseCloudProvider {
     OAuthScope.readMetadata,
   };
   
-  /// Initializes the provider with an account
-  
-  @override
-  void initialize({
-    required dynamic configuration,
-    CloudAccount? account,
+  /// Creates a new Google Drive provider with the given configuration
+  GoogleDriveProvider({
+    required super.oauthConfiguration,
+    super.account,
   }) {
-    super.initialize(configuration: configuration, account: account);
-    if (account != null) {
-      _httpClient = AuthenticatedClient(account.accessToken);
+    if (currentAccount != null) {
+      _httpClient = OAuthAuthenticatedClient(this);
       _driveApi = drive.DriveApi(_httpClient!);
     }
   }
@@ -142,50 +147,74 @@ class GoogleDriveProvider extends BaseCloudProvider {
     );
   }
 
-  /// Handles API errors and updates account status if needed
+  /// Handles API errors with enhanced OAuth error handling patterns
   void _handleApiError(Exception e) {
-    // LOG DETALHADO: Print da resposta completa para debug
-    AppLogger.error('GoogleDrive API Error - Exception completa', component: 'GoogleDrive', error: e);
+    AppLogger.error('GoogleDrive API Error', component: 'GoogleDrive', error: e);
     AppLogger.debug('Type: ${e.runtimeType}', component: 'GoogleDrive');
     AppLogger.debug('Message: ${e.toString()}', component: 'GoogleDrive');
     AppLogger.debug('Current Account: ${currentAccount?.email}', component: 'GoogleDrive');
-    AppLogger.debug('Access Token (last 10 chars): ${currentAccount?.accessToken.substring(currentAccount!.accessToken.length - 10)}', component: 'GoogleDrive');
-    AppLogger.debug('Refresh Token exists: ${currentAccount?.refreshToken != null}', component: 'GoogleDrive');
-    AppLogger.debug('Account Status: ${currentAccount?.status}', component: 'GoogleDrive');
-    AppLogger.debug('Token expires at: ${currentAccount?.expiresAt}', component: 'GoogleDrive');
-    AppLogger.debug('Current time: ${DateTime.now().toIso8601String()}', component: 'GoogleDrive');
     
-    if (e.toString().contains('401')) {
-      AppLogger.warning('401 Unauthorized detected - marking account as revoked', component: 'GoogleDrive');
-      _updateAccountStatus(AccountStatus.revoked);
-      throw CloudProviderException(
-        'Authentication failed. Please reauthorize your account.',
-        code: 'unauthorized',
-        statusCode: 401,
-      );
-    } else if (e.toString().contains('403')) {
-      AppLogger.warning('403 Forbidden detected', component: 'GoogleDrive');
+    // Use parent OAuth provider's error handling for authentication errors
+    if (_isAuthenticationError(e)) {
+      AppLogger.warning('Authentication error detected - delegating to OAuth provider', component: 'GoogleDrive');
+      handleOAuthError(e);
+      return; // handleOAuthError will throw appropriate exception
+    }
+    
+    // Handle Google Drive specific errors
+    if (e.toString().contains('403')) {
       if (e.toString().contains('insufficientPermissions') || 
           e.toString().contains('forbidden')) {
-        AppLogger.warning('Insufficient permissions detected - marking account as missing scopes', component: 'GoogleDrive');
+        AppLogger.warning('Insufficient permissions detected', component: 'GoogleDrive');
         _updateAccountStatus(AccountStatus.missingScopes);
         throw CloudProviderException(
           'Insufficient permissions. Please reauthorize with required scopes.',
           code: 'insufficient_permissions',
           statusCode: 403,
         );
+      } else if (e.toString().contains('quotaExceeded')) {
+        throw CloudProviderException(
+          'Google Drive quota exceeded. Please try again later.',
+          code: 'quota_exceeded',
+          statusCode: 403,
+        );
       }
+    } else if (e.toString().contains('404')) {
+      throw CloudProviderException(
+        'Requested file or folder not found.',
+        code: 'not_found',
+        statusCode: 404,
+      );
+    } else if (e.toString().contains('429')) {
+      throw CloudProviderException(
+        'Rate limit exceeded. Please try again later.',
+        code: 'rate_limit',
+        statusCode: 429,
+      );
     }
     
-    AppLogger.error('Generic API error - rethrowing as CloudProviderException', component: 'GoogleDrive');
-    throw CloudProviderException('API request failed: ${e.toString()}');
+    // Generic error with improved context
+    AppLogger.error('Unhandled Google Drive API error', component: 'GoogleDrive');
+    throw CloudProviderException(
+      'Google Drive operation failed: ${e.toString()}',
+      originalException: e,
+    );
+  }
+
+  /// Check if the error is authentication-related
+  bool _isAuthenticationError(dynamic error) {
+    final errorString = error.toString().toLowerCase();
+    return errorString.contains('401') || 
+           errorString.contains('unauthorized') ||
+           errorString.contains('invalid_token') ||
+           errorString.contains('token_expired');
   }
 
   /// Updates the current account status
   void _updateAccountStatus(AccountStatus status) {
     if (currentAccount != null) {
       // Update account in parent class if needed
-      // Note: AccountBasedProvider should handle this
+      // Note: Account status is managed by OAuthCloudProvider
     }
   }
 
@@ -310,6 +339,7 @@ class GoogleDriveProvider extends BaseCloudProvider {
       
     } catch (e) {
       _handleApiError(e as Exception);
+      rethrow; // Won't reach here due to _handleApiError throwing
     }
   }
   
@@ -363,6 +393,7 @@ class GoogleDriveProvider extends BaseCloudProvider {
       
     } catch (e) {
       _handleApiError(e as Exception);
+      rethrow; // Won't reach here due to _handleApiError throwing
     }
   }
   
@@ -428,18 +459,24 @@ class GoogleDriveProvider extends BaseCloudProvider {
       );
     }
 
-    
-    // 🚨 SECURITY: Client credentials should NEVER be hardcoded!
-    // They should come from secure configuration or environment variables
-    // This implementation requires external OAuth server to provide these values
-    AppLogger.warning('Refresh token requires proper OAuth configuration', component: 'GoogleDrive');
-    AppLogger.debug('Account: ${account.email}', component: 'GoogleDrive');
-    
-    // Throw exception to indicate refresh is not available without proper OAuth setup
-    throw CloudProviderException(
-      'Token refresh not available: OAuth client credentials not configured',
-      code: 'oauth_not_configured',
-    );
+    try {
+      // Use configuration's token URL generator instead of hardcoded URLs
+      final tokenUrl = oauthConfiguration.tokenUrlGenerator('refresh');
+      
+      AppLogger.debug('Refreshing token for account: ${account.email}', component: 'GoogleDrive');
+      AppLogger.debug('Using token URL from configuration: $tokenUrl', component: 'GoogleDrive');
+      
+      // Delegate to parent OAuth provider's token refresh implementation
+      return await refreshTokens(account);
+      
+    } catch (e) {
+      AppLogger.error('Token refresh failed', component: 'GoogleDrive', error: e);
+      throw CloudProviderException(
+        'Token refresh failed: ${e.toString()}',
+        code: 'refresh_failed',
+        originalException: e,
+      );
+    }
   }
 
   @override

@@ -175,11 +175,11 @@ class _DragDropOverlayState extends State<DragDropOverlay>
     return Container(
       padding: const EdgeInsets.all(AppConstants.paddingXL),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.9),
+        color: Colors.white.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(AppConstants.radiusL),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 20,
             spreadRadius: 5,
           ),
@@ -323,10 +323,10 @@ class _DragDropOverlayState extends State<DragDropOverlay>
     return Container(
       padding: const EdgeInsets.all(AppConstants.paddingM),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.3),
+        color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(AppConstants.radiusS),
         border: Border.all(
-          color: Theme.of(context).colorScheme.error.withOpacity(0.3),
+          color: Theme.of(context).colorScheme.error.withValues(alpha: 0.3),
         ),
       ),
       child: Row(
@@ -383,7 +383,7 @@ class _DragDropOverlayState extends State<DragDropOverlay>
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppConstants.radiusL),
             border: Border.all(
-              color: Colors.green.withOpacity(0.3 * (1 - _rippleAnimation.value)),
+              color: Colors.green.withValues(alpha: 0.3 * (1 - _rippleAnimation.value)),
               width: 2 + (10 * _rippleAnimation.value),
             ),
           ),
@@ -394,11 +394,11 @@ class _DragDropOverlayState extends State<DragDropOverlay>
 
   Color _getOverlayColor(BuildContext context) {
     if (widget.dragDropState.shouldShowAcceptFeedback) {
-      return Colors.green.withOpacity(0.1);
+      return Colors.green.withValues(alpha: 0.1);
     } else if (widget.dragDropState.shouldShowRejectFeedback) {
-      return Theme.of(context).colorScheme.error.withOpacity(0.1);
+      return Theme.of(context).colorScheme.error.withValues(alpha: 0.1);
     } else {
-      return Theme.of(context).colorScheme.primary.withOpacity(0.1);
+      return Theme.of(context).colorScheme.primary.withValues(alpha: 0.1);
     }
   }
 }
