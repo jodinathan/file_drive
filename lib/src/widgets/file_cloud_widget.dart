@@ -11,6 +11,8 @@ import '../models/crop_config.dart';
 import '../providers/base_cloud_provider.dart';
 import '../models/base_provider_configuration.dart';
 import '../models/oauth_provider_configuration.dart';
+import '../models/ready_provider_configuration.dart';
+import '../providers/oauth_cloud_provider.dart';
 import '../storage/account_storage.dart';
 import '../auth/oauth_config.dart';
 import '../factory/cloud_provider_factory.dart';
@@ -21,6 +23,7 @@ import '../l10n/generated/app_localizations.dart';
 import '../managers/navigation_manager.dart';
 
 import '../utils/app_logger.dart';
+import '../utils/error_handler.dart';
 import 'provider_logo.dart';
 import 'provider_card.dart';
 import 'account_card.dart';
@@ -421,6 +424,13 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
   String? _getRedirectScheme(BaseProviderConfiguration config) {
     if (config is OAuthProviderConfiguration) {
       return config.redirectScheme;
+    }
+    // Handle ReadyProviderConfiguration by checking the provider instance
+    if (config is ReadyProviderConfiguration) {
+      final provider = config.providerInstance;
+      if (provider is OAuthCloudProvider) {
+        return provider.oauthConfiguration.redirectScheme;
+      }
     }
     return null;
   }
@@ -1276,23 +1286,32 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
           }
         }
       } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Erro na autenticação: ${result.error ?? "Cancelado pelo usuário"}',
-              ),
-            ),
-          );
-        }
+        // OAuth failed - use ErrorHandler for consistent logging
+        final errorMessage = result.error ?? "Cancelado pelo usuário";
+        ErrorHandler.handleAuthError(
+          context: mounted ? context : null,
+          error: Exception('OAuth authentication failed: $errorMessage'),
+          operation: 'autenticação OAuth',
+          provider: _selectedProvider?.name,
+          additionalData: {
+            'resultError': result.error,
+            'accessToken': result.accessToken != null ? 'present' : 'null',
+            'refreshToken': result.refreshToken != null ? 'present' : 'null',
+            'additionalData': result.additionalData,
+          },
+        );
       }
     } catch (e) {
-      AppLogger.error('Erro ao adicionar conta', component: 'Auth', error: e);
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Erro ao adicionar conta: $e')));
-      }
+      ErrorHandler.handleAuthError(
+        context: mounted ? context : null,
+        error: e,
+        operation: 'adicionar conta',
+        provider: _selectedProvider?.name,
+        additionalData: {
+          'selectedProvider': _selectedProvider,
+          'isAddingAccount': _isAddingAccount,
+        },
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -1557,36 +1576,21 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
               component: 'FileOps',
             );
           } catch (e) {
-            AppLogger.error(
-              'Erro ao excluir arquivo ${file.name} (ID: ${file.id})',
-              component: 'FileOps',
+            ErrorHandler.handleFileError(
+              context: mounted ? context : null,
               error: e,
+              fileName: file.name,
+              operation: 'excluir',
+              additionalData: {
+                'fileId': file.id,
+                'provider': _selectedProvider,
+                'successCount': successCount,
+                'totalFiles': _selectedFiles.length,
+              },
             );
-            
-            // Print detailed error to console for debugging
-            print('ERROR DELETING FILE: ${file.name}');
-            print('File ID: ${file.id}');
-            print('Provider: $_selectedProvider');
-            print('Error details: $e');
-            print('Error type: ${e.runtimeType}');
-            if (e is CloudProviderException) {
-              print('Status code: ${e.statusCode}');
-              print('Error message: ${e.message}');
-            }
-            print('---');
 
             // Handle authentication errors
             await _handleAuthenticationError(e, 'FileOps');
-
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Erro ao excluir ${file.name}: $e'),
-                  duration: const Duration(seconds: 5), // Show longer for debugging
-                  backgroundColor: Theme.of(context).colorScheme.error,
-                ),
-              );
-            }
             // Continue tentando excluir outros arquivos
           }
         }
@@ -1615,28 +1619,17 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
         // Recarregar lista de arquivos
         await _loadFiles();
       } catch (e) {
-        AppLogger.error(
-          'Erro durante exclusão de arquivos',
-          component: 'FileOps',
+        ErrorHandler.handleError(
+          context: mounted ? context : null,
           error: e,
+          operation: 'exclusão de arquivos',
+          component: 'FileOps',
+          additionalData: {
+            'provider': _selectedProvider,
+            'selectedFiles': _selectedFiles.map((f) => '${f.name} (${f.id})').toList(),
+            'totalFiles': _selectedFiles.length,
+          },
         );
-        
-        // Print detailed error to console for debugging
-        print('GENERAL DELETE ERROR: $e');
-        print('Error type: ${e.runtimeType}');
-        print('Provider: $_selectedProvider');
-        print('Selected files: ${_selectedFiles.map((f) => '${f.name} (${f.id})').toList()}');
-        print('---');
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Erro ao excluir arquivos: $e'),
-              duration: const Duration(seconds: 5), // Show longer for debugging
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-          );
-        }
       }
     }
   }
