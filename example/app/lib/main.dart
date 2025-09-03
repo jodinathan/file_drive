@@ -1,6 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:file_cloud/file_cloud.dart';
+import 'package:file_cloud/src/providers/local_server_provider.dart';
+import 'package:file_cloud/src/providers/google_drive_provider.dart';
+import 'package:file_cloud/src/models/oauth_provider_configuration.dart';
+import 'package:file_cloud/src/models/ready_provider_configuration.dart';
 
 // Tente importar config.dart, senão use valores de exemplo
 import 'config.dart' deferred as config;
@@ -63,27 +67,51 @@ class _HomePageState extends State<HomePage> {
       
       // Configure providers with proper server URLs
       String serverBaseUrl = 'http://localhost:8080';
-      String redirectScheme = 'my-custom-app';
+      String redirectScheme = 'my-custom-app://oauth';
       
       try {
         // Try to use config if available
         serverBaseUrl = config.AppConfig.serverBaseUrl;
-        redirectScheme = config.AppConfig.customScheme;
+        final customScheme = config.AppConfig.customScheme;
+        redirectScheme = customScheme.contains('://') ? customScheme : '$customScheme://oauth';
       } catch (e) {
         // Use defaults if config not available
       }
       
-      // Create provider configurations using the new API
+      // Create provider configurations using ReadyProviderConfiguration to avoid factory conflicts
       _providers = <BaseProviderConfiguration>[
-        ProviderConfigurationFactories.googleDrive(
-          generateAuthUrl: (state) => '$serverBaseUrl/auth/google?state=$state',
-          generateTokenUrl: (state) => '$serverBaseUrl/auth/tokens/$state',
-          redirectScheme: redirectScheme,
-          requiredScopes: {OAuthScope.readFiles, OAuthScope.writeFiles, OAuthScope.createFolders},
+        ReadyProviderConfiguration.fromProvider(
+          providerInstance: GoogleDriveProvider(
+            oauthConfiguration: OAuthProviderConfiguration(
+              type: CloudProviderType.googleDrive,
+              displayName: 'Google Drive',
+              capabilities: const {
+                ProviderCapability.upload,
+                ProviderCapability.createFolders,
+                ProviderCapability.delete,
+                ProviderCapability.search,
+                ProviderCapability.thumbnails,
+                ProviderCapability.share,
+                ProviderCapability.move,
+                ProviderCapability.copy,
+                ProviderCapability.rename,
+              },
+              authUrlGenerator: (state) => Uri.parse('$serverBaseUrl/auth/google?state=$state'),
+              tokenUrlGenerator: (state) => Uri.parse('$serverBaseUrl/auth/tokens/$state'),
+              redirectScheme: redirectScheme,
+              scopes: ['https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive.metadata'],
+            ),
+          ),
+          configurationId: 'google_drive_main',
         ),
         // Add more providers if needed
-        ProviderConfigurationFactories.localServer(
-          displayName: 'Local Development Server',
+        ReadyProviderConfiguration.fromProvider(
+          providerInstance: LocalServerProvider(
+            configuration: const LocalServerProviderConfig(
+              displayName: 'Local Development Server',
+            ),
+          ),
+          configurationId: 'local_server_main',
         ),
       ];
       

@@ -326,19 +326,23 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
         component: 'Init',
       );
 
+      AppLogger.info('Tentando criar provedor: ${config.displayName} (${config.runtimeType})', component: 'Init');
+      
       final provider = _createProviderInstance(config);
       if (provider != null) {
         // Provider is already configured via constructor
         _providers[config.type] = provider;
         AppLogger.success(
-          'Provedor ${config.displayName} inicializado com sucesso',
+          '✅ SUCCESS: Provedor ${config.displayName} inicializado (tipo: ${config.type})',
           component: 'Init',
         );
+        print('✅ Provider ${config.displayName} created successfully');
       } else {
-        AppLogger.warning(
-          'Não foi possível criar instância para provedor: ${config.displayName}',
+        AppLogger.error(
+          '❌ ERRO: Falha ao criar provedor ${config.displayName} (tipo: ${config.type}, classe: ${config.runtimeType})',
           component: 'Init',
         );
+        print('❌ FAILED to create provider ${config.displayName} (${config.runtimeType})');
       }
     }
 
@@ -354,13 +358,20 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
 
   BaseCloudProvider? _createProviderInstance(BaseProviderConfiguration config) {
     try {
+      print('🔧 Calling CloudProviderFactory.createFromConfiguration for ${config.displayName} (${config.runtimeType})');
+      
       // Use the factory to create provider from configuration
-      return CloudProviderFactory.createFromConfiguration(config);
-    } catch (e) {
+      final provider = CloudProviderFactory.createFromConfiguration(config);
+      
+      print('🎉 CloudProviderFactory returned: ${provider?.runtimeType ?? 'null'}');
+      return provider;
+    } catch (e, stackTrace) {
       AppLogger.error(
-        'Erro ao criar provedor ${config.displayName}: $e',
+        '💥 EXCEPTION ao criar provedor ${config.displayName}: $e',
         component: 'Init',
       );
+      print('💥 EXCEPTION in _createProviderInstance: $e');
+      print('Stack trace: $stackTrace');
       return null;
     }
   }
@@ -1547,17 +1558,33 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
             );
           } catch (e) {
             AppLogger.error(
-              'Erro ao excluir arquivo ${file.name}',
+              'Erro ao excluir arquivo ${file.name} (ID: ${file.id})',
               component: 'FileOps',
               error: e,
             );
+            
+            // Print detailed error to console for debugging
+            print('ERROR DELETING FILE: ${file.name}');
+            print('File ID: ${file.id}');
+            print('Provider: $_selectedProvider');
+            print('Error details: $e');
+            print('Error type: ${e.runtimeType}');
+            if (e is CloudProviderException) {
+              print('Status code: ${e.statusCode}');
+              print('Error message: ${e.message}');
+            }
+            print('---');
 
             // Handle authentication errors
             await _handleAuthenticationError(e, 'FileOps');
 
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Erro ao excluir ${file.name}: $e')),
+                SnackBar(
+                  content: Text('Erro ao excluir ${file.name}: $e'),
+                  duration: const Duration(seconds: 5), // Show longer for debugging
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                ),
               );
             }
             // Continue tentando excluir outros arquivos
@@ -1593,10 +1620,21 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
           component: 'FileOps',
           error: e,
         );
+        
+        // Print detailed error to console for debugging
+        print('GENERAL DELETE ERROR: $e');
+        print('Error type: ${e.runtimeType}');
+        print('Provider: $_selectedProvider');
+        print('Selected files: ${_selectedFiles.map((f) => '${f.name} (${f.id})').toList()}');
+        print('---');
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Erro ao excluir arquivos: $e')),
+            SnackBar(
+              content: Text('Erro ao excluir arquivos: $e'),
+              duration: const Duration(seconds: 5), // Show longer for debugging
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
           );
         }
       }
@@ -2722,13 +2760,17 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
   Widget _buildFileNavigation() {
     // Check if provider requires account
     if (_selectedProvider == null || _providers[_selectedProvider] == null) {
-      return const Center(
+      return Center(
+        key: const Key('provider_not_available_error'),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
-            Text('Provider not available'),
+            const Icon(Icons.error_outline, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
+            Text(
+              'Provider not available: $_selectedProvider (providers: ${_providers.keys.toList()})',
+              key: const Key('provider_not_available_text'),
+            ),
           ],
         ),
       );

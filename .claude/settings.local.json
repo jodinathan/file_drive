@@ -4,7 +4,8 @@
       "Bash(flutter run:*)",
       "mcp__dart__connect_dart_tooling_daemon",
       "mcp__dart__add_roots",
-      "mcp__dart__analyze_files"
+      "mcp__dart__analyze_files",
+      "mcp__dart__hot_reload"
     ]
   },
   "enableAllProjectMcpServers": true,

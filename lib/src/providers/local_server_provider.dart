@@ -187,11 +187,23 @@ class LocalServerProvider extends BaseCloudProvider {
     required String entryId,
     bool permanent = false,
   }) async {
+    AppLogger.info('🗑️ Attempting to delete entryId: "$entryId"', component: 'LocalServer');
+    
     final response = await _makeRequest('DELETE', '/api/files/$entryId');
     
-    if (response.statusCode != 204) {
+    AppLogger.info('🗑️ Delete response: ${response.statusCode}', component: 'LocalServer');
+    
+    if (response.statusCode == 204) {
+      AppLogger.success('🗑️ Delete successful for entryId: "$entryId"', component: 'LocalServer');
+    } else {
+      final responseBody = response.body;
+      AppLogger.error(
+        '🗑️ Delete failed for entryId: "$entryId" - Status: ${response.statusCode}, Body: $responseBody',
+        component: 'LocalServer',
+      );
+      
       throw CloudProviderException(
-        'Failed to delete entry: ${response.statusCode}',
+        'Failed to delete entry "$entryId": Server returned ${response.statusCode}. Response: $responseBody',
         statusCode: response.statusCode,
       );
     }

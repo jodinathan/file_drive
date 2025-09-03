@@ -382,17 +382,19 @@ abstract class CloudProviderFactory {
         isBuiltIn: true,
       );
       
-      // Register OneDrive OAuth provider
-      registerStaticProvider<OAuthProviderConfiguration>(
-        configurationType: OAuthProviderConfiguration,
-        providerType: CloudProviderType.oneDrive,
-        constructor: ({required configuration, account}) => OneDriveProvider(
-          oauthConfiguration: configuration,
-          account: account,
-        ),
-        displayName: 'OneDrive',
-        isBuiltIn: true,
-      );
+      // NOTE: OneDrive OAuth provider temporarily disabled due to 
+      // type conflict with GoogleDrive (both use OAuthProviderConfiguration)
+      // TODO: Create specific configuration types for each OAuth provider
+      // registerStaticProvider<OAuthProviderConfiguration>(
+      //   configurationType: OAuthProviderConfiguration,
+      //   providerType: CloudProviderType.oneDrive,
+      //   constructor: ({required configuration, account}) => OneDriveProvider(
+      //     oauthConfiguration: configuration,
+      //     account: account,
+      //   ),
+      //   displayName: 'OneDrive',
+      //   isBuiltIn: true,
+      // );
       
       // Note: Dropbox provider will be implemented in a separate task
       

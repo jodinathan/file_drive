@@ -709,28 +709,45 @@ class OAuthServer {
   }
 
   String _generateFileId(String filePath) {
-    // Simple ID generation based on path
+    // Generate ID based on relative path from storage root
     final relativePath = path.relative(filePath, from: _storageRoot);
-    final fileId = relativePath.replaceAll('/', '_').replaceAll('\\', '_');
-    print('🆔 Generated fileId from path "$filePath" -> "$fileId"');
-    print('🆔 FileId bytes: ${fileId.codeUnits}');
+    // Use base64 encoding to avoid conflicts with special characters
+    final fileId = base64Url.encode(utf8.encode(relativePath)).replaceAll('=', '');
+    print('🆔 Generated fileId from path "$filePath"');
+    print('🆔 Relative path: "$relativePath"');
+    print('🆔 FileId: "$fileId"');
     return fileId;
   }
 
   String _getFilePathFromId(String fileId) {
     print('🔄 Converting fileId to path: "$fileId"');
-    print('🔄 FileId bytes: ${fileId.codeUnits}');
     
-    // Decode URL encoding first
-    final decodedFileId = Uri.decodeComponent(fileId);
-    print('🔄 Decoded fileId: "$decodedFileId"');
-    print('🔄 Decoded fileId bytes: ${decodedFileId.codeUnits}');
-    
-    final relativePath = decodedFileId.replaceAll('_', '/');
-    final fullPath = path.join(_storageRoot, relativePath);
-    print('🔄 Relative path: "$relativePath"');
-    print('🔄 Full path: "$fullPath"');
-    return fullPath;
+    try {
+      // Decode URL encoding first if needed
+      final decodedFileId = Uri.decodeComponent(fileId);
+      
+      // Add padding if needed for base64
+      final paddingNeeded = (4 - (decodedFileId.length % 4)) % 4;
+      final paddedFileId = decodedFileId + ('=' * paddingNeeded);
+      
+      // Decode base64 to get original relative path
+      final relativePath = utf8.decode(base64Url.decode(paddedFileId));
+      final fullPath = path.join(_storageRoot, relativePath);
+      
+      print('🔄 Decoded relative path: "$relativePath"');
+      print('🔄 Full path: "$fullPath"');
+      
+      return fullPath;
+    } catch (e) {
+      print('🚨 Error decoding fileId "$fileId": $e');
+      // Fallback to old method for backward compatibility
+      final decodedFileId = Uri.decodeComponent(fileId);
+      final relativePath = decodedFileId.replaceAll('_', '/');
+      final fullPath = path.join(_storageRoot, relativePath);
+      print('🔄 Fallback relative path: "$relativePath"');
+      print('🔄 Fallback full path: "$fullPath"');
+      return fullPath;
+    }
   }
 
   String? _getMimeType(String fileName) {
