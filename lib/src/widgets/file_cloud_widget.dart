@@ -1358,7 +1358,6 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
           context: mounted ? context : null,
           error: Exception('OAuth authentication failed: $errorMessage'),
           operation: 'autenticação OAuth',
-          provider: _selectedProvider?.name,
           additionalData: {
             'resultError': result.error,
             'accessToken': result.accessToken != null ? 'present' : 'null',
@@ -1372,7 +1371,6 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
         context: mounted ? context : null,
         error: e,
         operation: 'adicionar conta',
-        provider: _selectedProvider?.name,
         additionalData: {
           'selectedProvider': _selectedProvider,
           'isAddingAccount': _isAddingAccount,

@@ -76,6 +76,23 @@ class GoogleDriveProvider extends OAuthCloudProvider {
   }
   
   @override
+  void setCurrentAccount(CloudAccount? account) {
+    super.setCurrentAccount(account);
+    
+    // Reinitialize API client when account changes
+    if (currentAccount != null) {
+      _httpClient = OAuthAuthenticatedClient(this);
+      _driveApi = drive.DriveApi(_httpClient!);
+      AppLogger.info('Google Drive API client reinitialized', component: 'GoogleDrive');
+    } else {
+      _driveApi = null;
+      _httpClient?.close();
+      _httpClient = null;
+      AppLogger.info('Google Drive API client cleared', component: 'GoogleDrive');
+    }
+  }
+  
+  @override
   ProviderCapabilities getCapabilities() {
     return const ProviderCapabilities(
       canUpload: true,

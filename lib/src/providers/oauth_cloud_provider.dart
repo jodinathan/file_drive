@@ -261,6 +261,22 @@ abstract class OAuthCloudProvider extends BaseCloudProvider {
     }
   }
   
+  @override
+  void setCurrentAccount(CloudAccount? account) {
+    super.setCurrentAccount(account);
+    _authenticatedAccount = account;
+    
+    if (account != null) {
+      if (account.expiresAt != null) {
+        _scheduleTokenRefresh(account);
+      }
+      _authStateController?.add(AuthenticationState.authenticated);
+    } else {
+      _tokenRefreshTimer?.cancel();
+      _authStateController?.add(AuthenticationState.notAuthenticated);
+    }
+  }
+  
   void updateStoredAccount(CloudAccount account) {
     _authenticatedAccount = account;
     if (account.expiresAt != null) {
