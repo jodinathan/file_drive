@@ -87,7 +87,7 @@ The architecture uses a provider pattern with factory-based configuration:
 ProviderConfigurationFactories.googleDrive(
   generateAuthUrl: (state) => 'https://your-server.com/auth/google?state=$state',
   generateTokenUrl: (state) => 'https://your-server.com/auth/tokens/$state',
-  redirectScheme: 'myapp://oauth',
+  redirectScheme: 'com.example.myapp',
   requiredScopes: {OAuthScope.readFiles, OAuthScope.writeFiles},
 )
 

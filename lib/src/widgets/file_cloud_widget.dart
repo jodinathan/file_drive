@@ -13,6 +13,7 @@ import '../models/base_provider_configuration.dart';
 import '../models/oauth_provider_configuration.dart';
 import '../models/ready_provider_configuration.dart';
 import '../providers/oauth_cloud_provider.dart';
+import '../providers/google_drive_provider.dart';
 import '../storage/account_storage.dart';
 import '../auth/oauth_config.dart';
 import '../factory/cloud_provider_factory.dart';
@@ -396,14 +397,40 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
 
   /// Helper method to safely get OAuth properties from configurations
   String? _getAuthUrl(BaseProviderConfiguration config, String state) {
+    AppLogger.info('Getting auth URL for config type: ${config.runtimeType}', component: 'OAuth');
+    
     if (config is OAuthProviderConfiguration) {
       try {
-        return config.authUrlGenerator(state).toString();
+        final uri = config.authUrlGenerator(state);
+        final urlString = uri.toString();
+        AppLogger.info('Generated auth URL: $urlString', component: 'OAuth');
+        return urlString;
       } catch (e) {
-        AppLogger.warning('Failed to generate auth URL: $e', component: 'OAuth');
+        AppLogger.error('Failed to generate auth URL: $e', component: 'OAuth', error: e);
         return null;
       }
     }
+    
+    // Check if it's a ReadyProviderConfiguration with a GoogleDriveProvider
+    if (config is ReadyProviderConfiguration) {
+      final providerInstance = config.providerInstance;
+      AppLogger.info('ReadyProviderConfiguration contains: ${providerInstance.runtimeType}', component: 'OAuth');
+      
+      if (providerInstance is GoogleDriveProvider) {
+        try {
+          final oauthConfig = providerInstance.oauthConfiguration;
+          final uri = oauthConfig.authUrlGenerator(state);
+          final urlString = uri.toString();
+          AppLogger.info('Generated auth URL from GoogleDriveProvider: $urlString', component: 'OAuth');
+          return urlString;
+        } catch (e) {
+          AppLogger.error('Failed to generate auth URL from GoogleDriveProvider: $e', component: 'OAuth', error: e);
+          return null;
+        }
+      }
+    }
+    
+    AppLogger.warning('Config is not supported for OAuth: ${config.runtimeType}', component: 'OAuth');
     return null;
   }
 
@@ -417,6 +444,22 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
         return null;
       }
     }
+    
+    // Check if it's a ReadyProviderConfiguration with a GoogleDriveProvider
+    if (config is ReadyProviderConfiguration) {
+      final providerInstance = config.providerInstance;
+      
+      if (providerInstance is GoogleDriveProvider) {
+        try {
+          final oauthConfig = providerInstance.oauthConfiguration;
+          return oauthConfig.tokenUrlGenerator(state).toString();
+        } catch (e) {
+          AppLogger.warning('Failed to generate token URL from GoogleDriveProvider: $e', component: 'OAuth');
+          return null;
+        }
+      }
+    }
+    
     return null;
   }
 

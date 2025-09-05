@@ -67,13 +67,14 @@ class _HomePageState extends State<HomePage> {
       
       // Configure providers with proper server URLs
       String serverBaseUrl = 'http://localhost:8080';
-      String redirectScheme = 'my-custom-app://oauth';
+      String redirectScheme = 'com.example.filedrive://';
       
       try {
         // Try to use config if available
         serverBaseUrl = config.AppConfig.serverBaseUrl;
         final customScheme = config.AppConfig.customScheme;
-        redirectScheme = customScheme.contains('://') ? customScheme : '$customScheme://oauth';
+        // Use the scheme as is from config
+        redirectScheme = customScheme;
       } catch (e) {
         // Use defaults if config not available
       }

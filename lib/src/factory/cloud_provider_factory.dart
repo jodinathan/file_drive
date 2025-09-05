@@ -360,7 +360,7 @@ abstract class CloudProviderFactory {
         configurationType: OAuthProviderConfiguration,
         providerType: CloudProviderType.googleDrive,
         constructor: ({required configuration, account}) => GoogleDriveProvider(
-          oauthConfiguration: configuration,
+          oauthConfiguration: configuration as OAuthProviderConfiguration,
           account: account,
         ),
         displayName: 'Google Drive',

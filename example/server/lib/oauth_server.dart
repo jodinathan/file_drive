@@ -816,7 +816,7 @@ class OAuthServer {
     }
     
     // Redireciona diretamente para o custom scheme (como no exemplo funcional)
-    final appUri = Uri(scheme: 'my-custom-app', queryParameters: queryParams);
+    final appUri = Uri(scheme: 'com.example.filedrive', queryParameters: queryParams);
     
     print('📱 Redirecionando para app: $appUri');
     

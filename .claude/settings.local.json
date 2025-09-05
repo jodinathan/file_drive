@@ -11,7 +11,11 @@
       "mcp__dart__pub_dev_search",
       "WebFetch(domain:pub.dev)",
       "WebFetch(domain:github.com)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(flutter config:*)",
+      "Read(//Users/jonathanrezende/.pub-cache/hosted/pub.dev/flutter_web_auth_2-4.1.0/**)",
+      "Bash(flutter clean:*)",
+      "Bash(flutter pub:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
