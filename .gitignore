@@ -33,3 +33,7 @@ build/
 forge.yaml
 #old/
 old_/
+.mcp.json
+.claude
+plans/
+bkp/

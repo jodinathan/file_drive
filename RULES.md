@@ -1,6 +1,12 @@
 ## OBJETIVO
 - O objetivo deste projeto é facilitar o acesso aos arquivos de provedores de serviços de nuvem, como o Dropbox, Google Drive, OneDrive, provedores customizados, etc.
 
+## CÓDIGO
+- Código Nível senior. 
+- Não pode haver gambiarras ou código desnecessário.
+- Deve haver asserts() pelo sistema para garantir que as informações estejam conforme esperado. Por ex: strings que não podem ser vazias, inteiros que não podem ser negativos ou zero, etc.
+
+
 ## DIRETRIZES
 - O projeto deve exportar apenas 1 widget e outras propriedades auxiliares necessárias para o funcionamento do widget (interfaces, callbacks etc). Este widget deve ser configurável para que todas funcionalidades funcionem como esperado.
 - Deve existir uma classe base para provedores onde deve ficar o core das funcionalidades, restando aos provedores somente os percaussos necessários de cada um. Deve haver métodos ou variáveis abstratas (prefira métodos quando fizer sentido) que devem ser sobrescritos pelos provedores. Cada provedor deve ter nome e o nome da imagem para ser usada como logo. Lista de métodos abstratos necessários, porém, podem haver mais: listFolder, createFolder, deleteEntry, downloadFile, uploadFile(com progresso, pode retornar um Stream), searchByName, getUserProfile, refreshAuth, getCapabilities.

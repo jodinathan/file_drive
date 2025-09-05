@@ -4,7 +4,6 @@ import '../models/oauth_provider_configuration.dart';
 import '../models/ready_provider_configuration.dart';
 import '../providers/base_cloud_provider.dart';
 import '../providers/google_drive_provider.dart';
-import '../providers/onedrive_provider.dart';
 import '../providers/local_server_provider.dart';
 
 /// Exception thrown by the CloudProviderFactory
@@ -360,7 +359,7 @@ abstract class CloudProviderFactory {
         configurationType: OAuthProviderConfiguration,
         providerType: CloudProviderType.googleDrive,
         constructor: ({required configuration, account}) => GoogleDriveProvider(
-          oauthConfiguration: configuration as OAuthProviderConfiguration,
+          oauthConfiguration: configuration,
           account: account,
         ),
         displayName: 'Google Drive',

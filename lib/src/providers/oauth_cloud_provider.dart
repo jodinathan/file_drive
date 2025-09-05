@@ -47,9 +47,14 @@ abstract class OAuthCloudProvider extends BaseCloudProvider {
     return AuthenticationState.authenticated;
   }
 
-  Future<Uri> generateAuthorizationUrl(String state) async {
+  Uri generateAuthorizationUrl(String state) {
     validateOAuthConfiguration();
     return oauthConfiguration.authUrlGenerator(state);
+  }
+
+  Uri generateTokenUrl(String state) {
+    validateOAuthConfiguration();
+    return oauthConfiguration.tokenUrlGenerator(state);
   }
   
   Future<CloudAccount> exchangeAuthorizationCode({

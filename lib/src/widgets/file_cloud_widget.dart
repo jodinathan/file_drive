@@ -13,7 +13,6 @@ import '../models/base_provider_configuration.dart';
 import '../models/oauth_provider_configuration.dart';
 import '../models/ready_provider_configuration.dart';
 import '../providers/oauth_cloud_provider.dart';
-import '../providers/google_drive_provider.dart';
 import '../storage/account_storage.dart';
 import '../auth/oauth_config.dart';
 import '../factory/cloud_provider_factory.dart';
@@ -340,13 +339,13 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
           '✅ SUCCESS: Provedor ${config.displayName} inicializado (tipo: ${config.type})',
           component: 'Init',
         );
-        print('✅ Provider ${config.displayName} created successfully');
+        AppLogger.info('✅ Provider ${config.displayName} created successfully', component: 'Init');
       } else {
         AppLogger.error(
           '❌ ERRO: Falha ao criar provedor ${config.displayName} (tipo: ${config.type}, classe: ${config.runtimeType})',
           component: 'Init',
         );
-        print('❌ FAILED to create provider ${config.displayName} (${config.runtimeType})');
+        AppLogger.error('❌ FAILED to create provider ${config.displayName} (${config.runtimeType})', component: 'Init');
       }
     }
 
@@ -362,20 +361,20 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
 
   BaseCloudProvider? _createProviderInstance(BaseProviderConfiguration config) {
     try {
-      print('🔧 Calling CloudProviderFactory.createFromConfiguration for ${config.displayName} (${config.runtimeType})');
+      AppLogger.info('🔧 Calling CloudProviderFactory.createFromConfiguration for ${config.displayName} (${config.runtimeType})', component: 'Init');
       
       // Use the factory to create provider from configuration
       final provider = CloudProviderFactory.createFromConfiguration(config);
       
-      print('🎉 CloudProviderFactory returned: ${provider?.runtimeType ?? 'null'}');
+      AppLogger.info('🎉 CloudProviderFactory returned: ${provider.runtimeType}', component: 'Init');
       return provider;
     } catch (e, stackTrace) {
       AppLogger.error(
         '💥 EXCEPTION ao criar provedor ${config.displayName}: $e',
         component: 'Init',
       );
-      print('💥 EXCEPTION in _createProviderInstance: $e');
-      print('Stack trace: $stackTrace');
+      AppLogger.error('💥 EXCEPTION in _createProviderInstance: $e', component: 'Init', error: e);
+      AppLogger.error('Stack trace: $stackTrace', component: 'Init');
       return null;
     }
   }
@@ -411,20 +410,19 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       }
     }
     
-    // Check if it's a ReadyProviderConfiguration with a GoogleDriveProvider
+    // Check if it's a ReadyProviderConfiguration with an OAuth provider
     if (config is ReadyProviderConfiguration) {
       final providerInstance = config.providerInstance;
       AppLogger.info('ReadyProviderConfiguration contains: ${providerInstance.runtimeType}', component: 'OAuth');
       
-      if (providerInstance is GoogleDriveProvider) {
+      if (providerInstance is OAuthCloudProvider) {
         try {
-          final oauthConfig = providerInstance.oauthConfiguration;
-          final uri = oauthConfig.authUrlGenerator(state);
+          final uri = providerInstance.generateAuthorizationUrl(state);
           final urlString = uri.toString();
-          AppLogger.info('Generated auth URL from GoogleDriveProvider: $urlString', component: 'OAuth');
+          AppLogger.info('Generated auth URL from ${providerInstance.runtimeType}: $urlString', component: 'OAuth');
           return urlString;
         } catch (e) {
-          AppLogger.error('Failed to generate auth URL from GoogleDriveProvider: $e', component: 'OAuth', error: e);
+          AppLogger.error('Failed to generate auth URL from ${providerInstance.runtimeType}: $e', component: 'OAuth', error: e);
           return null;
         }
       }
@@ -445,16 +443,15 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       }
     }
     
-    // Check if it's a ReadyProviderConfiguration with a GoogleDriveProvider
+    // Check if it's a ReadyProviderConfiguration with an OAuth provider
     if (config is ReadyProviderConfiguration) {
       final providerInstance = config.providerInstance;
       
-      if (providerInstance is GoogleDriveProvider) {
+      if (providerInstance is OAuthCloudProvider) {
         try {
-          final oauthConfig = providerInstance.oauthConfiguration;
-          return oauthConfig.tokenUrlGenerator(state).toString();
+          return providerInstance.generateTokenUrl(state).toString();
         } catch (e) {
-          AppLogger.warning('Failed to generate token URL from GoogleDriveProvider: $e', component: 'OAuth');
+          AppLogger.warning('Failed to generate token URL from ${providerInstance.runtimeType}: $e', component: 'OAuth');
           return null;
         }
       }
@@ -1231,15 +1228,29 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       );
 
       // Create OAuthConfig from provider configuration for authentication
+      final authUrlGenerator = (String state) => _getAuthUrl(providerConfig, state) ?? '';
+      final tokenUrlGenerator = (String state) => _getTokenUrl(providerConfig, state) ?? '';
+      final redirectScheme = _getRedirectScheme(providerConfig) ?? '';
+      
+      AppLogger.info('🔧 Creating OAuthConfig for provider: ${providerConfig.type}', component: 'Auth');
+      AppLogger.info('🔧 Auth URL generator ready: ${authUrlGenerator('test').isNotEmpty}', component: 'Auth');
+      AppLogger.info('🔧 Token URL generator ready: ${tokenUrlGenerator('test').isNotEmpty}', component: 'Auth');
+      AppLogger.info('🔧 Redirect scheme: $redirectScheme', component: 'Auth');
+      
+      assert(redirectScheme.isNotEmpty, 'Redirect scheme cannot be empty');
+      
       final oauthConfig = OAuthConfig(
         providerType: providerConfig.type,
         requiredScopes: _getScopes(providerConfig).map((scope) => OAuthScope.values.firstWhere((s) => s.name == scope, orElse: () => OAuthScope.readFiles)).toSet(),
-        generateAuthUrl: (state) => _getAuthUrl(providerConfig, state) ?? '',
-        generateTokenUrl: (state) => _getTokenUrl(providerConfig, state) ?? '',
-        redirectScheme: _getRedirectScheme(providerConfig) ?? '',
+        generateAuthUrl: authUrlGenerator,
+        generateTokenUrl: tokenUrlGenerator,
+        redirectScheme: redirectScheme,
       );
 
+      AppLogger.info('🚨🚨🚨 ABOUT TO CALL OAUTH MANAGER 🚨🚨🚨', component: 'Auth');
+      AppLogger.info('🚀 Starting OAuth authentication...', component: 'Auth');
       final result = await oauthManager.authenticate(oauthConfig);
+      AppLogger.info('🚨🚨🚨 OAUTH MANAGER RETURNED 🚨🚨🚨', component: 'Auth');
 
       AppLogger.info(
         'Resultado OAuth - Sucesso: ${result.isSuccess}',
@@ -1302,8 +1313,14 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
         );
 
         if (_requiresAccountManagement(providerConfig)) {
-          provider.setCurrentAccount(tempAccount);
-          final profile = await provider.getUserProfile();
+          try {
+            // Primeiro configuramos a conta temporária no provider
+            provider.setCurrentAccount(tempAccount);
+            AppLogger.info('Conta temporária configurada no provider', component: 'Auth');
+            
+            // Agora podemos obter o profile do usuário
+            final profile = await provider.getUserProfile();
+            AppLogger.info('Profile do usuário obtido: ${profile.name} (${profile.email})', component: 'Auth');
 
           final account = CloudAccount(
             id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -1319,12 +1336,18 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
             updatedAt: DateTime.now(),
           );
 
-          await widget.accountStorage.saveAccount(account);
-          await _loadAccounts();
+            await widget.accountStorage.saveAccount(account);
+            await _loadAccounts();
 
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Conta adicionada com sucesso!')),
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Conta adicionada com sucesso!')),
+              );
+            }
+          } catch (profileError) {
+            AppLogger.error('Erro ao obter profile do usuário: $profileError', component: 'Auth', error: profileError);
+            throw CloudProviderException(
+              'Falha ao obter informações do usuário: ${profileError.toString()}',
             );
           }
         }

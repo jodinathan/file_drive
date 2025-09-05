@@ -28,6 +28,7 @@ class OAuthManager {
   /// [config] - OAuth configuration for the provider
   /// Returns the result of the authentication
   Future<OAuthResult> authenticate(OAuthConfig config) async {
+    print('🔥🔥🔥 OAUTH MANAGER AUTHENTICATE STARTED 🔥🔥🔥');
     try {
       // Generate unique state parameter
       final state = _generateState();
@@ -40,47 +41,71 @@ class OAuthManager {
       AppLogger.info('Callback scheme: ${config.redirectScheme}', component: 'OAuth');
 
       // Start the OAuth flow using flutter_web_auth_2
-      // Extract the scheme part for callbackUrlScheme (remove :// if present)
-      final callbackScheme = config.redirectScheme
-          .replaceAll('://', '')
-          .split('/')
-          .first;
+      // Extract the scheme part for callbackUrlScheme (remove :// and everything after)
+      String callbackScheme = config.redirectScheme;
+      if (callbackScheme.contains('://')) {
+        callbackScheme = callbackScheme.split('://').first;
+      }
       
       assert(authUrl.trim().isNotEmpty, 'Auth URL is empty');
       assert(callbackScheme.trim().isNotEmpty, 'Callback scheme is empty');
+      
+      AppLogger.info('🚀 Starting FlutterWebAuth2.authenticate...', component: 'OAuth');
+      AppLogger.info('📍 Auth URL: $authUrl', component: 'OAuth');
+      AppLogger.info('📍 Callback scheme: $callbackScheme', component: 'OAuth');
 
+      AppLogger.info('🔄 Waiting for redirect from browser...', component: 'OAuth');
+      
       final result = await FlutterWebAuth2.authenticate(
         url: authUrl,
         callbackUrlScheme: callbackScheme,
+        options: const FlutterWebAuth2Options(
+          timeout: 120000, // 2 minutes timeout
+        ),
       );
+
+      AppLogger.info('✅ FlutterWebAuth2.authenticate completed', component: 'OAuth');
+      AppLogger.info('📤 Result URL: $result', component: 'OAuth');
 
       // Parse the result URL
       final resultUri = Uri.parse(result);
       final queryParams = resultUri.queryParameters;
+      
+      AppLogger.info('🔍 Parsed URI - Scheme: ${resultUri.scheme}, Host: ${resultUri.host}, Path: ${resultUri.path}', component: 'OAuth');
+      AppLogger.info('🔍 Query parameters: $queryParams', component: 'OAuth');
 
       // Check for errors in the callback
       if (queryParams.containsKey('error')) {
         final error = queryParams['error'] ?? 'Unknown error';
         final errorDescription = queryParams['error_description'] ?? error;
+        AppLogger.error('❌ OAuth error in callback - Error: $error, Description: $errorDescription', component: 'OAuth');
         return OAuthResult.error(errorDescription);
       }
 
       // Check for token in hid parameter (based on working example)
       if (queryParams.containsKey('hid')) {
+        AppLogger.info('🔑 Found "hid" parameter in callback', component: 'OAuth');
         final accessToken = queryParams['hid'];
         final refreshToken =
             queryParams['refresh_token']; // 🔑 Captura refresh token
 
+        AppLogger.info('🔑 Access token present: ${accessToken?.isNotEmpty == true}', component: 'OAuth');
+        AppLogger.info('🔑 Refresh token present: ${refreshToken?.isNotEmpty == true}', component: 'OAuth');
+
         if (accessToken != null && accessToken.isNotEmpty) {
+          AppLogger.info('✅ OAuth success with hid parameter', component: 'OAuth');
           return OAuthResult.success(
             accessToken: accessToken,
             refreshToken: refreshToken, // 🔑 Inclui refresh token
             additionalData: queryParams,
           );
         }
+      } else {
+        AppLogger.info('❌ No "hid" parameter found in callback', component: 'OAuth');
       }
 
       // Fallback: try to get tokens from server using state
+      AppLogger.info('🔄 Falling back to server token retrieval with state: $state', component: 'OAuth');
       final tokenResult = await _retrieveTokens(config, state);
       return tokenResult;
     } on PlatformException catch (e) {
@@ -105,6 +130,10 @@ class OAuthManager {
     try {
       // Get the token URL
       final tokenUrl = config.generateTokenUrl(state);
+      assert(tokenUrl.trim().isNotEmpty, 'Token URL is empty');
+      
+      AppLogger.info('🌐 Making token request to: $tokenUrl', component: 'OAuth');
+      AppLogger.info('📍 Using state: $state', component: 'OAuth');
 
       // Make request to get tokens
       final response = await http.get(
@@ -114,6 +143,10 @@ class OAuthManager {
           'Content-Type': 'application/json',
         },
       );
+      
+      AppLogger.info('📥 Token response status: ${response.statusCode}', component: 'OAuth');
+      AppLogger.info('📥 Token response headers: ${response.headers}', component: 'OAuth');
+      AppLogger.info('📥 Token response body: ${response.body}', component: 'OAuth');
 
       if (response.statusCode != 200) {
         return OAuthResult.error(
@@ -133,16 +166,21 @@ class OAuthManager {
       if (data.containsKey('error')) {
         final error = data['error'] as String? ?? 'Unknown error';
         final description = data['error_description'] as String? ?? error;
+        AppLogger.error('❌ Server returned error - Error: $error, Description: $description', component: 'OAuth');
         return OAuthResult.error(description);
       }
 
       // Extract tokens
       final accessToken = data['access_token'] as String?;
+      AppLogger.info('🔑 Access token extracted: ${accessToken?.isNotEmpty == true}', component: 'OAuth');
+      
       if (accessToken == null || accessToken.isEmpty) {
+        AppLogger.error('❌ No access token in server response', component: 'OAuth');
         return OAuthResult.error('No access token received');
       }
 
       final refreshToken = data['refresh_token'] as String?;
+      AppLogger.info('🔑 Refresh token extracted: ${refreshToken?.isNotEmpty == true}', component: 'OAuth');
 
       // Parse expiration
       DateTime? expiresAt;

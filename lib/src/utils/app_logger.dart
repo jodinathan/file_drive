@@ -6,7 +6,7 @@ import 'dart:io';
 class AppLogger {
   static const String _tag = 'FileCloud';
   
-  static bool _debugMode = false;
+  static bool _debugMode = true;
   
   /// Habilita modo debug (mostra logs no terminal além do DevTools)
   static void enableDebugMode() {
