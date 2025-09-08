@@ -15,7 +15,9 @@
       "Bash(flutter config:*)",
       "Read(//Users/jonathanrezende/.pub-cache/hosted/pub.dev/flutter_web_auth_2-4.1.0/**)",
       "Bash(flutter clean:*)",
-      "Bash(flutter pub:*)"
+      "Bash(flutter pub:*)",
+      "Bash(flutter analyze:*)",
+      "Bash(find:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

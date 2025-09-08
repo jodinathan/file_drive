@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import '../enums/oauth_scope.dart';
+import '../enums/provider_scope_mapper.dart';
 import '../models/cloud_account.dart';
 import '../models/oauth_provider_configuration.dart';
 import 'base_cloud_provider.dart';
@@ -66,9 +67,9 @@ abstract class OAuthCloudProvider extends BaseCloudProvider {
     
     try {
       final tokenUrl = oauthConfiguration.tokenUrlGenerator(state);
-      final response = await _performTokenExchange(tokenUrl, authorizationCode, state);
+      final response = await performTokenExchange(tokenUrl, authorizationCode, state);
       
-      final account = _parseTokenResponse(response);
+      final account = parseTokenResponse(response);
       _authenticatedAccount = account;
       _authStateController?.add(AuthenticationState.authenticated);
       _scheduleTokenRefresh(account);
@@ -88,10 +89,10 @@ abstract class OAuthCloudProvider extends BaseCloudProvider {
     _authStateController?.add(AuthenticationState.authenticating);
     
     try {
-      final state = _generateOAuthState();
-      final authUrl = await generateAuthorizationUrl(state);
+      final state = generateOAuthState();
+      final authUrl = generateAuthorizationUrl(state);
       
-      await _launchAuthorizationUrl(authUrl);
+      await launchAuthorizationUrl(authUrl);
     } catch (error) {
       _authStateController?.add(AuthenticationState.authenticationFailed);
       handleOAuthError(error);
@@ -99,17 +100,25 @@ abstract class OAuthCloudProvider extends BaseCloudProvider {
     }
   }
 
-  Future<Map<String, dynamic>> _performTokenExchange(
+  /// Performs OAuth token exchange with authorization code
+  /// Must be implemented by subclasses to handle provider-specific token exchange
+  Future<Map<String, dynamic>> performTokenExchange(
     Uri tokenUrl, 
     String authorizationCode, 
     String state,
   );
   
-  CloudAccount _parseTokenResponse(Map<String, dynamic> response);
+  /// Parses token response from OAuth provider
+  /// Must be implemented by subclasses to handle provider-specific response format
+  CloudAccount parseTokenResponse(Map<String, dynamic> response);
   
-  String _generateOAuthState();
+  /// Generates secure OAuth state parameter
+  /// Must be implemented by subclasses for security
+  String generateOAuthState();
   
-  Future<void> _launchAuthorizationUrl(Uri authUrl);
+  /// Launches authorization URL in browser/webview
+  /// Must be implemented by subclasses for platform-specific browser launching
+  Future<void> launchAuthorizationUrl(Uri authUrl);
   
   
   bool checkAuthentication() {
@@ -178,13 +187,21 @@ abstract class OAuthCloudProvider extends BaseCloudProvider {
   }
   
   void _validateTokenScopes() {
-    final requiredScopeNames = requiredScopes.map((scope) => scope.name).toSet();
+    // Convert required scopes to provider-specific scope strings
+    final requiredScopeStrings = ProviderScopeMapper.mapScopesToProvider(requiredScopes, providerType);
+    final requiredScopesSet = requiredScopeStrings.toSet();
     final availableScopes = oauthConfiguration.scopes.toSet();
     
-    if (!availableScopes.containsAll(requiredScopeNames)) {
-      final missingScopes = requiredScopeNames.difference(availableScopes);
+    // Check if all required scopes are available
+    if (!availableScopes.containsAll(requiredScopesSet)) {
+      final missingScopes = requiredScopesSet.difference(availableScopes);
+      final missingScopeNames = requiredScopes.where((scope) {
+        final singleScopeString = ProviderScopeMapper.mapScopesToProvider({scope}, providerType).first;
+        return missingScopes.contains(singleScopeString);
+      }).map((scope) => scope.name);
+      
       throw CloudProviderException(
-        'Missing required OAuth scopes: ${missingScopes.join(', ')}',
+        'Missing required OAuth scopes: ${missingScopeNames.join(', ')}',
         code: 'INSUFFICIENT_SCOPES',
       );
     }
@@ -208,7 +225,7 @@ abstract class OAuthCloudProvider extends BaseCloudProvider {
     try {
       _authStateController?.add(AuthenticationState.authenticating);
       
-      final refreshedAccount = await _performTokenRefresh(account);
+      final refreshedAccount = await performTokenRefresh(account);
       
       _authenticatedAccount = refreshedAccount;
       _authStateController?.add(AuthenticationState.authenticated);
@@ -291,7 +308,9 @@ abstract class OAuthCloudProvider extends BaseCloudProvider {
     _authStateController?.add(AuthenticationState.notAuthenticated);
   }
   
-  Future<CloudAccount> _performTokenRefresh(CloudAccount account);
+  /// Performs OAuth token refresh
+  /// Must be implemented by subclasses to handle provider-specific token refresh
+  Future<CloudAccount> performTokenRefresh(CloudAccount account);
   
   Duration? getTokenTimeToExpiry() {
     if (_authenticatedAccount?.expiresAt == null) return null;
@@ -322,7 +341,7 @@ abstract class OAuthCloudProvider extends BaseCloudProvider {
     } catch (error) {
       if (!autoRetry) rethrow;
       
-      if (_isAuthenticationError(error) && hasValidRefreshToken()) {
+      if (isAuthenticationError(error) && hasValidRefreshToken()) {
         try {
           await refreshTokens(_authenticatedAccount!);
           return await request();
@@ -348,7 +367,7 @@ abstract class OAuthCloudProvider extends BaseCloudProvider {
       'Authorization': 'Bearer ${_authenticatedAccount!.accessToken}',
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      ...await _getProviderSpecificHeaders(),
+      ...await getProviderSpecificHeaders(),
     };
   }
   
@@ -363,7 +382,7 @@ abstract class OAuthCloudProvider extends BaseCloudProvider {
         ...?additionalHeaders,
       };
       
-      final response = await _performHttpRequest('GET', url, headers: headers);
+      final response = await performHttpRequest('GET', url, headers: headers);
       
       if (parser != null) {
         return parser(response);
@@ -384,7 +403,7 @@ abstract class OAuthCloudProvider extends BaseCloudProvider {
         ...?additionalHeaders,
       };
       
-      final response = await _performHttpRequest(
+      final response = await performHttpRequest(
         'POST', 
         url, 
         headers: headers,
@@ -410,7 +429,7 @@ abstract class OAuthCloudProvider extends BaseCloudProvider {
         ...?additionalHeaders,
       };
       
-      final response = await _performHttpRequest(
+      final response = await performHttpRequest(
         'PUT', 
         url, 
         headers: headers,
@@ -435,7 +454,7 @@ abstract class OAuthCloudProvider extends BaseCloudProvider {
         ...?additionalHeaders,
       };
       
-      final response = await _performHttpRequest('DELETE', url, headers: headers);
+      final response = await performHttpRequest('DELETE', url, headers: headers);
       
       if (parser != null) {
         return parser(response);
@@ -459,21 +478,29 @@ abstract class OAuthCloudProvider extends BaseCloudProvider {
       ...?additionalHeaders,
     };
     
-    return _performStreamRequest(url, headers);
+    return performStreamRequest(url, headers);
   }
   
-  bool _isAuthenticationError(dynamic error);
+  /// Checks if the error indicates an authentication problem
+  /// Must be implemented by subclasses to handle provider-specific auth errors
+  bool isAuthenticationError(dynamic error);
   
-  Future<Map<String, String>> _getProviderSpecificHeaders();
+  /// Gets provider-specific headers for API requests
+  /// Must be implemented by subclasses to add provider-specific headers
+  Future<Map<String, String>> getProviderSpecificHeaders();
   
-  Future<Map<String, dynamic>> _performHttpRequest(
+  /// Performs HTTP request with proper error handling
+  /// Must be implemented by subclasses for provider-specific HTTP handling
+  Future<Map<String, dynamic>> performHttpRequest(
     String method, 
     Uri url, {
     Map<String, String>? headers,
     Map<String, dynamic>? body,
   });
   
-  Future<Stream<List<int>>> _performStreamRequest(
+  /// Performs streaming HTTP request for file downloads
+  /// Must be implemented by subclasses for provider-specific streaming
+  Future<Stream<List<int>>> performStreamRequest(
     Uri url,
     Map<String, String> headers,
   );

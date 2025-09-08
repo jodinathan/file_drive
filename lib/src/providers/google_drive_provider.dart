@@ -10,6 +10,7 @@ import '../models/provider_capabilities.dart';
 import '../models/cloud_account.dart';
 import '../models/account_status.dart';
 import '../utils/app_logger.dart';
+import '../auth/oauth_manager.dart';
 
 /// HTTP client that uses OAuthCloudProvider's authentication
 class OAuthAuthenticatedClient extends http.BaseClient {
@@ -172,7 +173,7 @@ class GoogleDriveProvider extends OAuthCloudProvider {
     AppLogger.debug('Current Account: ${currentAccount?.email}', component: 'GoogleDrive');
     
     // Use parent OAuth provider's error handling for authentication errors
-    if (_isAuthenticationError(e)) {
+    if (isAuthenticationError(e)) {
       AppLogger.warning('Authentication error detected - delegating to OAuth provider', component: 'GoogleDrive');
       handleOAuthError(e);
       return; // handleOAuthError will throw appropriate exception
@@ -219,12 +220,189 @@ class GoogleDriveProvider extends OAuthCloudProvider {
   }
 
   /// Check if the error is authentication-related
-  bool _isAuthenticationError(dynamic error) {
+  @override
+  bool isAuthenticationError(dynamic error) {
+    assert(error != null, 'Error cannot be null');
+    
     final errorString = error.toString().toLowerCase();
     return errorString.contains('401') || 
            errorString.contains('unauthorized') ||
            errorString.contains('invalid_token') ||
            errorString.contains('token_expired');
+  }
+
+  /// Get Google Drive specific headers for API requests
+  @override
+  Future<Map<String, String>> getProviderSpecificHeaders() async {
+    return {
+      'User-Agent': 'Flutter FileCloud Google Drive Client/1.0',
+    };
+  }
+
+  /// Performs OAuth token exchange with Google Drive
+  @override
+  Future<Map<String, dynamic>> performTokenExchange(
+    Uri tokenUrl, 
+    String authorizationCode, 
+    String state,
+  ) async {
+    assert(tokenUrl.toString().isNotEmpty, 'Token URL cannot be empty');
+    assert(authorizationCode.isNotEmpty, 'Authorization code cannot be empty');
+    assert(state.isNotEmpty, 'State cannot be empty');
+    
+    // This should be handled by the OAuth server, not the client
+    throw UnimplementedError(
+      'Token exchange should be handled by the OAuth server. '
+      'Use the server endpoint to exchange authorization code for tokens.'
+    );
+  }
+
+  /// Parses token response from Google Drive OAuth server
+  @override
+  CloudAccount parseTokenResponse(Map<String, dynamic> response) {
+    assert(response.isNotEmpty, 'Token response cannot be empty');
+    
+    final accessToken = response['access_token'] as String?;
+    final refreshToken = response['refresh_token'] as String?;
+    final expiresIn = response['expires_in'] as int?;
+    
+    assert(accessToken != null && accessToken.isNotEmpty, 
+           'Access token is required in token response');
+    
+    DateTime? expiresAt;
+    if (expiresIn != null) {
+      expiresAt = DateTime.now().add(Duration(seconds: expiresIn));
+    }
+    
+    assert(accessToken != null && accessToken.isNotEmpty, 
+           'Access token is required for CloudAccount creation');
+    
+    final now = DateTime.now();
+    return CloudAccount(
+      id: 'temp_${now.millisecondsSinceEpoch}',
+      externalId: 'temp_external_${now.millisecondsSinceEpoch}', // Will be updated after getUserProfile
+      email: 'pending@google.com', // Will be updated after getUserProfile
+      name: 'Pending User',
+      providerType: providerType.name,
+      accessToken: accessToken!,
+      refreshToken: refreshToken,
+      expiresAt: expiresAt,
+      createdAt: now,
+      updatedAt: now,
+      // scopes: oauthConfiguration.scopes, // TODO: Add scopes support to CloudAccount
+    );
+  }
+
+  /// Generates secure OAuth state parameter
+  @override
+  String generateOAuthState() {
+    final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+    final random = DateTime.now().microsecond.toString();
+    return '${timestamp}_${random}_google_drive';
+  }
+
+  /// Launches authorization URL in browser
+  @override
+  Future<void> launchAuthorizationUrl(Uri authUrl) async {
+    assert(authUrl.toString().isNotEmpty, 'Authorization URL cannot be empty');
+    assert(authUrl.hasScheme, 'Authorization URL must have a valid scheme');
+    
+    throw UnimplementedError(
+      'Authorization URL launching should be handled by the FileCloudWidget. '
+      'URL to launch: ${authUrl.toString()}'
+    );
+  }
+
+  /// Performs OAuth token refresh with Google Drive
+  @override
+  Future<CloudAccount> performTokenRefresh(CloudAccount account) async {
+    assert(account.refreshToken != null && account.refreshToken!.isNotEmpty,
+           'Refresh token is required for token refresh');
+    assert(account.providerType == providerType.name,
+           'Account provider type must match this provider');
+    
+    AppLogger.debug('Performing token refresh for account: ${account.email}', component: 'GoogleDrive');
+    
+    try {
+      // Use OAuth manager to refresh the token
+      final oauthManager = OAuthManager();
+      
+      // Use the dedicated refresh endpoint instead of token URL generator
+      // The server has /auth/refresh endpoint specifically for token refresh
+      final baseUrl = oauthConfiguration.tokenUrlGenerator('').toString();
+      final refreshUrl = baseUrl.replaceAll('/auth/tokens/', '/auth/refresh');
+      
+      AppLogger.debug('Using refresh URL: $refreshUrl', component: 'GoogleDrive');
+      
+      final result = await oauthManager.refreshToken(
+        refreshUrl: refreshUrl,
+        refreshToken: account.refreshToken!,
+      );
+      
+      if (result.isSuccess) {
+        AppLogger.info('Token refresh successful', component: 'GoogleDrive');
+        
+        // Create updated account with new tokens
+        final updatedAccount = account.copyWith(
+          accessToken: result.accessToken!,
+          refreshToken: result.refreshToken ?? account.refreshToken,
+          expiresAt: result.expiresAt,
+          updatedAt: DateTime.now(),
+        );
+        
+        AppLogger.debug('Updated account created with new tokens', component: 'GoogleDrive');
+        return updatedAccount;
+        
+      } else {
+        AppLogger.error('Token refresh failed: ${result.error}', component: 'GoogleDrive');
+        throw CloudProviderException(
+          'Token refresh failed: ${result.error}',
+          code: 'refresh_failed',
+        );
+      }
+      
+    } catch (e) {
+      AppLogger.error('Exception during token refresh: $e', component: 'GoogleDrive');
+      throw CloudProviderException(
+        'Token refresh failed: ${e.toString()}',
+        code: 'refresh_failed',
+        originalException: e,
+      );
+    }
+  }
+
+  /// Performs HTTP request with Google Drive API error handling
+  @override
+  Future<Map<String, dynamic>> performHttpRequest(
+    String method, 
+    Uri url, {
+    Map<String, String>? headers,
+    Map<String, dynamic>? body,
+  }) async {
+    assert(method.isNotEmpty, 'HTTP method cannot be empty');
+    assert(url.toString().isNotEmpty, 'URL cannot be empty');
+    assert(['GET', 'POST', 'PUT', 'DELETE', 'PATCH'].contains(method.toUpperCase()),
+           'HTTP method must be valid: $method');
+    
+    throw UnimplementedError(
+      'HTTP requests for Google Drive should use the googleapis SDK. '
+      'Method: $method, URL: $url'
+    );
+  }
+
+  /// Performs streaming HTTP request for file downloads
+  @override
+  Future<Stream<List<int>>> performStreamRequest(
+    Uri url,
+    Map<String, String> headers,
+  ) async {
+    assert(url.toString().isNotEmpty, 'URL cannot be empty');
+    assert(headers.isNotEmpty, 'Headers cannot be empty');
+    
+    throw UnimplementedError(
+      'Streaming requests for Google Drive should use the googleapis SDK. '
+      'URL: $url'
+    );
   }
 
   /// Updates the current account status
@@ -276,7 +454,7 @@ class GoogleDriveProvider extends OAuthCloudProvider {
       );
       
     } catch (e) {
-      _handleApiError(e as Exception);
+      _handleApiError(e is Exception ? e : Exception(e.toString()));
       rethrow; // Won't reach here due to _handleApiError throwing
     }
   }
@@ -317,7 +495,7 @@ class GoogleDriveProvider extends OAuthCloudProvider {
       return _convertToFileEntry(createdFile);
       
     } catch (e) {
-      _handleApiError(e as Exception);
+      _handleApiError(e is Exception ? e : Exception(e.toString()));
       rethrow; // Won't reach here due to _handleApiError throwing
     }
   }
@@ -337,7 +515,7 @@ class GoogleDriveProvider extends OAuthCloudProvider {
         await _driveApi!.files.update(file, entryId);
       }
     } catch (e) {
-      _handleApiError(e as Exception);
+      _handleApiError(e is Exception ? e : Exception(e.toString()));
       rethrow; // Won't reach here due to _handleApiError throwing
     }
   }
@@ -355,7 +533,7 @@ class GoogleDriveProvider extends OAuthCloudProvider {
       yield* media.stream;
       
     } catch (e) {
-      _handleApiError(e as Exception);
+      _handleApiError(e is Exception ? e : Exception(e.toString()));
       rethrow; // Won't reach here due to _handleApiError throwing
     }
   }
@@ -409,7 +587,7 @@ class GoogleDriveProvider extends OAuthCloudProvider {
       );
       
     } catch (e) {
-      _handleApiError(e as Exception);
+      _handleApiError(e is Exception ? e : Exception(e.toString()));
       rethrow; // Won't reach here due to _handleApiError throwing
     }
   }
@@ -441,7 +619,7 @@ class GoogleDriveProvider extends OAuthCloudProvider {
       );
       
     } catch (e) {
-      _handleApiError(e as Exception);
+      _handleApiError(e is Exception ? e : Exception(e.toString()));
       rethrow; // Won't reach here due to _handleApiError throwing
     }
   }
@@ -451,8 +629,12 @@ class GoogleDriveProvider extends OAuthCloudProvider {
     _ensureInitialized();
     
     try {
+      AppLogger.debug('Calling Google Drive API about.get()', component: 'GoogleDrive');
       final about = await _driveApi!.about.get($fields: 'user');
+      AppLogger.debug('About response received: ${about.toJson()}', component: 'GoogleDrive');
+      
       final user = about.user!;
+      AppLogger.debug('User data: ${user.toJson()}', component: 'GoogleDrive');
       
       return UserProfile(
         id: user.permissionId!,
@@ -461,8 +643,22 @@ class GoogleDriveProvider extends OAuthCloudProvider {
         photoUrl: user.photoLink,
       );
       
-    } catch (e) {
-      _handleApiError(e as Exception);
+    } catch (e, stackTrace) {
+      AppLogger.error('Error in getUserProfile - Type: ${e.runtimeType}', component: 'GoogleDrive');
+      AppLogger.error('Error message: ${e.toString()}', component: 'GoogleDrive');
+      AppLogger.error('Stack trace: $stackTrace', component: 'GoogleDrive');
+      
+      if (e is Exception) {
+        _handleApiError(e);
+      } else {
+        // Handle non-Exception errors (like NoSuchMethodError)
+        AppLogger.error('Non-Exception error caught: $e', component: 'GoogleDrive', error: e);
+        throw CloudProviderException(
+          'Falha ao obter informações do usuário: ${e.toString()}',
+          code: 'user_profile_error',
+          originalException: e is Exception ? e : null,
+        );
+      }
       rethrow; // Won't reach here due to _handleApiError throwing
     }
   }

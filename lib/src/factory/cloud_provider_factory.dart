@@ -1,7 +1,9 @@
 import '../enums/cloud_provider_type.dart';
+import '../enums/provider_scope_mapper.dart';
 import '../models/base_provider_configuration.dart';
 import '../models/oauth_provider_configuration.dart';
 import '../models/ready_provider_configuration.dart';
+import '../models/provider_configuration.dart';
 import '../providers/base_cloud_provider.dart';
 import '../providers/google_drive_provider.dart';
 import '../providers/local_server_provider.dart';
@@ -354,20 +356,50 @@ abstract class CloudProviderFactory {
     if (_staticProvidersInitialized) return;
     
     try {
-      // Register Google Drive OAuth provider
-      registerStaticProvider<OAuthProviderConfiguration>(
-        configurationType: OAuthProviderConfiguration,
-        providerType: CloudProviderType.googleDrive,
-        constructor: ({required configuration, account}) => GoogleDriveProvider(
-          oauthConfiguration: configuration,
-          account: account,
-        ),
-        displayName: 'Google Drive',
+      // Register ProviderConfiguration (unified modern approach)
+      registerStaticProvider<ProviderConfiguration>(
+        configurationType: ProviderConfiguration,
+        providerType: CloudProviderType.googleDrive, // This is just the default, we handle multiple types
+        constructor: ({required BaseProviderConfiguration configuration, account}) {
+          final providerConfig = configuration as ProviderConfiguration;
+          if (providerConfig.type == CloudProviderType.googleDrive) {
+            // Create OAuthProviderConfiguration from ProviderConfiguration
+            final scopeStrings = ProviderScopeMapper.mapScopesToProvider(
+              providerConfig.requiredScopes, 
+              providerConfig.type
+            );
+            
+            final oauthProviderConfig = OAuthProviderConfiguration(
+              type: providerConfig.type,
+              displayName: providerConfig.displayName,
+              capabilities: Set<ProviderCapability>.from(providerConfig.capabilities),
+              authUrlGenerator: (state) => Uri.parse(providerConfig.generateAuthUrl(state)),
+              tokenUrlGenerator: (state) => Uri.parse(providerConfig.generateTokenUrl(state)),
+              redirectScheme: providerConfig.redirectScheme,
+              scopes: scopeStrings,
+            );
+            
+            return GoogleDriveProvider(
+              oauthConfiguration: oauthProviderConfig,
+              account: account,
+            );
+          } else if (providerConfig.type == CloudProviderType.localServer) {
+            return LocalServerProvider(
+              configuration: LocalServerProviderConfig(
+                displayName: providerConfig.displayName,
+              ),
+              account: account,
+            );
+          } else {
+            throw CloudProviderFactoryException(
+              'Unsupported provider type: ${providerConfig.type}',
+              code: 'UNSUPPORTED_PROVIDER_TYPE',
+            );
+          }
+        },
+        displayName: 'Unified Provider Configuration',
         isBuiltIn: true,
       );
-      
-      // Note: Dropbox provider is not yet implemented
-      // It can be added here when concrete implementation is available
       
       // Register Local Server provider
       registerStaticProvider<LocalServerProviderConfig>(
@@ -802,7 +834,7 @@ abstract class CloudProviderFactory {
   static void _validateConfigurationTypeConsistency(Type configurationType, CloudProviderType providerType) {
     // Define expected configuration types for each provider type
     final expectedConfigTypes = <CloudProviderType, Set<Type>>{
-      CloudProviderType.googleDrive: {OAuthProviderConfiguration},
+      CloudProviderType.googleDrive: {OAuthProviderConfiguration, ProviderConfiguration},
       CloudProviderType.oneDrive: {OAuthProviderConfiguration},
       CloudProviderType.dropbox: {OAuthProviderConfiguration},
       CloudProviderType.localServer: {LocalServerProviderConfig},

@@ -178,21 +178,23 @@ class ProviderConfiguration extends BaseProviderConfiguration {
       );
     }
 
-    // Test URL generation functions with a sample state
-    try {
-      final sampleState = 'test_state_123';
-      final authUrl = generateAuthUrl(sampleState);
-      final tokenUrl = generateTokenUrl(sampleState);
+    // Test URL generation functions with a sample state (skip for local server)
+    if (type != CloudProviderType.localServer) {
+      try {
+        final sampleState = 'test_state_123';
+        final authUrl = generateAuthUrl(sampleState);
+        final tokenUrl = generateTokenUrl(sampleState);
 
-      if (Uri.tryParse(authUrl) == null) {
-        throw ArgumentError('generateAuthUrl must return a valid URL');
-      }
+        if (Uri.tryParse(authUrl) == null) {
+          throw ArgumentError('generateAuthUrl must return a valid URL');
+        }
 
-      if (Uri.tryParse(tokenUrl) == null) {
-        throw ArgumentError('generateTokenUrl must return a valid URL');
+        if (Uri.tryParse(tokenUrl) == null) {
+          throw ArgumentError('generateTokenUrl must return a valid URL');
+        }
+      } catch (e) {
+        throw ArgumentError('URL generation functions failed validation: $e');
       }
-    } catch (e) {
-      throw ArgumentError('URL generation functions failed validation: $e');
     }
   }
 
@@ -400,7 +402,7 @@ extension ProviderConfigurationFactories on ProviderConfiguration {
           throw 'Unexpected generateAuthUrl call for local server',
       generateTokenUrl: (s) =>
           throw 'Unexpected generateTokenUrl call for local server',
-      redirectScheme: 'UNKNOWN',
+      redirectScheme: 'localserver://auth',
       requiredScopes: {},
       providerCapabilities: const ProviderCapabilities(
         canUpload: true,

@@ -640,6 +640,131 @@ class DropboxProvider extends OAuthCloudProvider {
     }
   }
 
+  /// Check if the error is authentication-related
+  @override
+  bool isAuthenticationError(dynamic error) {
+    assert(error != null, 'Error cannot be null');
+    
+    final errorString = error.toString().toLowerCase();
+    return errorString.contains('401') || 
+           errorString.contains('unauthorized') ||
+           errorString.contains('invalid_token') ||
+           errorString.contains('token_expired');
+  }
+
+  /// Get Dropbox specific headers for API requests
+  @override
+  Future<Map<String, String>> getProviderSpecificHeaders() async {
+    return {
+      'User-Agent': 'Flutter FileCloud Dropbox Client/1.0',
+    };
+  }
+
+  /// Performs OAuth token exchange with Dropbox
+  @override
+  Future<Map<String, dynamic>> performTokenExchange(
+    Uri tokenUrl, 
+    String authorizationCode, 
+    String state,
+  ) async {
+    assert(tokenUrl.toString().isNotEmpty, 'Token URL cannot be empty');
+    assert(authorizationCode.isNotEmpty, 'Authorization code cannot be empty');
+    assert(state.isNotEmpty, 'State cannot be empty');
+    
+    throw UnimplementedError(
+      'Token exchange should be handled by the OAuth server for Dropbox'
+    );
+  }
+
+  /// Parses token response from Dropbox OAuth server
+  @override
+  CloudAccount parseTokenResponse(Map<String, dynamic> response) {
+    assert(response.isNotEmpty, 'Token response cannot be empty');
+    
+    final accessToken = response['access_token'] as String?;
+    final refreshToken = response['refresh_token'] as String?;
+    
+    assert(accessToken != null && accessToken.isNotEmpty, 
+           'Access token is required in token response');
+    
+    final now = DateTime.now();
+    return CloudAccount(
+      id: 'temp_dropbox_${now.millisecondsSinceEpoch}',
+      externalId: 'temp_external_dropbox_${now.millisecondsSinceEpoch}', // Will be updated after getUserProfile
+      email: 'pending@dropbox.com', // Will be updated after getUserProfile
+      name: 'Pending User', // Will be updated after getUserProfile  
+      providerType: providerType.name,
+      accessToken: accessToken!,
+      refreshToken: refreshToken,
+      createdAt: now,
+      updatedAt: now,
+    );
+  }
+
+  /// Generates secure OAuth state parameter
+  @override
+  String generateOAuthState() {
+    final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+    final random = DateTime.now().microsecond.toString();
+    return '${timestamp}_${random}_dropbox';
+  }
+
+  /// Launches authorization URL in browser
+  @override
+  Future<void> launchAuthorizationUrl(Uri authUrl) async {
+    assert(authUrl.toString().isNotEmpty, 'Authorization URL cannot be empty');
+    assert(authUrl.hasScheme, 'Authorization URL must have a valid scheme');
+    
+    throw UnimplementedError(
+      'Authorization URL launching should be handled by the FileCloudWidget for Dropbox'
+    );
+  }
+
+  /// Performs OAuth token refresh with Dropbox
+  @override
+  Future<CloudAccount> performTokenRefresh(CloudAccount account) async {
+    assert(account.refreshToken != null && account.refreshToken!.isNotEmpty,
+           'Refresh token is required for token refresh');
+    assert(account.providerType == providerType,
+           'Account provider type must match this provider');
+    
+    throw UnimplementedError(
+      'Token refresh should be handled by the OAuth server for Dropbox'
+    );
+  }
+
+  /// Performs HTTP request with Dropbox API error handling
+  @override
+  Future<Map<String, dynamic>> performHttpRequest(
+    String method, 
+    Uri url, {
+    Map<String, String>? headers,
+    Map<String, dynamic>? body,
+  }) async {
+    assert(method.isNotEmpty, 'HTTP method cannot be empty');
+    assert(url.toString().isNotEmpty, 'URL cannot be empty');
+    assert(['GET', 'POST', 'PUT', 'DELETE', 'PATCH'].contains(method.toUpperCase()),
+           'HTTP method must be valid: $method');
+    
+    throw UnimplementedError(
+      'HTTP requests for Dropbox should use the existing HTTP client pattern'
+    );
+  }
+
+  /// Performs streaming HTTP request for file downloads
+  @override
+  Future<Stream<List<int>>> performStreamRequest(
+    Uri url,
+    Map<String, String> headers,
+  ) async {
+    assert(url.toString().isNotEmpty, 'URL cannot be empty');
+    assert(headers.isNotEmpty, 'Headers cannot be empty');
+    
+    throw UnimplementedError(
+      'Streaming requests for Dropbox should use the existing HTTP client pattern'
+    );
+  }
+
   @override
   void dispose() {
     _httpClient?.close();

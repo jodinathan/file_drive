@@ -11,6 +11,7 @@ import '../models/crop_config.dart';
 import '../providers/base_cloud_provider.dart';
 import '../models/base_provider_configuration.dart';
 import '../models/oauth_provider_configuration.dart';
+import '../models/provider_configuration.dart';
 import '../models/ready_provider_configuration.dart';
 import '../providers/oauth_cloud_provider.dart';
 import '../storage/account_storage.dart';
@@ -428,6 +429,18 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       }
     }
     
+    // Check if it's a ProviderConfiguration
+    if (config is ProviderConfiguration) {
+      try {
+        final urlString = config.generateAuthUrl(state);
+        AppLogger.info('Generated auth URL from ProviderConfiguration: $urlString', component: 'OAuth');
+        return urlString;
+      } catch (e) {
+        AppLogger.error('Failed to generate auth URL from ProviderConfiguration: $e', component: 'OAuth', error: e);
+        return null;
+      }
+    }
+    
     AppLogger.warning('Config is not supported for OAuth: ${config.runtimeType}', component: 'OAuth');
     return null;
   }
@@ -457,12 +470,27 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       }
     }
     
+    // Check if it's a ProviderConfiguration
+    if (config is ProviderConfiguration) {
+      try {
+        final urlString = config.generateTokenUrl(state);
+        AppLogger.info('Generated token URL from ProviderConfiguration: $urlString', component: 'OAuth');
+        return urlString;
+      } catch (e) {
+        AppLogger.error('Failed to generate token URL from ProviderConfiguration: $e', component: 'OAuth', error: e);
+        return null;
+      }
+    }
+    
     return null;
   }
 
   /// Helper method to safely get redirect scheme from configurations
   String? _getRedirectScheme(BaseProviderConfiguration config) {
     if (config is OAuthProviderConfiguration) {
+      return config.redirectScheme;
+    }
+    if (config is ProviderConfiguration) {
       return config.redirectScheme;
     }
     // Handle ReadyProviderConfiguration by checking the provider instance

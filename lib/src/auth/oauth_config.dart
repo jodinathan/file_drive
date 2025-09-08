@@ -34,50 +34,9 @@ class OAuthConfig {
     this.configurationId,
   });
 
-  /// Creates an OAuthConfig from provider configuration
-  factory OAuthConfig.fromProviderConfig({
-    required CloudProviderType providerType,
-    required Set<OAuthScope> requiredScopes,
-    required String baseUrl,
-    required String redirectScheme,
-    String? configurationId,
-  }) {
-    // Validate that provider supports all required scopes
-    ProviderScopeMapper.validateScopes(requiredScopes, providerType);
-    
-    return OAuthConfig(
-      providerType: providerType,
-      requiredScopes: requiredScopes,
-      redirectScheme: redirectScheme,
-      configurationId: configurationId,
-      generateAuthUrl: (state) => '$baseUrl/auth/${providerType.name}?state=$state',
-      generateTokenUrl: (state) => '$baseUrl/auth/tokens/$state',
-    );
-  }
-
   /// Gets the provider-specific scope strings for this configuration
   List<String> get providerScopes {
     return ProviderScopeMapper.mapScopesToProvider(requiredScopes, providerType);
-  }
-
-
-  /// Creates a copy of this configuration with updated values
-  OAuthConfig copyWith({
-    CloudProviderType? providerType,
-    Set<OAuthScope>? requiredScopes,
-    String Function(String state)? generateAuthUrl,
-    String Function(String state)? generateTokenUrl,
-    String? redirectScheme,
-    String? configurationId,
-  }) {
-    return OAuthConfig(
-      providerType: providerType ?? this.providerType,
-      requiredScopes: requiredScopes ?? this.requiredScopes,
-      generateAuthUrl: generateAuthUrl ?? this.generateAuthUrl,
-      generateTokenUrl: generateTokenUrl ?? this.generateTokenUrl,
-      redirectScheme: redirectScheme ?? this.redirectScheme,
-      configurationId: configurationId ?? this.configurationId,
-    );
   }
 
   @override

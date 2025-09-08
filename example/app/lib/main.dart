@@ -1,10 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:file_cloud/file_cloud.dart';
-import 'package:file_cloud/src/providers/local_server_provider.dart';
-import 'package:file_cloud/src/providers/google_drive_provider.dart';
-import 'package:file_cloud/src/models/oauth_provider_configuration.dart';
-import 'package:file_cloud/src/models/ready_provider_configuration.dart';
 
 // Tente importar config.dart, senão use valores de exemplo
 import 'config.dart' deferred as config;
@@ -79,39 +75,38 @@ class _HomePageState extends State<HomePage> {
         // Use defaults if config not available
       }
       
-      // Create provider configurations using ReadyProviderConfiguration to avoid factory conflicts
+      // Create provider configurations using the new ProviderConfiguration system
       _providers = <BaseProviderConfiguration>[
-        ReadyProviderConfiguration.fromProvider(
-          providerInstance: GoogleDriveProvider(
-            oauthConfiguration: OAuthProviderConfiguration(
-              type: CloudProviderType.googleDrive,
-              displayName: 'Google Drive',
-              capabilities: const {
-                ProviderCapability.upload,
-                ProviderCapability.createFolders,
-                ProviderCapability.delete,
-                ProviderCapability.search,
-                ProviderCapability.thumbnails,
-                ProviderCapability.share,
-                ProviderCapability.move,
-                ProviderCapability.copy,
-                ProviderCapability.rename,
-              },
-              authUrlGenerator: (state) => Uri.parse('$serverBaseUrl/auth/google?state=$state'),
-              tokenUrlGenerator: (state) => Uri.parse('$serverBaseUrl/auth/tokens/$state'),
-              redirectScheme: redirectScheme,
-              scopes: ['https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive.metadata'],
-            ),
-          ),
+        ProviderConfigurationFactories.googleDrive(
+          generateAuthUrl: (state) {
+            // Convert OAuth scopes to provider-specific scope strings
+            final requiredScopes = {
+              OAuthScope.readFiles,
+              OAuthScope.writeFiles,
+              OAuthScope.createFolders,
+              OAuthScope.deleteFiles,
+              OAuthScope.readProfile,
+              OAuthScope.readMetadata,
+            };
+            final scopeStrings = ProviderScopeMapper.mapScopesToProvider(requiredScopes, CloudProviderType.googleDrive);
+            final scopesParam = scopeStrings.join(',');
+            return '$serverBaseUrl/auth/google?state=$state&scopes=$scopesParam';
+          },
+          generateTokenUrl: (state) => '$serverBaseUrl/auth/tokens/$state',
+          redirectScheme: redirectScheme,
+          requiredScopes: {
+            OAuthScope.readFiles,
+            OAuthScope.writeFiles,
+            OAuthScope.createFolders,
+            OAuthScope.deleteFiles,
+            OAuthScope.readProfile,
+            OAuthScope.readMetadata,
+          },
           configurationId: 'google_drive_main',
         ),
-        // Add more providers if needed
-        ReadyProviderConfiguration.fromProvider(
-          providerInstance: LocalServerProvider(
-            configuration: const LocalServerProviderConfig(
-              displayName: 'Local Development Server',
-            ),
-          ),
+        // Add local development server
+        ProviderConfigurationFactories.localServer(
+          displayName: 'Local Development Server',
           configurationId: 'local_server_main',
         ),
       ];
@@ -127,7 +122,7 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       // Initialize providers with empty list on error to prevent LateInitializationError
       _providers = <BaseProviderConfiguration>[];
-      print('❌ Erro ao inicializar: $e');
+      debugPrint('❌ Erro ao inicializar: $e');
       if (mounted) {
         setState(() {
           _error = 'Erro ao inicializar: $e';
