@@ -1,5 +1,5 @@
 /// 🔧 CONFIGURAÇÃO DO SERVIDOR OAUTH - EXEMPLO
-/// Copie para config.dart e preencha com suas credenciais do Google Cloud Console
+/// Copie para config/config.dart e preencha com suas credenciais do Google Cloud Console
 library;
 
 /// 🖥️ CONFIGURAÇÃO DO SERVIDOR
@@ -60,7 +60,7 @@ class ServerConfig {
 /// 6. Para mobile, crie também credenciais do tipo "Android" ou "iOS"
 ///    e configure o esquema personalizado
 ///
-/// ⚠️ IMPORTANTE: 
-/// - Nunca commite o arquivo config.dart com suas credenciais!
-/// - Mantenha sempre o config.dart no .gitignore
+/// ⚠️ IMPORTANTE:
+/// - Nunca commite o arquivo config/config.dart com suas credenciais!
+/// - Mantenha sempre config/config.dart no .gitignore
 /// - Use este arquivo como template apenas

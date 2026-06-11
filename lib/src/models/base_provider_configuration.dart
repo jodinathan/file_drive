@@ -128,7 +128,7 @@ abstract class BaseProviderConfiguration {
 
   @override
   String toString() {
-    return '${runtimeType}('
+    return '$runtimeType('
         'type: $type, '
         'displayName: $displayName, '
         'capabilities: ${capabilities.map((c) => c.name).join(', ')}, '

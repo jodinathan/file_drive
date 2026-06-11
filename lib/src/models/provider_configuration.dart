@@ -67,9 +67,9 @@ class ProviderConfiguration extends BaseProviderConfiguration {
   final Map<String, dynamic> additionalConfig;
 
   ProviderConfiguration({
-    required CloudProviderType type,
-    required String displayName,
-    Widget? logoWidget,
+    required super.type,
+    required super.displayName,
+    super.logoWidget,
     this.logoAssetPath,
     required this.generateAuthUrl,
     required this.generateTokenUrl,
@@ -79,8 +79,8 @@ class ProviderConfiguration extends BaseProviderConfiguration {
     this.requiresAccountManagement = true,
     this.createProvider,
     this.additionalConfig = const {},
-    bool enabled = true,
-    String? configurationId,
+    super.enabled,
+    super.configurationId,
   }) : assert(
          logoWidget != null ||
              logoAssetPath != null ||
@@ -93,12 +93,7 @@ class ProviderConfiguration extends BaseProviderConfiguration {
          'At least one OAuth scope must be specified (except for local server)',
        ),
        super(
-         type: type,
-         displayName: displayName,
-         logoWidget: logoWidget,
          capabilities: _convertCapabilities(providerCapabilities),
-         enabled: enabled,
-         configurationId: configurationId,
        );
 
   /// Creates a copy of this configuration with updated values

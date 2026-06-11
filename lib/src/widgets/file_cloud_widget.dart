@@ -224,9 +224,11 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
         'Busca por "$query" retornou ${searchResults.entries.length} resultados',
         component: 'Search',
       );
-    } catch (e) {
-      AppLogger.error(
-        'Erro ao buscar por "$query": $e',
+    } catch (e, stackTrace) {
+      AppLogger.exception(
+        'Erro ao buscar por "$query"',
+        e,
+        stackTrace,
         component: 'Search',
       );
       setState(() {
@@ -313,7 +315,35 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     _scrollController.addListener(_onScroll);
 
     _initializeProvidersFromConfiguration();
+    _loadLastSelectedProvider();
     _loadAccounts();
+  }
+
+  Future<void> _loadLastSelectedProvider() async {
+    AppLogger.info('Loading last selected provider from storage...', component: 'Init');
+    final lastProvider = await widget.accountStorage.getLastSelectedProvider();
+    AppLogger.info('Last selected provider from storage: $lastProvider', component: 'Init');
+    if (lastProvider != null && mounted) {
+      final providerType = CloudProviderType.values.where(
+        (type) => type.name == lastProvider,
+      ).firstOrNull;
+
+      if (providerType != null && _providers.containsKey(providerType)) {
+        setState(() {
+          _selectedProvider = providerType;
+        });
+        AppLogger.info(
+          'Restored last selected provider: $providerType',
+          component: 'Init',
+        );
+        // Reload accounts for the restored provider
+        _loadAccounts();
+      } else {
+        AppLogger.warning('Provider type not found or not available: $lastProvider', component: 'Init');
+      }
+    } else {
+      AppLogger.info('No last selected provider found or widget not mounted', component: 'Init');
+    }
   }
 
   void _initializeProvidersFromConfiguration() {
@@ -597,11 +627,12 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
           component: 'Accounts',
         );
       }
-    } catch (e) {
-      AppLogger.error(
+    } catch (e, stackTrace) {
+      AppLogger.exception(
         'Erro ao carregar contas',
+        e,
+        stackTrace,
         component: 'Accounts',
-        error: e,
       );
       setState(() {
         _error = 'Erro ao carregar contas: $e';
@@ -851,11 +882,12 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
         );
         return null;
       }
-    } catch (e) {
-      AppLogger.error(
+    } catch (e, stackTrace) {
+      AppLogger.exception(
         'Erro durante refresh token',
+        e,
+        stackTrace,
         component: 'Auth',
-        error: e,
       );
       AppLogger.info('🔍 DEBUG: Exception during refresh: ${e.toString()}');
       return null;
@@ -950,8 +982,8 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
 
       // Start new OAuth flow for the same provider
       await _addAccount();
-    } catch (e) {
-      AppLogger.error('Erro ao reconectar conta', component: 'Auth', error: e);
+    } catch (e, stackTrace) {
+      AppLogger.exception('Erro ao reconectar conta', e, stackTrace, component: 'Auth');
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -991,11 +1023,12 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
           );
         }
       });
-    } catch (e) {
-      AppLogger.error(
+    } catch (e, stackTrace) {
+      AppLogger.exception(
         'Erro ao recarregar contas',
+        e,
+        stackTrace,
         component: 'Accounts',
-        error: e,
       );
     }
   }
@@ -1062,11 +1095,12 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
         _currentPageToken = filesPage.nextPageToken;
         _hasMoreItems = filesPage.hasMore;
       });
-    } catch (e) {
-      AppLogger.error(
+    } catch (e, stackTrace) {
+      AppLogger.exception(
         'Error loading more files',
+        e,
+        stackTrace,
         component: 'Pagination',
-        error: e,
       );
 
       // Handle authentication errors
@@ -1213,11 +1247,12 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
           _pathStack = _navigationManager.history.current?.pathComponents ?? [];
         }
       });
-    } catch (e) {
-      AppLogger.error(
+    } catch (e, stackTrace) {
+      AppLogger.exception(
         'Erro ao carregar arquivos',
+        e,
+        stackTrace,
         component: 'Files',
-        error: e,
       );
 
       // Handle authentication errors
@@ -1256,8 +1291,8 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       );
 
       // Create OAuthConfig from provider configuration for authentication
-      final authUrlGenerator = (String state) => _getAuthUrl(providerConfig, state) ?? '';
-      final tokenUrlGenerator = (String state) => _getTokenUrl(providerConfig, state) ?? '';
+      String authUrlGenerator(String state) => _getAuthUrl(providerConfig, state) ?? '';
+      String tokenUrlGenerator(String state) => _getTokenUrl(providerConfig, state) ?? '';
       final redirectScheme = _getRedirectScheme(providerConfig) ?? '';
       
       AppLogger.info('🔧 Creating OAuthConfig for provider: ${providerConfig.type}', component: 'Auth');
@@ -1394,10 +1429,11 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
           },
         );
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       ErrorHandler.handleAuthError(
         context: mounted ? context : null,
         error: e,
+        stackTrace: stackTrace,
         operation: 'adicionar conta',
         additionalData: {
           'selectedProvider': _selectedProvider,
@@ -1667,10 +1703,11 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
               'Arquivo excluído com sucesso: ${file.name}',
               component: 'FileOps',
             );
-          } catch (e) {
+          } catch (e, stackTrace) {
             ErrorHandler.handleFileError(
               context: mounted ? context : null,
               error: e,
+              stackTrace: stackTrace,
               fileName: file.name,
               operation: 'excluir',
               additionalData: {
@@ -1710,10 +1747,11 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
 
         // Recarregar lista de arquivos
         await _loadFiles();
-      } catch (e) {
+      } catch (e, stackTrace) {
         ErrorHandler.handleError(
           context: mounted ? context : null,
           error: e,
+          stackTrace: stackTrace,
           operation: 'exclusão de arquivos',
           component: 'FileOps',
           additionalData: {
@@ -1804,15 +1842,23 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     });
 
     // Trigger callback for cropped images
+    bool croppedImageCallbackTriggered = false;
     if (widget.onImageCropped != null) {
       for (final croppedFile in croppedFiles) {
         if (croppedFile.hasCropData()) {
           widget.onImageCropped!(croppedFile);
+          croppedImageCallbackTriggered = true;
         }
       }
     }
 
-    // Complete the selection process
+    // When onImageCropped was triggered, don't also call onFilesSelected
+    // to avoid double callbacks (e.g., double Navigator.pop)
+    if (croppedImageCallbackTriggered) {
+      return;
+    }
+
+    // Complete the selection process (only when onImageCropped was not triggered)
     if (widget.onFilesSelected != null && _selectedFiles.isNotEmpty) {
       widget.onFilesSelected!(_selectedFiles);
     }
@@ -1879,8 +1925,8 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
             SnackBar(content: Text('Pasta "$result" criada com sucesso!')),
           );
         }
-      } catch (e) {
-        AppLogger.error('Erro ao criar pasta', component: 'Folder', error: e);
+      } catch (e, stackTrace) {
+        AppLogger.exception('Erro ao criar pasta', e, stackTrace, component: 'Folder');
         if (mounted) {
           ScaffoldMessenger.of(
             context,
@@ -2114,11 +2160,12 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
                   }
                 }
               }
-            } catch (e) {
-              AppLogger.error(
+            } catch (e, stackTrace) {
+              AppLogger.exception(
                 'Erro ao fazer upload do arquivo ${file.name}',
+                e,
+                stackTrace,
                 component: 'Upload',
-                error: e,
               );
               failCount++;
             }
@@ -2169,11 +2216,12 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       } else {
         AppLogger.info('Nenhum arquivo selecionado', component: 'Upload');
       }
-    } catch (e) {
-      AppLogger.error(
+    } catch (e, stackTrace) {
+      AppLogger.exception(
         'Erro geral no upload de arquivos',
+        e,
+        stackTrace,
         component: 'Upload',
-        error: e,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -2539,6 +2587,9 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
                     });
                     // Reset navigation history when changing provider
                     _navigationManager.clearHistory();
+                    // Save last selected provider
+                    AppLogger.info('Saving last selected provider: ${providerConfig.type.name}', component: 'Provider');
+                    widget.accountStorage.setLastSelectedProvider(providerConfig.type.name);
                     _loadAccounts();
                   },
                 );

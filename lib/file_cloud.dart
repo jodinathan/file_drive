@@ -46,6 +46,7 @@ export 'src/theme/app_constants.dart';
 // Export utilities
 export 'src/utils/app_logger.dart';
 export 'src/utils/error_handler.dart';
+export 'src/utils/image_dimension_detector.dart';
 
 // Export main widgets
 export 'src/widgets/file_cloud_widget.dart';

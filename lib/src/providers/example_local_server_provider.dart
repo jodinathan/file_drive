@@ -512,6 +512,18 @@ class ExampleLocalServerProvider extends LocalCloudProvider {
     }
   }
   
+  /// Resolves a potentially relative URL against the base URI
+  String? _resolveUrl(String? url) {
+    if (url == null || url.isEmpty) return url;
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    if (url.startsWith('/')) {
+      return localConfiguration.baseUri.resolve(url).toString();
+    }
+    return url;
+  }
+
   /// Helper method to parse file entry data from server response
   FileEntry _parseFileEntry(Map<String, dynamic> data) {
     return FileEntry(
@@ -529,10 +541,10 @@ class ExampleLocalServerProvider extends LocalCloudProvider {
       parents: data['parents'] != null
           ? List<String>.from(data['parents'] as List)
           : [],
-      thumbnailUrl: data['thumbnailUrl'] as String?,
+      thumbnailUrl: _resolveUrl(data['thumbnailUrl'] as String?),
       hasThumbnail: data['hasThumbnail'] as bool? ?? false,
       thumbnailVersion: data['thumbnailVersion'] as String?,
-      downloadUrl: data['downloadUrl'] as String?,
+      downloadUrl: _resolveUrl(data['downloadUrl'] as String?),
       canDownload: data['canDownload'] as bool? ?? true,
       canDelete: data['canDelete'] as bool? ?? true,
       canShare: data['canShare'] as bool? ?? false,

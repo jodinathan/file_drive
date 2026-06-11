@@ -7,6 +7,7 @@ import 'account_storage.dart';
 /// SharedPreferences implementation of AccountStorage
 class SharedPreferencesAccountStorage implements AccountStorage {
   static const String _accountsKey = 'file_cloud_accounts';
+  static const String _lastSelectedProviderKey = 'file_cloud_last_provider';
   
   SharedPreferences? _prefs;
   
@@ -146,5 +147,17 @@ class SharedPreferencesAccountStorage implements AccountStorage {
       );
       await saveAccount(updatedAccount);
     }
+  }
+
+  @override
+  Future<String?> getLastSelectedProvider() async {
+    await _ensureInitialized();
+    return _prefs!.getString(_lastSelectedProviderKey);
+  }
+
+  @override
+  Future<void> setLastSelectedProvider(String providerType) async {
+    await _ensureInitialized();
+    await _prefs!.setString(_lastSelectedProviderKey, providerType);
   }
 }

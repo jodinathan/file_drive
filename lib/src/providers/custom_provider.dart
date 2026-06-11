@@ -23,26 +23,21 @@ class CustomProviderConfig extends BaseProviderConfiguration {
   final String providerType;
 
   const CustomProviderConfig({
-    required String displayName,
+    required super.displayName,
     required this.baseUrl,
-    required Widget logoWidget,
+    required Widget super.logoWidget,
     this.showAccountManagement = true,
     this.providerType = 'custom',
-    Set<ProviderCapability> capabilities = const {
+    super.capabilities = const {
       ProviderCapability.upload,
       ProviderCapability.createFolders,
       ProviderCapability.delete,
       ProviderCapability.search,
     },
-    bool enabled = true,
-    String? configurationId,
+    super.enabled,
+    super.configurationId,
   }) : super(
     type: CloudProviderType.custom,
-    displayName: displayName,
-    logoWidget: logoWidget,
-    capabilities: capabilities,
-    enabled: enabled,
-    configurationId: configurationId,
   );
 
   @override
@@ -96,9 +91,9 @@ class CustomProvider extends BaseCloudProvider {
   bool get showAccountManagement => config.showAccountManagement;
 
   CustomProvider({
-    required CustomProviderConfig configuration,
-    CloudAccount? account,
-  }) : super(configuration: configuration, account: account) {
+    required CustomProviderConfig super.configuration,
+    super.account,
+  }) {
     _httpClient = http.Client();
   }
 

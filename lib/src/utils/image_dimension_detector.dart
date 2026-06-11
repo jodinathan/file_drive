@@ -82,14 +82,32 @@ class ImageDimensionDetector {
     }
   }
 
+  /// Global base URL for resolving relative URLs
+  /// Set this from your app configuration to handle relative URLs properly
+  static String? configuredBaseUrl;
+
   /// Builds a complete URL from a potentially relative URL
+  ///
+  /// [url] - The URL to process (may be relative or absolute)
+  /// [defaultBaseUrl] - Fallback base URL if [configuredBaseUrl] is not set
+  ///
+  /// Priority for base URL resolution:
+  /// 1. Use [configuredBaseUrl] if set
+  /// 2. On web, use window origin (not implemented yet - requires dart:html)
+  /// 3. Fall back to [defaultBaseUrl]
   static String buildCompleteUrl(String url, {String defaultBaseUrl = 'http://localhost:8080'}) {
     if (url.startsWith('http://') || url.startsWith('https://')) {
       return url; // Already complete
     }
     if (url.startsWith('/')) {
       // Relative URL - build complete URL
-      return '$defaultBaseUrl$url';
+      var baseUrl = configuredBaseUrl ?? defaultBaseUrl;
+      // Remove trailing slash from base URL to avoid double slashes
+      if (baseUrl.endsWith('/')) {
+        baseUrl = baseUrl.substring(0, baseUrl.length - 1);
+      }
+      AppLogger.debug('Resolving relative URL "$url" with base "$baseUrl"', component: 'ImageDetector');
+      return '$baseUrl$url';
     }
     return url; // Return as-is for other cases
   }

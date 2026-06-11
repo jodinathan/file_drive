@@ -187,7 +187,7 @@ void main() {
       expect(updated.displayName, 'Updated Provider');
       expect(updated.enabled, false);
       expect(updated.type, original.type); // Should remain unchanged
-      expect((updated as ProviderConfiguration).logoAssetPath, (original as ProviderConfiguration).logoAssetPath); // Should remain unchanged
+      expect((updated as ProviderConfiguration).logoAssetPath, (original).logoAssetPath); // Should remain unchanged
     });
 
     test('should handle equality comparison correctly', () {

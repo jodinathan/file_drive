@@ -37,3 +37,8 @@ old_/
 .claude
 plans/
 bkp/
+# Real (non-template) example configs and runtime junk - never commit
+example/app/lib/config/config.dart
+example/server/lib/config/config.dart
+nohup.out
+**/nohup.out

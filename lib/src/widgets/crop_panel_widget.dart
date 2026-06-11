@@ -123,20 +123,24 @@ class _CropPanelWidgetState extends State<CropPanelWidget> {
 
     try {
       await Future.delayed(const Duration(milliseconds: 100)); // Give UI time to update
-      
+
       _cropController?.dispose();
+
+      // Calculate initial crop that respects minRatio/maxRatio constraints
+      final defaultCrop = _calculateInitialCrop();
+
       _cropController = CropController(
         aspectRatio: widget.cropConfig?.effectiveAspectRatio,
-        defaultCrop: const Rect.fromLTRB(0.1, 0.1, 0.9, 0.9),
+        defaultCrop: defaultCrop,
       );
-      
+
       // Add listener to track crop changes
       _cropController!.addListener(_updateCropDimensions);
-      
+
       setState(() {
         _isLoadingImage = false;
       });
-      
+
       // Initialize crop dimensions after a delay
       Future.delayed(const Duration(milliseconds: 300), () {
         if (mounted) {
@@ -149,6 +153,72 @@ class _CropPanelWidgetState extends State<CropPanelWidget> {
         _errorMessage = 'Error loading image: $e';
       });
     }
+  }
+
+  /// Calculates the initial crop rectangle that respects minRatio/maxRatio constraints
+  Rect _calculateInitialCrop() {
+    const defaultRect = Rect.fromLTRB(0.1, 0.1, 0.9, 0.9);
+
+    final config = widget.cropConfig;
+    if (config == null) return defaultRect;
+
+    // If there's an enforced aspect ratio, use it
+    if (config.effectiveAspectRatio != null) {
+      return _calculateCropForRatio(config.effectiveAspectRatio!);
+    }
+
+    // For free-form with minRatio constraint, use minRatio as the initial aspect ratio
+    if (config.minRatio != null) {
+      return _calculateCropForRatio(config.minRatio!);
+    }
+
+    // For free-form with maxRatio constraint only, use maxRatio
+    if (config.maxRatio != null) {
+      return _calculateCropForRatio(config.maxRatio!);
+    }
+
+    return defaultRect;
+  }
+
+  /// Calculates a crop rectangle for a specific aspect ratio
+  Rect _calculateCropForRatio(double targetRatio) {
+    // Get current image dimensions
+    final currentFile = _croppedFiles[_currentIndex];
+    final imageWidth = currentFile.width?.toDouble() ?? 1024.0;
+    final imageHeight = currentFile.height?.toDouble() ?? 1024.0;
+    final imageRatio = imageWidth / imageHeight;
+
+    // Calculate crop dimensions that fit within 80% of the image
+    // while maintaining the target aspect ratio
+    double cropWidth, cropHeight;
+
+    if (targetRatio > imageRatio) {
+      // Target is wider than image - constrain by width
+      cropWidth = 0.8;
+      cropHeight = (cropWidth * imageWidth) / (targetRatio * imageHeight);
+      // Ensure height doesn't exceed 80%
+      if (cropHeight > 0.8) {
+        cropHeight = 0.8;
+        cropWidth = (cropHeight * targetRatio * imageHeight) / imageWidth;
+      }
+    } else {
+      // Target is taller than image - constrain by height
+      cropHeight = 0.8;
+      cropWidth = (cropHeight * targetRatio * imageHeight) / imageWidth;
+      // Ensure width doesn't exceed 80%
+      if (cropWidth > 0.8) {
+        cropWidth = 0.8;
+        cropHeight = (cropWidth * imageWidth) / (targetRatio * imageHeight);
+      }
+    }
+
+    // Center the crop rectangle
+    final left = (1.0 - cropWidth) / 2;
+    final top = (1.0 - cropHeight) / 2;
+    final right = left + cropWidth;
+    final bottom = top + cropHeight;
+
+    return Rect.fromLTRB(left, top, right, bottom);
   }
 
   void _updateCropDimensions() {
@@ -523,7 +593,8 @@ class _CropPanelWidgetState extends State<CropPanelWidget> {
                               ],
                               
                               // Validation indicators
-                              if (widget.cropConfig?.minWidth != null || widget.cropConfig?.minHeight != null) ...[
+                              if (widget.cropConfig?.minWidth != null || widget.cropConfig?.minHeight != null ||
+                                  widget.cropConfig?.effectiveMinRatio != null || widget.cropConfig?.effectiveMaxRatio != null) ...[
                                 Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -547,6 +618,24 @@ class _CropPanelWidgetState extends State<CropPanelWidget> {
                                         color: _currentCropHeight >= widget.cropConfig!.minHeight!
                                             ? Colors.green
                                             : Colors.red,
+                                      ),
+                                    ],
+                                    // Ratio validation indicator
+                                    if (widget.cropConfig?.effectiveMinRatio != null || widget.cropConfig?.effectiveMaxRatio != null) ...[
+                                      const SizedBox(width: 2),
+                                      Builder(
+                                        builder: (context) {
+                                          final cropRatio = _currentCropWidth / _currentCropHeight;
+                                          final minRatio = widget.cropConfig?.effectiveMinRatio;
+                                          final maxRatio = widget.cropConfig?.effectiveMaxRatio;
+                                          final isValid = (minRatio == null || cropRatio >= minRatio) &&
+                                                          (maxRatio == null || cropRatio <= maxRatio);
+                                          return Icon(
+                                            isValid ? Icons.aspect_ratio : Icons.error,
+                                            size: 14,
+                                            color: isValid ? Colors.green : Colors.red,
+                                          );
+                                        },
                                       ),
                                     ],
                                   ],

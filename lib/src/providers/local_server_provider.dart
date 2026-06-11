@@ -20,23 +20,19 @@ class LocalServerProviderConfig extends BaseProviderConfiguration {
   final String testToken;
 
   const LocalServerProviderConfig({
-    String displayName = 'Local Server',
+    super.displayName = 'Local Server',
     this.serverUrl = 'http://localhost:8080',
     this.testToken = 'test_token_dev',
-    Set<ProviderCapability> capabilities = const {
+    super.capabilities = const {
       ProviderCapability.upload,
       ProviderCapability.createFolders,
       ProviderCapability.delete,
       ProviderCapability.search,
     },
-    bool enabled = true,
-    String? configurationId,
+    super.enabled,
+    super.configurationId,
   }) : super(
     type: CloudProviderType.localServer,
-    displayName: displayName,
-    capabilities: capabilities,
-    enabled: enabled,
-    configurationId: configurationId,
   );
 
   @override
@@ -76,9 +72,9 @@ class LocalServerProvider extends BaseCloudProvider {
   String get testToken => config.testToken;
   
   LocalServerProvider({
-    required LocalServerProviderConfig configuration,
-    CloudAccount? account,
-  }) : super(configuration: configuration, account: account);
+    required LocalServerProviderConfig super.configuration,
+    super.account,
+  });
   
   @override
   CloudProviderType get providerType => CloudProviderType.localServer;
@@ -137,9 +133,9 @@ class LocalServerProvider extends BaseCloudProvider {
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       final files = (data['files'] as List)
-          .map((file) => FileEntry.fromJson(file))
+          .map((file) => _parseFileEntry(file as Map<String, dynamic>))
           .toList();
-      
+
       return FileListPage(
         entries: files,
         nextPageToken: (data['has_next_page'] as bool? ?? false) ? 'next' : null,
@@ -173,7 +169,7 @@ class LocalServerProvider extends BaseCloudProvider {
     
     if (response.statusCode == 201) {
       final data = json.decode(response.body);
-      return FileEntry.fromJson(data);
+      return _parseFileEntry(data as Map<String, dynamic>);
     } else {
       throw CloudProviderException(
         'Failed to create folder: ${response.statusCode}',
@@ -335,6 +331,27 @@ class LocalServerProvider extends BaseCloudProvider {
       default:
         throw CloudProviderException('Unsupported HTTP method: $method');
     }
+  }
+
+  /// Parses a file entry from JSON, converting relative URLs to absolute
+  FileEntry _parseFileEntry(Map<String, dynamic> json) {
+    // Convert relative downloadUrl to absolute URL
+    if (json['downloadUrl'] != null) {
+      final downloadUrl = json['downloadUrl'] as String;
+      if (downloadUrl.startsWith('/')) {
+        json = Map<String, dynamic>.from(json);
+        json['downloadUrl'] = '$serverUrl$downloadUrl';
+      }
+    }
+    // Convert relative thumbnailUrl to absolute URL
+    if (json['thumbnailUrl'] != null) {
+      final thumbnailUrl = json['thumbnailUrl'] as String;
+      if (thumbnailUrl.startsWith('/')) {
+        json = Map<String, dynamic>.from(json);
+        json['thumbnailUrl'] = '$serverUrl$thumbnailUrl';
+      }
+    }
+    return FileEntry.fromJson(json);
   }
 
   @override

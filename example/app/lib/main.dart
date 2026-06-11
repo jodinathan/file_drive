@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:file_cloud/file_cloud.dart';
 
 // Tente importar config.dart, senão use valores de exemplo
-import 'config.dart' deferred as config;
+import 'config/config.dart' deferred as config;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,7 +14,7 @@ void main() async {
   } catch (e) {
     if (kDebugMode) {
       debugPrint('⚠️  config.dart não encontrado, usando configuração de exemplo');
-      debugPrint('📝 Copie lib/config.example.dart para lib/config.dart e configure');
+      debugPrint('📝 Copie lib/config/example.dart para lib/config/config.dart e configure');
     }
   }
   
@@ -438,7 +438,7 @@ class _HomePageState extends State<HomePage> {
                     'Para testar o File Cloud widget, você precisa:\n\n'
                     '1. 🔧 Configurar credenciais Google OAuth2\n'
                     '2. 🖥️  Iniciar o servidor OAuth (../server/)\n'
-                    '3. 📱 Configurar o arquivo config.dart\n\n'
+                    '3. 📱 Configurar o arquivo config/config.dart\n\n'
                     'Veja as instruções detalhadas no README.',
                   ),
                   const SizedBox(height: 16),

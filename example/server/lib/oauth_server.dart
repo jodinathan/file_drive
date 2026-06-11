@@ -8,7 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as path;
 
 // Tente importar config.dart, senão use o exemplo
-import 'config.dart' deferred as config;
+import 'config/config.dart' deferred as config;
 
 /// Servidor OAuth e de Arquivos de exemplo para desenvolvimento do File Cloud widget
 class OAuthServer {
@@ -853,10 +853,10 @@ class OAuthServer {
       print('Pressione Ctrl+C para parar o servidor');
       
     } catch (e) {
-      if (e.toString().contains('config.dart')) {
-        print('❌ Arquivo config.dart não encontrado!');
+      if (e.toString().contains('config.dart') || e.toString().contains('config/config.dart')) {
+        print('❌ Arquivo config/config.dart não encontrado!');
         print('📝 Por favor:');
-        print('   1. Copie lib/config.example.dart para lib/config.dart');
+        print('   1. Copie lib/config/example.dart para lib/config/config.dart');
         print('   2. Configure suas credenciais do Google OAuth2');
         print('   3. Execute novamente');
         exit(1);
