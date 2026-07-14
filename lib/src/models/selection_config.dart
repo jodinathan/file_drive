@@ -105,6 +105,26 @@ class SelectionConfig {
     );
   }
 
+  /// Creates a selection config for media files (images AND videos in one
+  /// flow) — for single-field "photo or video" pickers (e.g. a `media`
+  /// model field whose type is the common parent of image/video).
+  factory SelectionConfig.media({
+    int minSelection = 1,
+    int maxSelection = 1,
+    List<String>? allowedMimeTypes,
+    String? mimeTypeHint,
+    required void Function(List<FileEntry> selectedFiles) onSelectionConfirm,
+  }) {
+    return SelectionConfig(
+      minSelection: minSelection,
+      maxSelection: maxSelection,
+      allowedMimeTypes: allowedMimeTypes ?? const ['image/*', 'video/*'],
+      mimeTypeHint: mimeTypeHint ?? 'Only image or video files are allowed',
+      allowFolders: false,
+      onSelectionConfirm: onSelectionConfirm,
+    );
+  }
+
   /// Creates a selection config for single file selection
   factory SelectionConfig.singleFile({
     List<String>? allowedMimeTypes,

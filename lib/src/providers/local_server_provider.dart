@@ -106,6 +106,8 @@ class LocalServerProvider extends BaseCloudProvider {
         'image/png',
         'image/jpeg',
         'image/gif',
+        'video/mp4',
+        'video/quicktime',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'application/vnd.openxmlformats-officedocument.presentationml.presentation',
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

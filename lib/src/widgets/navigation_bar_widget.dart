@@ -6,6 +6,10 @@ import 'search_bar_widget.dart';
 
 /// Widget for navigation bar with home, back, forward buttons and breadcrumb
 class NavigationBarWidget extends StatelessWidget {
+  /// Available width below which the bar switches to the compact layout
+  /// (search bar and breadcrumb on their own rows)
+  static const double _compactBreakpoint = 600;
+
   /// Current navigation history
   final NavigationHistory navigationHistory;
 
@@ -96,7 +100,12 @@ class NavigationBarWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return LayoutBuilder(builder: (context, constraints) {
+      // Decide layout by the space actually given to this widget (it may live
+      // inside a drawer/dialog much narrower than the screen), not MediaQuery.
+      final compact = constraints.maxWidth < _compactBreakpoint;
+
+      return Container(
       padding: const EdgeInsets.all(AppConstants.paddingM),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
@@ -113,35 +122,37 @@ class NavigationBarWidget extends StatelessWidget {
             children: [
               _buildNavigationButtons(context),
               const SizedBox(width: AppConstants.spacingM),
-              Expanded(child: _buildBreadcrumb(context)),
+              Expanded(child: _buildBreadcrumb(context, compact)),
               const SizedBox(width: AppConstants.spacingM),
-              
+
               // Search bar (if enabled and enough space)
-              if ((showSearchBar || searchDisabledMessage != null) && !_shouldShowSeparateBreadcrumb(context)) ...[
-                Tooltip(
-                  message: onSearch != null
-                      ? 'Pesquisar arquivos'
-                      : searchDisabledMessage ?? 'Busca não disponível para este provedor',
-                  child: SearchBarWidget(
-                    onSearch: onSearch,
-                    onClear: onSearchClear,
-                    isLoading: isSearchLoading,
-                    initialQuery: searchQuery,
-                    enabled: onSearch != null,
-                    placeholder: onSearch != null
-                        ? null
-                        : 'Busca não disponível',
+              if ((showSearchBar || searchDisabledMessage != null) && !compact) ...[
+                Flexible(
+                  child: Tooltip(
+                    message: onSearch != null
+                        ? 'Pesquisar arquivos'
+                        : searchDisabledMessage ?? 'Busca não disponível para este provedor',
+                    child: SearchBarWidget(
+                      onSearch: onSearch,
+                      onClear: onSearchClear,
+                      isLoading: isSearchLoading,
+                      initialQuery: searchQuery,
+                      enabled: onSearch != null,
+                      placeholder: onSearch != null
+                          ? null
+                          : 'Busca não disponível',
+                    ),
                   ),
                 ),
                 const SizedBox(width: AppConstants.spacingM),
               ],
-              
+
               _buildActionButtons(context),
             ],
           ),
 
           // Search bar row (mobile-friendly)
-          if ((showSearchBar || searchDisabledMessage != null) && _shouldShowSeparateBreadcrumb(context)) ...[
+          if ((showSearchBar || searchDisabledMessage != null) && compact) ...[
             const SizedBox(height: AppConstants.spacingS),
             Tooltip(
               message: onSearch != null
@@ -161,13 +172,14 @@ class NavigationBarWidget extends StatelessWidget {
           ],
 
           // Breadcrumb row (mobile-friendly)
-          if (_shouldShowSeparateBreadcrumb(context)) ...[
+          if (compact) ...[
             const SizedBox(height: AppConstants.spacingS),
             _buildMobileBreadcrumb(context),
           ],
         ],
       ),
-    );
+      );
+    });
   }
 
   Widget _buildNavigationButtons(BuildContext context) {
@@ -211,8 +223,8 @@ class NavigationBarWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildBreadcrumb(BuildContext context) {
-    if (_shouldShowSeparateBreadcrumb(context)) {
+  Widget _buildBreadcrumb(BuildContext context, bool compact) {
+    if (compact) {
       // Show simplified breadcrumb on small screens
       final current = navigationHistory.current;
       if (current == null) return const SizedBox.shrink();
@@ -429,23 +441,20 @@ class NavigationBarWidget extends StatelessWidget {
             ),
           ),
 
-          // Upload counter with divider - sempre presente mas invisível quando zero
-          const SizedBox(width: AppConstants.spacingS),
-          Container(
-            height: 24,
-            width: 1,
-            color: activeUploadsCount > 0
-                ? Theme.of(context).colorScheme.outline.withValues(alpha: 0.3)
-                : Colors.transparent,
-          ),
-          const SizedBox(width: AppConstants.spacingS),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Opacity(
-                opacity: activeUploadsCount > 0 ? 1.0 : 0.0,
-                child: TextButton.icon(
-                  onPressed: activeUploadsCount > 0 ? onViewUploads : null,
+          // Upload counter with divider - só ocupa espaço quando há uploads
+          if (activeUploadsCount > 0) ...[
+            const SizedBox(width: AppConstants.spacingS),
+            Container(
+              height: 24,
+              width: 1,
+              color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+            ),
+            const SizedBox(width: AppConstants.spacingS),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton.icon(
+                  onPressed: onViewUploads,
                   icon: const Icon(Icons.upload_file, size: 16),
                   label: Text('$activeUploadsCount uploads'),
                   style: TextButton.styleFrom(
@@ -456,9 +465,7 @@ class NavigationBarWidget extends StatelessWidget {
                     ),
                   ),
                 ),
-              ),
-              // Barra de progresso
-              if (activeUploadsCount > 0)
+                // Barra de progresso
                 Container(
                   width: 100,
                   height: 3,
@@ -480,8 +487,9 @@ class NavigationBarWidget extends StatelessWidget {
                     ),
                   ),
                 ),
-            ],
-          ),
+              ],
+            ),
+          ],
         ],
       ],
     );
@@ -551,10 +559,6 @@ class NavigationBarWidget extends StatelessWidget {
     }
 
     return items;
-  }
-
-  bool _shouldShowSeparateBreadcrumb(BuildContext context) {
-    return MediaQuery.of(context).size.width < 600;
   }
 
   String _getUploadText(BuildContext context) {

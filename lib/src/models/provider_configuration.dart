@@ -173,24 +173,10 @@ class ProviderConfiguration extends BaseProviderConfiguration {
       );
     }
 
-    // Test URL generation functions with a sample state (skip for local server)
-    if (type != CloudProviderType.localServer) {
-      try {
-        final sampleState = 'test_state_123';
-        final authUrl = generateAuthUrl(sampleState);
-        final tokenUrl = generateTokenUrl(sampleState);
-
-        if (Uri.tryParse(authUrl) == null) {
-          throw ArgumentError('generateAuthUrl must return a valid URL');
-        }
-
-        if (Uri.tryParse(tokenUrl) == null) {
-          throw ArgumentError('generateTokenUrl must return a valid URL');
-        }
-      } catch (e) {
-        throw ArgumentError('URL generation functions failed validation: $e');
-      }
-    }
+    // generateAuthUrl/generateTokenUrl are app-owned callbacks and MUST NOT be
+    // invoked here: apps that authenticate outside the widget's OAuth flow
+    // pass generators that throw on purpose, and validate() runs on every
+    // widget init. Any URL problem surfaces at the actual OAuth call site.
   }
 
   /// Converts this configuration to a JSON map
@@ -379,9 +365,14 @@ extension ProviderConfigurationFactories on ProviderConfiguration {
     );
   }
 
-  /// Creates a local server provider configuration (for development/testing)
+  /// Creates a local server provider configuration (for development/testing).
+  ///
+  /// [serverUrl] overrides the provider's default (http://localhost:8080) —
+  /// threaded through [ProviderConfiguration.additionalConfig] and read by
+  /// the provider factory when instantiating the [LocalServerProvider].
   static ProviderConfiguration localServer({
     String displayName = 'Local Development Server',
+    String? serverUrl,
     Widget? logoWidget,
     Map<String, dynamic> additionalConfig = const {},
     bool enabled = true,
@@ -413,7 +404,10 @@ extension ProviderConfigurationFactories on ProviderConfiguration {
       ),
       requiresAccountManagement:
           false, // Local server doesn't need multiple accounts
-      additionalConfig: additionalConfig,
+      additionalConfig: {
+        if (serverUrl != null) 'serverUrl': serverUrl,
+        ...additionalConfig,
+      },
       enabled: enabled,
       configurationId: configurationId,
     );

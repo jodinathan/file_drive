@@ -59,6 +59,14 @@ class FileCloudWidget extends StatefulWidget {
   /// Callback when an image is cropped
   final Function(ImageFileEntry)? onImageCropped;
 
+  /// Called immediately BEFORE [onFilesSelected]/[onImageCropped]/
+  /// [selectionConfig] with the active account and the provider type of the
+  /// selection. Lets the consumer build import metadata (e.g. the
+  /// `FileModel.external` of oni_front) without changing the signature of the
+  /// existing callbacks.
+  final void Function(CloudAccount? account, CloudProviderType providerType)?
+      onSelectionContext;
+
   const FileCloudWidget({
     super.key,
     required this.accountStorage,
@@ -68,6 +76,7 @@ class FileCloudWidget extends StatefulWidget {
     this.initialProvider,
     this.cropConfig,
     this.onImageCropped,
+    this.onSelectionContext,
   });
 
   @override
@@ -1129,8 +1138,22 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       return;
     }
 
-    // Check if this provider requires account management
-    final provider = _providers[_selectedProvider!]!;
+    // Check if this provider requires account management. The instance can be
+    // missing when creation failed at init (config rejected by the factory) —
+    // the provider list is rendered from widget.providers, so a broken entry
+    // is still selectable and must degrade gracefully instead of null-banging.
+    final provider = _providers[_selectedProvider!];
+    if (provider == null) {
+      AppLogger.warning(
+        'Provedor $_selectedProvider sem instância (falha na inicialização) - abortando carregamento',
+        component: 'Files',
+      );
+      setState(() {
+        _error = 'Provedor ${_getProviderName()} indisponível.';
+        _isLoading = false;
+      });
+      return;
+    }
     final requiresAccount = provider.requiresAccountManagement;
 
     if (requiresAccount && _selectedAccount == null) {
@@ -1167,7 +1190,6 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
         }
       }
 
-      final provider = _providers[_selectedProvider!]!;
       final providerConfig = widget.providers.firstWhere(
         (config) => config.type == _selectedProvider,
         orElse: () => throw Exception('Provider configuration not found'),
@@ -1803,6 +1825,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     }
 
     AppLogger.info('   - Using original behavior');
+    _notifySelectionContext();
     // Original behavior for non-crop cases
     if (widget.onFilesSelected != null && _selectedFiles.isNotEmpty) {
       widget.onFilesSelected!(_selectedFiles);
@@ -1812,7 +1835,16 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     if (widget.selectionConfig != null && _selectedFiles.isNotEmpty) {
       widget.selectionConfig!.onSelectionConfirm(_selectedFiles);
     }
-    
+
+  }
+
+  /// Emits the account/provider context of the current selection right before
+  /// the selection callbacks fire (see [FileCloudWidget.onSelectionContext]).
+  void _notifySelectionContext() {
+    final provider = _selectedProvider;
+    if (provider != null) {
+      widget.onSelectionContext?.call(_selectedAccount, provider);
+    }
   }
 
   void _handleCropCompleted(List<ImageFileEntry> croppedFiles) {
@@ -1840,6 +1872,8 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       _showCropPanel = false;
       _croppableImageFiles = [];
     });
+
+    _notifySelectionContext();
 
     // Trigger callback for cropped images
     bool croppedImageCallbackTriggered = false;

@@ -384,9 +384,12 @@ abstract class CloudProviderFactory {
               account: account,
             );
           } else if (providerConfig.type == CloudProviderType.localServer) {
+            final serverUrl =
+                providerConfig.additionalConfig['serverUrl'] as String?;
             return LocalServerProvider(
               configuration: LocalServerProviderConfig(
                 displayName: providerConfig.displayName,
+                serverUrl: serverUrl ?? 'http://localhost:8080',
               ),
               account: account,
             );
@@ -575,43 +578,11 @@ abstract class CloudProviderFactory {
       }
     }
     
-    // Test URL generation functions with validation
-    try {
-      final testState = 'validation_test_12345';
-      final authUrl = config.authUrlGenerator(testState);
-      final tokenUrl = config.tokenUrlGenerator(testState);
-      
-      // Validate generated URLs are well-formed
-      if (!authUrl.hasScheme || authUrl.host.isEmpty) {
-        throw CloudProviderFactoryException(
-          'OAuth authUrlGenerator must return a valid absolute URL with scheme and host',
-          code: 'INVALID_OAUTH_AUTH_URL',
-        );
-      }
-      
-      if (!tokenUrl.hasScheme || tokenUrl.host.isEmpty) {
-        throw CloudProviderFactoryException(
-          'OAuth tokenUrlGenerator must return a valid absolute URL with scheme and host',
-          code: 'INVALID_OAUTH_TOKEN_URL',
-        );
-      }
-      
-      // Check that URLs are different (they should serve different purposes)
-      if (authUrl.toString() == tokenUrl.toString()) {
-        throw CloudProviderFactoryException(
-          'OAuth auth URL and token URL should be different endpoints',
-          code: 'IDENTICAL_OAUTH_URLS',
-        );
-      }
-      
-    } catch (e) {
-      if (e is CloudProviderFactoryException) rethrow;
-      throw CloudProviderFactoryException(
-        'OAuth URL generation validation failed: $e',
-        code: 'OAUTH_URL_GENERATION_ERROR',
-        originalException: e,
-      );
-    }
+    // authUrlGenerator/tokenUrlGenerator are app-owned callbacks and MUST NOT
+    // be invoked here: factory validation runs at provider creation (widget
+    // init), and apps that authenticate outside the widget's OAuth flow pass
+    // generators that throw on purpose. Any URL problem surfaces at the
+    // actual OAuth call site.
   }
   
   /// Validates Local Server configuration properties

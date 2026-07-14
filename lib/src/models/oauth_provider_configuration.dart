@@ -47,10 +47,10 @@ class OAuthProviderConfiguration extends BaseProviderConfiguration {
   /// custom endpoints, feature flags, etc.
   final Map<String, dynamic> additionalConfig;
 
-  /// Creates an OAuth provider configuration with validation
-  /// 
-  /// All parameters are validated during construction. OAuth-specific
-  /// validation includes URL generation testing and scope validation.
+  /// Creates an OAuth provider configuration
+  ///
+  /// Structural properties (redirect scheme, scopes) are checked by
+  /// [validate]; the URL generators are only exercised during the OAuth flow.
   const OAuthProviderConfiguration({
     required super.type,
     required super.displayName,
@@ -84,22 +84,11 @@ class OAuthProviderConfiguration extends BaseProviderConfiguration {
       throw ArgumentError('At least one OAuth scope must be specified');
     }
 
-    // Test URL generation functions with a sample state
-    try {
-      const sampleState = 'validation_test_state';
-      final authUrl = authUrlGenerator(sampleState);
-      final tokenUrl = tokenUrlGenerator(sampleState);
-
-      if (!authUrl.hasScheme || authUrl.host.isEmpty) {
-        throw ArgumentError('authUrlGenerator must return a valid absolute URL');
-      }
-
-      if (!tokenUrl.hasScheme || tokenUrl.host.isEmpty) {
-        throw ArgumentError('tokenUrlGenerator must return a valid absolute URL');
-      }
-    } catch (e) {
-      throw ArgumentError('OAuth URL generation validation failed: $e');
-    }
+    // authUrlGenerator/tokenUrlGenerator are app-owned callbacks and MUST NOT
+    // be invoked here: this validate() runs at provider construction
+    // (BaseCloudProvider), and apps that authenticate outside the widget's
+    // OAuth flow pass generators that throw on purpose. Any URL problem
+    // surfaces at the actual OAuth call site.
   }
 
   @override
