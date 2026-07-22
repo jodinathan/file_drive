@@ -296,6 +296,36 @@ class LocalServerProvider extends BaseCloudProvider {
     }
   }
   
+  /// Sobe [bytes] em uma única requisição e devolve a [FileEntry] resultante
+  /// (parseando o corpo do 201 — o mesmo que o `uploadFile` de progresso
+  /// descarta). `downloadUrl` já vem absoluta via [_parseFileEntry].
+  Future<FileEntry> uploadFileEntry({
+    required String fileName,
+    required List<int> bytes,
+    String? parentId,
+    String? mimeType,
+  }) async {
+    final queryParams = <String, String>{'file_name': fileName};
+    if (parentId != null) queryParams['parent_id'] = parentId;
+
+    final uri = Uri.parse('$serverUrl/api/upload')
+        .replace(queryParameters: queryParams);
+
+    final request = http.Request('POST', uri)
+      ..headers['Authorization'] = 'Bearer $testToken'
+      ..bodyBytes = bytes;
+    if (mimeType != null) request.headers['Content-Type'] = mimeType;
+
+    final response = await http.Response.fromStream(await request.send());
+    if (response.statusCode == 201) {
+      return _parseFileEntry(json.decode(response.body) as Map<String, dynamic>);
+    }
+    throw CloudProviderException(
+      'Upload failed: ${response.statusCode}',
+      statusCode: response.statusCode,
+    );
+  }
+
   @override
   Future<FileListPage> searchByName({
     required String query,

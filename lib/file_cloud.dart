@@ -9,6 +9,7 @@ export 'src/models/account_status.dart';
 export 'src/models/provider_capabilities.dart';
 export 'src/models/selection_config.dart';
 export 'src/models/crop_config.dart';
+export 'src/models/image_stylizer.dart';
 export 'src/models/provider_configuration.dart';
 export 'src/models/base_provider_configuration.dart';
 export 'src/models/oauth_provider_configuration.dart';

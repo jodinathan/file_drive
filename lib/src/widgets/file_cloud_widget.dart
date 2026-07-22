@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import 'package:file_picker/file_picker.dart';
@@ -8,7 +10,9 @@ import '../models/file_entry.dart';
 import '../models/image_file_entry.dart';
 import '../models/selection_config.dart';
 import '../models/crop_config.dart';
+import '../models/image_stylizer.dart';
 import '../providers/base_cloud_provider.dart';
+import '../providers/local_server_provider.dart';
 import '../models/base_provider_configuration.dart';
 import '../models/oauth_provider_configuration.dart';
 import '../models/provider_configuration.dart';
@@ -67,6 +71,12 @@ class FileCloudWidget extends StatefulWidget {
   final void Function(CloudAccount? account, CloudProviderType providerType)?
       onSelectionContext;
 
+  /// Modo de edição OPCIONAL "estilizador" (edição criativa por bytes). Se
+  /// presente E a seleção for imagem, roda no lugar do crop (mutuamente
+  /// exclusivo — o estilizador já contém crop). O file_cloud lê os bytes do
+  /// original, chama este callback e sobe o resultado no provider localServer.
+  final ImageStylizer? imageStylizer;
+
   const FileCloudWidget({
     super.key,
     required this.accountStorage,
@@ -77,6 +87,7 @@ class FileCloudWidget extends StatefulWidget {
     this.cropConfig,
     this.onImageCropped,
     this.onSelectionContext,
+    this.imageStylizer,
   });
 
   @override
@@ -1793,6 +1804,14 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       '   - selectedFiles types: ${_selectedFiles.map((f) => f.runtimeType).toList()}',
     );
 
+    if (widget.imageStylizer != null) {
+      final image = _firstSelectedImage();
+      if (image != null) {
+        _runImageStylizer(image);
+        return;
+      }
+    }
+
     // Check if crop is enabled and we have selected image files
     if (widget.cropConfig != null && _selectedFiles.isNotEmpty) {
       // Try to get both existing ImageFileEntry and convert FileEntry to ImageFileEntry
@@ -1844,6 +1863,110 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
     final provider = _selectedProvider;
     if (provider != null) {
       widget.onSelectionContext?.call(_selectedAccount, provider);
+    }
+  }
+
+  /// Primeiro arquivo de imagem (não-pasta) da seleção atual, ou `null`.
+  FileEntry? _firstSelectedImage() {
+    for (final file in _selectedFiles) {
+      if (!file.isFolder && (file.mimeType ?? '').startsWith('image/')) {
+        return file;
+      }
+    }
+    return null;
+  }
+
+  /// Executa o estilizador: baixa os bytes do original (qualquer provider),
+  /// chama o callback do app, sobe o resultado no localServer (nosso store) e
+  /// troca a seleção pela versão editada. Cancelar (callback devolve `null`)
+  /// aborta a seleção. Origem ≠ destino: o Drive nunca é reescrito.
+  Future<void> _runImageStylizer(FileEntry file) async {
+    final stylizer = widget.imageStylizer;
+    final providerType = _selectedProvider;
+    if (stylizer == null || providerType == null) return;
+
+    final origin = _providers[providerType];
+    if (origin == null) return;
+
+    final localConfig = widget.providers
+        .where((p) => p.type == CloudProviderType.localServer)
+        .cast<BaseProviderConfiguration?>()
+        .firstWhere((_) => true, orElse: () => null);
+    if (localConfig == null) {
+      AppLogger.warning(
+        'imageStylizer sem provider localServer de destino — pulando edição',
+        component: 'FileCloud',
+      );
+      _finishPlainSelection();
+      return;
+    }
+
+    final originalBytes = <int>[];
+    try {
+      await for (final chunk in origin.downloadFile(fileId: file.id)) {
+        originalBytes.addAll(chunk);
+      }
+    } catch (e) {
+      AppLogger.error('Falha ao baixar original p/ estilizador: $e',
+          component: 'FileCloud');
+      _finishPlainSelection();
+      return;
+    }
+
+    if (!mounted) return;
+    final edited = await stylizer(
+      context,
+      bytes: Uint8List.fromList(originalBytes),
+      mimeType: file.mimeType,
+    );
+    if (edited == null) return;
+
+    final dest = (_providers[CloudProviderType.localServer] ??
+        _createProviderInstance(localConfig));
+    if (dest is! LocalServerProvider) {
+      _finishPlainSelection();
+      return;
+    }
+
+    final FileEntry entry;
+    try {
+      entry = await dest.uploadFileEntry(
+        fileName: 'stylized-${DateTime.now().microsecondsSinceEpoch}.jpg',
+        bytes: edited,
+        mimeType: 'image/jpeg',
+      );
+    } catch (e) {
+      AppLogger.error('Falha ao subir editado: $e', component: 'FileCloud');
+      _finishPlainSelection();
+      return;
+    }
+
+    final index = _selectedFiles.indexOf(file);
+    if (index != -1) _selectedFiles[index] = entry;
+
+    if (!mounted) return;
+    widget.onSelectionContext?.call(null, CloudProviderType.localServer);
+    if (widget.onFilesSelected != null && _selectedFiles.isNotEmpty) {
+      widget.onFilesSelected!(_selectedFiles);
+    }
+    if (widget.selectionConfig != null && _selectedFiles.isNotEmpty) {
+      widget.selectionConfig!.onSelectionConfirm(_selectedFiles);
+    }
+  }
+
+  /// Fecha a seleção pelo caminho comum (sem edição) — usado quando o
+  /// estilizador não pode rodar (sem destino, falha de download/upload).
+  /// Guarda `mounted` no topo: é alcançado por caminhos PÓS-`await` (catches de
+  /// download/upload, ramo não-localServer), então nunca emite seleção sobre um
+  /// `State` descartado.
+  void _finishPlainSelection() {
+    if (!mounted) return;
+    _notifySelectionContext();
+    if (widget.onFilesSelected != null && _selectedFiles.isNotEmpty) {
+      widget.onFilesSelected!(_selectedFiles);
+    }
+    if (widget.selectionConfig != null && _selectedFiles.isNotEmpty) {
+      widget.selectionConfig!.onSelectionConfirm(_selectedFiles);
     }
   }
 
@@ -3187,12 +3310,7 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
           ),
           const SizedBox(width: 16),
           TextButton(
-            onPressed: () {
-              setState(() {
-                _selectedFiles.clear();
-                _isSelectionMode = false;
-              });
-            },
+            onPressed: () => Navigator.of(context).maybePop(),
             child: const Text('Cancelar'),
           ),
           const SizedBox(width: 8),
