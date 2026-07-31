@@ -326,6 +326,21 @@ class LocalServerProvider extends BaseCloudProvider {
     );
   }
 
+  /// Garante que exista uma pasta [name] na raiz e devolve seu id (para usar
+  /// como `parentId` em uploads). Lista a raiz e reusa a pasta homônima se já
+  /// existir; senão cria. Devolve null para nome vazio — o chamador então sobe
+  /// na raiz (comportamento anterior).
+  Future<String?> ensureFolderId(String name) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return null;
+    final page = await listFolder();
+    for (final entry in page.entries) {
+      if (entry.isFolder && entry.name == trimmed) return entry.id;
+    }
+    final created = await createFolder(name: trimmed);
+    return created.id;
+  }
+
   @override
   Future<FileListPage> searchByName({
     required String query,

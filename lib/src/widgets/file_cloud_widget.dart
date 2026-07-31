@@ -77,6 +77,12 @@ class FileCloudWidget extends StatefulWidget {
   /// original, chama este callback e sobe o resultado no provider localServer.
   final ImageStylizer? imageStylizer;
 
+  /// Nome da pasta (no provider localServer) que recebe as imagens estilizadas.
+  /// Nulo/vazio = raiz (comportamento anterior). O nome já vem LOCALIZADO pelo
+  /// app; o widget só garante a pasta ([LocalServerProvider.ensureFolderId]) e
+  /// sobe o resultado nela.
+  final String? stylizedFolderName;
+
   const FileCloudWidget({
     super.key,
     required this.accountStorage,
@@ -88,6 +94,7 @@ class FileCloudWidget extends StatefulWidget {
     this.onImageCropped,
     this.onSelectionContext,
     this.imageStylizer,
+    this.stylizedFolderName,
   });
 
   @override
@@ -1928,12 +1935,26 @@ class _FileCloudWidgetState extends State<FileCloudWidget> {
       return;
     }
 
+    String? parentId;
+    final folderName = widget.stylizedFolderName;
+    if (folderName != null && folderName.trim().isNotEmpty) {
+      try {
+        parentId = await dest.ensureFolderId(folderName);
+      } catch (e) {
+        AppLogger.warning(
+          'Falha ao garantir pasta "$folderName" p/ editado (sobe na raiz): $e',
+          component: 'FileCloud',
+        );
+      }
+    }
+
     final FileEntry entry;
     try {
       entry = await dest.uploadFileEntry(
         fileName: 'stylized-${DateTime.now().microsecondsSinceEpoch}.jpg',
         bytes: edited,
         mimeType: 'image/jpeg',
+        parentId: parentId,
       );
     } catch (e) {
       AppLogger.error('Falha ao subir editado: $e', component: 'FileCloud');
